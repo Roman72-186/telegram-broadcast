@@ -2,12 +2,16 @@
 # ============================================================
 # install-vps.sh — Полная установка telegram-broadcast на VPS
 # Использование:
-#   curl -fsSL https://raw.githubusercontent.com/Roman72-186/telegram-broadcast/main/install-vps.sh | bash
-#   или:
-#   chmod +x install-vps.sh && ./install-vps.sh
+#   wget https://raw.githubusercontent.com/Roman72-186/telegram-broadcast/main/install-vps.sh && bash install-vps.sh
 # ============================================================
 
 set -e
+
+# Убираем \r из самого скрипта если запущен с Windows-окончаниями
+if grep -q $'\r' "$0" 2>/dev/null; then
+  sed -i 's/\r$//' "$0"
+  exec bash "$0" "$@"
+fi
 
 # Цвета
 RED='\033[0;31m'
@@ -15,6 +19,15 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m'
+
+# Безопасный read — убирает \r\n и пробелы по краям
+safe_read() {
+  local varname="$1"
+  local input
+  IFS= read -r input
+  input=$(printf '%s' "$input" | tr -d '\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+  eval "$varname=\"\$input\""
+}
 
 echo -e "${CYAN}"
 echo "╔══════════════════════════════════════════════╗"
@@ -50,33 +63,33 @@ echo -e "${GREEN}ОС: ${OS_ID} ${OS_VERSION}${NC}"
 echo ""
 echo -e "${YELLOW}=== Настройка параметров ===${NC}"
 
-# Домен
-read -p "Введите домен (например broadcast.example.com): " DOMAIN
+printf "Введите домен (например broadcast.example.com): "
+safe_read DOMAIN
 if [ -z "$DOMAIN" ]; then
   echo -e "${RED}Домен обязателен для SSL${NC}"
   exit 1
 fi
 
-# Telegram Bot Token
-read -p "Telegram Bot Token: " TG_BOT_TOKEN
+printf "Telegram Bot Token: "
+safe_read TG_BOT_TOKEN
 if [ -z "$TG_BOT_TOKEN" ]; then
   echo -e "${RED}Telegram Bot Token обязателен${NC}"
   exit 1
 fi
 
-# Leadteh API Token
-read -p "Leadteh API Token: " LEADTEH_TOKEN
+printf "Leadteh API Token: "
+safe_read LEADTEH_TOKEN
 if [ -z "$LEADTEH_TOKEN" ]; then
   echo -e "${RED}Leadteh API Token обязателен${NC}"
   exit 1
 fi
 
-# Leadteh Bot ID
-read -p "Leadteh Bot ID [257034]: " LEADTEH_BOT_ID
+printf "Leadteh Bot ID [257034]: "
+safe_read LEADTEH_BOT_ID
 LEADTEH_BOT_ID=${LEADTEH_BOT_ID:-257034}
 
-# Admin Telegram IDs
-read -p "Telegram ID администраторов (через запятую): " ADMIN_IDS
+printf "Telegram ID администраторов (через запятую): "
+safe_read ADMIN_IDS
 if [ -z "$ADMIN_IDS" ]; then
   echo -e "${RED}Нужен хотя бы один ID администратора${NC}"
   exit 1
@@ -89,7 +102,8 @@ CRON_SECRET=$(openssl rand -hex 16)
 APP_PORT=3000
 
 # Репозиторий (GitHub)
-read -p "URL репозитория GitHub [https://github.com/Roman72-186/telegram-broadcast.git]: " REPO_URL
+printf "URL репозитория GitHub [https://github.com/Roman72-186/telegram-broadcast.git]: "
+safe_read REPO_URL
 REPO_URL=${REPO_URL:-https://github.com/Roman72-186/telegram-broadcast.git}
 
 echo ""
@@ -102,7 +116,9 @@ echo "  Админы:      $ADMIN_IDS"
 echo "  Порт:        $APP_PORT"
 echo "  Репо:        $REPO_URL"
 echo ""
-read -p "Всё верно? (y/n): " CONFIRM
+
+printf "Всё верно? (y/n): "
+safe_read CONFIRM
 if [ "$CONFIRM" != "y" ] && [ "$CONFIRM" != "Y" ]; then
   echo "Отменено."
   exit 0
@@ -131,7 +147,7 @@ echo -e "${YELLOW}[2/7] Установка Node.js 20...${NC}"
 if command -v node &>/dev/null; then
   NODE_VER=$(node -v | sed 's/v//' | cut -d. -f1)
   if [ "$NODE_VER" -ge 18 ]; then
-    echo -e "  Node.js $(node -v) уже установлен"
+    echo "  Node.js $(node -v) уже установлен"
   else
     echo "  Node.js слишком старый ($NODE_VER), обновляю..."
     INSTALL_NODE=1
@@ -233,7 +249,6 @@ NGINXEOF
 # Для CentOS/AlmaLinux — другой путь конфигов
 if [[ "$OS_ID" == "centos" || "$OS_ID" == "almalinux" || "$OS_ID" == "rocky" ]]; then
   mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
-  # Добавляем include если его нет
   if ! grep -q "sites-enabled" /etc/nginx/nginx.conf; then
     sed -i '/http {/a \    include /etc/nginx/sites-enabled/*;' /etc/nginx/nginx.conf
   fi
@@ -243,9 +258,7 @@ fi
 ln -sf /etc/nginx/sites-available/telegram-broadcast /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
 
-# Проверяем конфигурацию
 nginx -t
-
 systemctl restart nginx
 echo "  Nginx настроен"
 
@@ -261,12 +274,15 @@ elif [[ "$OS_ID" == "centos" || "$OS_ID" == "almalinux" || "$OS_ID" == "rocky" ]
 fi
 
 echo "  Получение SSL-сертификата для ${DOMAIN}..."
-echo "  (Убедитесь, что DNS A-запись ${DOMAIN} → $(curl -s ifconfig.me) уже настроена)"
+echo "  (DNS A-запись ${DOMAIN} должна указывать на $(curl -s ifconfig.me 2>/dev/null || echo 'этот сервер'))"
 echo ""
-read -p "DNS настроен и указывает на этот сервер? (y/n): " DNS_READY
+
+printf "DNS настроен и указывает на этот сервер? (y/n): "
+safe_read DNS_READY
 
 if [ "$DNS_READY" = "y" ] || [ "$DNS_READY" = "Y" ]; then
-  read -p "Email для Let's Encrypt: " LE_EMAIL
+  printf "Email для Let's Encrypt: "
+  safe_read LE_EMAIL
   certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos --email "$LE_EMAIL" --redirect
   echo -e "  ${GREEN}SSL установлен!${NC}"
 else
@@ -301,10 +317,7 @@ echo -e "${YELLOW}Запуск приложения...${NC}"
 
 cd "$APP_DIR"
 
-# Останавливаем если уже запущено
 pm2 delete broadcast 2>/dev/null || true
-
-# Запускаем
 pm2 start server.js --name broadcast --cwd "$APP_DIR"
 pm2 save
 pm2 startup systemd -u root --hp /root 2>/dev/null || pm2 startup
