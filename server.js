@@ -12,6 +12,18 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ============================================
+// API: Проверка админа
+// ============================================
+app.get('/api/auth', (req, res) => {
+  const telegramId = req.query.telegram_id;
+  if (!telegramId) {
+    return res.json({ admin: false });
+  }
+  const isAdmin = config.adminTelegramIds.includes(String(telegramId));
+  return res.json({ admin: isAdmin });
+});
+
+// ============================================
 // API: Теги
 // ============================================
 app.get('/api/tags', async (req, res) => {

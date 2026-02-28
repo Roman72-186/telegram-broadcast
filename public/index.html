@@ -348,10 +348,19 @@
       }
 
       // Проверяем через API что пользователь — админ
-      adminTelegramId = String(userId);
+      try {
+        const r = await fetch(`/api/auth?telegram_id=${userId}`);
+        const data = await r.json();
+        if (!data.admin) {
+          document.getElementById('accessDenied').classList.remove('hidden');
+          return;
+        }
+      } catch (e) {
+        document.getElementById('accessDenied').classList.remove('hidden');
+        return;
+      }
 
-      // Для проверки на клиенте загружаем список админов
-      // (фактическая проверка на сервере при сохранении)
+      adminTelegramId = String(userId);
       document.getElementById('app').classList.remove('hidden');
     }
 
