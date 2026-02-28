@@ -131,6 +131,37 @@
     input[type="number"]::-webkit-outer-spin-button {
       -webkit-appearance: none;
     }
+
+    .photo-preview {
+      max-width: 100%;
+      max-height: 160px;
+      border-radius: 8px;
+      object-fit: cover;
+    }
+
+    .char-counter {
+      font-size: 11px;
+      opacity: 0.5;
+      text-align: right;
+    }
+
+    .char-counter.warning {
+      color: #e53e3e;
+      opacity: 1;
+    }
+
+    .msg-card {
+      background-color: var(--tg-theme-secondary-bg-color);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    .msg-card:active {
+      opacity: 0.7;
+    }
   </style>
 </head>
 <body class="pb-24">
@@ -157,39 +188,67 @@
 
     <!-- TAB: Создание рассылки -->
     <div id="createTab">
-      <!-- Индикатор шагов -->
+      <!-- Индикатор шагов (основные: 1, 3, 4, 5 — шаг 2 подшаг) -->
       <div class="step-indicator flex items-center justify-center gap-2 mb-6">
         <div class="step active" data-step="1"></div>
-        <div class="step" data-step="2"></div>
         <div class="step" data-step="3"></div>
         <div class="step" data-step="4"></div>
         <div class="step" data-step="5"></div>
       </div>
 
-      <!-- Шаг 1: Текст сообщения -->
+      <!-- Шаг 1: Список сообщений -->
       <div id="step1" class="step-content fade-in">
-        <h2 class="text-lg font-bold mb-1">Текст сообщения</h2>
-        <p class="text-xs opacity-60 mb-3">Поддержка Markdown: *жирный*, _курсив_, `код`</p>
-        <textarea id="messageText" rows="6" placeholder="Введите текст рассылки..."
-          class="input-field w-full rounded-xl px-4 py-3 text-sm resize-none mb-3"
-          oninput="updatePreview()"></textarea>
-        <div id="previewToggle" class="hidden">
-          <button onclick="togglePreview()" class="text-xs underline opacity-60 mb-2">Предпросмотр</button>
-          <div id="previewBox" class="hidden broadcast-card text-sm preview-text"></div>
-        </div>
+        <h2 class="text-lg font-bold mb-1">Сообщения</h2>
+        <p class="text-xs opacity-60 mb-3">От 1 до 5 сообщений, идут подряд получателю</p>
+
+        <div id="messagesList"></div>
+
+        <button id="addMessageBtn" onclick="addMessage()"
+          class="w-full py-2 rounded-xl text-sm btn-secondary mt-2">
+          + Добавить сообщение
+        </button>
       </div>
 
-      <!-- Шаг 2: Кнопки -->
+      <!-- Шаг 2: Редактор сообщения (подшаг) -->
       <div id="step2" class="step-content hidden fade-in">
-        <h2 class="text-lg font-bold mb-1">Кнопки</h2>
-        <p class="text-xs opacity-60 mb-3">Макс. 6 кнопок (3 строки по 2). Необязательно.</p>
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-lg font-bold" id="editorTitle">Сообщение 1 из 1</h2>
+          <button onclick="finishEditMessage()" class="text-sm btn-secondary rounded-lg px-3 py-1">Готово</button>
+        </div>
 
-        <div id="buttonsList"></div>
+        <!-- Фото URL -->
+        <div class="mb-3">
+          <label class="text-sm font-medium mb-1 block">Фото (необязательно)</label>
+          <input type="text" id="editorPhotoUrl" placeholder="https://example.com/photo.jpg"
+            class="input-field w-full rounded-lg px-3 py-2 text-sm"
+            oninput="onEditorPhotoInput()" />
+          <div id="editorPhotoPreview" class="mt-2 hidden">
+            <img id="editorPhotoImg" class="photo-preview" alt="Превью фото"
+              onerror="this.parentElement.classList.add('hidden')" />
+          </div>
+        </div>
 
-        <button id="addButtonBtn" onclick="addButton()"
-          class="w-full py-2 rounded-xl text-sm btn-secondary mt-2">
-          + Добавить кнопку
-        </button>
+        <!-- Текст -->
+        <div class="mb-3">
+          <div class="flex items-center justify-between mb-1">
+            <label class="text-sm font-medium">Текст сообщения</label>
+            <div id="editorCharCounter" class="char-counter hidden">0 / 1024</div>
+          </div>
+          <p class="text-xs opacity-60 mb-1">Поддержка Markdown: *жирный*, _курсив_, `код`</p>
+          <textarea id="editorText" rows="6" placeholder="Введите текст..."
+            class="input-field w-full rounded-xl px-4 py-3 text-sm resize-none"
+            oninput="onEditorTextInput()"></textarea>
+        </div>
+
+        <!-- Кнопки -->
+        <div class="mb-3">
+          <label class="text-sm font-medium mb-1 block">Кнопки (макс. 6)</label>
+          <div id="editorButtonsList"></div>
+          <button id="editorAddButtonBtn" onclick="editorAddButton()"
+            class="w-full py-2 rounded-xl text-sm btn-secondary mt-2">
+            + Добавить кнопку
+          </button>
+        </div>
       </div>
 
       <!-- Шаг 3: Фильтры по тегам -->
@@ -262,15 +321,7 @@
       <div id="step5" class="step-content hidden fade-in">
         <h2 class="text-lg font-bold mb-3">Подтверждение</h2>
 
-        <div class="broadcast-card mb-3">
-          <div class="text-xs opacity-50 mb-1">Текст сообщения:</div>
-          <div id="confirmText" class="text-sm preview-text mb-2"></div>
-        </div>
-
-        <div id="confirmButtons" class="broadcast-card mb-3 hidden">
-          <div class="text-xs opacity-50 mb-1">Кнопки:</div>
-          <div id="confirmButtonsList" class="text-sm"></div>
-        </div>
+        <div id="confirmMessages"></div>
 
         <div class="broadcast-card mb-3">
           <div class="text-xs opacity-50 mb-1">Фильтры:</div>
@@ -289,7 +340,7 @@
       </div>
 
       <!-- Навигация -->
-      <div class="flex gap-3 mt-6">
+      <div id="navButtons" class="flex gap-3 mt-6">
         <button id="prevBtn" onclick="prevStep()"
           class="flex-1 py-3 rounded-xl text-sm font-medium btn-secondary hidden">
           Назад
@@ -319,12 +370,15 @@
     // ============================================
     const tg = window.Telegram?.WebApp;
     let currentStep = 1;
-    const totalSteps = 5;
+    const mainSteps = [1, 3, 4, 5]; // Основные шаги (2 — подшаг)
     let allTags = [];
     let selectedIncludeTags = [];
     let selectedExcludeTags = [];
-    let buttons = [];
     let adminTelegramId = null;
+
+    // Мультисообщения
+    let messages = [{ photo_url: '', text: '', buttons: [] }];
+    let currentMessageIndex = 0;
 
     // Инициализация Telegram WebApp
     if (tg) {
@@ -337,17 +391,16 @@
       const userId = tg?.initDataUnsafe?.user?.id;
 
       if (!userId) {
-        // Для локальной разработки — показать интерфейс
         if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
           adminTelegramId = 'dev';
           document.getElementById('app').classList.remove('hidden');
+          renderMessagesList();
           return;
         }
         document.getElementById('accessDenied').classList.remove('hidden');
         return;
       }
 
-      // Проверяем через API что пользователь — админ
       try {
         const r = await fetch(`/api/auth?telegram_id=${userId}`);
         const data = await r.json();
@@ -362,6 +415,7 @@
 
       adminTelegramId = String(userId);
       document.getElementById('app').classList.remove('hidden');
+      renderMessagesList();
     }
 
     init();
@@ -393,8 +447,9 @@
     // Навигация по шагам
     // ============================================
     function showStep(step) {
-      for (let i = 1; i <= totalSteps; i++) {
-        const el = document.getElementById(`step${i}`);
+      const allSteps = [1, 2, 3, 4, 5];
+      for (const s of allSteps) {
+        const el = document.getElementById(`step${s}`);
         if (el) el.classList.add('hidden');
       }
 
@@ -404,25 +459,38 @@
         current.classList.add('fade-in');
       }
 
-      // Обновляем индикатор
+      // Обновляем индикатор (только основные шаги)
+      const indicatorStep = step === 2 ? 1 : step; // Шаг 2 показывает индикатор шага 1
       document.querySelectorAll('.step-indicator .step').forEach((dot) => {
         const s = parseInt(dot.dataset.step);
         dot.classList.remove('active', 'done');
-        if (s === step) dot.classList.add('active');
-        else if (s < step) dot.classList.add('done');
+        if (s === indicatorStep) dot.classList.add('active');
+        else if (s < indicatorStep) dot.classList.add('done');
       });
+
+      // Навигация: скрыть при подшаге 2
+      const navButtons = document.getElementById('navButtons');
+      if (step === 2) {
+        navButtons.classList.add('hidden');
+      } else {
+        navButtons.classList.remove('hidden');
+      }
 
       // Кнопки навигации
       document.getElementById('prevBtn').classList.toggle('hidden', step === 1);
       const nextBtn = document.getElementById('nextBtn');
 
-      if (step === totalSteps) {
+      if (step === 5) {
         nextBtn.textContent = 'Запланировать рассылку';
       } else {
         nextBtn.textContent = 'Далее';
       }
 
       // Загрузка данных для шагов
+      if (step === 1) {
+        renderMessagesList();
+      }
+
       if (step === 3 && allTags.length === 0) {
         loadTags();
       }
@@ -435,27 +503,22 @@
     }
 
     function nextStep() {
-      // Валидация текущего шага
       if (currentStep === 1) {
-        const text = document.getElementById('messageText').value.trim();
-        if (!text) {
-          showAlert('Введите текст сообщения');
-          return;
+        // Валидация: хотя бы 1 сообщение с текстом
+        for (let i = 0; i < messages.length; i++) {
+          if (!messages[i].text.trim()) {
+            showAlert(`Заполните текст сообщения ${i + 1}`);
+            return;
+          }
         }
+        // Шаг 1 → Шаг 3 (пропуская шаг 2)
+        showStep(3);
+        return;
       }
 
-      if (currentStep === 2) {
-        // Валидация кнопок (если есть)
-        for (const btn of buttons) {
-          if (!btn.text.trim()) {
-            showAlert('Заполните текст всех кнопок');
-            return;
-          }
-          if (!btn.value.trim()) {
-            showAlert('Заполните значение (URL или параметр) для всех кнопок');
-            return;
-          }
-        }
+      if (currentStep === 3) {
+        showStep(4);
+        return;
       }
 
       if (currentStep === 4) {
@@ -467,38 +530,223 @@
             return;
           }
         }
-      }
-
-      if (currentStep === totalSteps) {
-        saveBroadcast();
+        showStep(5);
         return;
       }
 
-      showStep(currentStep + 1);
+      if (currentStep === 5) {
+        saveBroadcast();
+        return;
+      }
     }
 
     function prevStep() {
-      if (currentStep > 1) {
-        showStep(currentStep - 1);
+      if (currentStep === 3) {
+        showStep(1);
+      } else if (currentStep === 4) {
+        showStep(3);
+      } else if (currentStep === 5) {
+        showStep(4);
       }
     }
 
     // ============================================
-    // Шаг 1: Текст и предпросмотр
+    // Шаг 1: Список сообщений
     // ============================================
-    function updatePreview() {
-      const text = document.getElementById('messageText').value;
-      const toggle = document.getElementById('previewToggle');
-      toggle.classList.toggle('hidden', !text.trim());
+    function renderMessagesList() {
+      const container = document.getElementById('messagesList');
+      container.innerHTML = '';
+
+      messages.forEach((msg, i) => {
+        const card = document.createElement('div');
+        card.className = 'msg-card fade-in';
+
+        const textPreview = msg.text
+          ? (msg.text.length > 60 ? msg.text.slice(0, 60) + '...' : msg.text)
+          : '(пустое сообщение)';
+
+        const photoIcon = msg.photo_url ? '<span class="text-xs opacity-50 mr-2">📷</span>' : '';
+        const btnCount = msg.buttons.length > 0
+          ? `<span class="text-xs opacity-40 ml-2">${msg.buttons.length} кн.</span>`
+          : '';
+
+        const deleteBtn = messages.length > 1
+          ? `<button onclick="event.stopPropagation(); removeMessage(${i})" class="text-xs text-red-500 ml-2">✕</button>`
+          : '';
+
+        card.innerHTML = `
+          <div class="flex items-start justify-between">
+            <div class="flex-1" onclick="editMessage(${i})">
+              <div class="flex items-center mb-1">
+                <span class="text-xs font-medium opacity-60">Сообщение ${i + 1}</span>
+                ${btnCount}
+                ${deleteBtn}
+              </div>
+              <div class="text-sm preview-text">${photoIcon}${escapeHtml(textPreview)}</div>
+            </div>
+            <button onclick="editMessage(${i})" class="text-xs btn-secondary rounded-lg px-3 py-1 ml-2 shrink-0">
+              Редактировать
+            </button>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+
+      // Кнопка «Добавить сообщение»
+      document.getElementById('addMessageBtn').classList.toggle('hidden', messages.length >= 5);
     }
 
-    function togglePreview() {
-      const box = document.getElementById('previewBox');
-      box.classList.toggle('hidden');
-      if (!box.classList.contains('hidden')) {
-        const text = document.getElementById('messageText').value;
-        box.innerHTML = formatMarkdown(text);
+    function addMessage() {
+      if (messages.length >= 5) {
+        showAlert('Максимум 5 сообщений');
+        return;
       }
+      messages.push({ photo_url: '', text: '', buttons: [] });
+      renderMessagesList();
+      // Сразу открыть редактор нового сообщения
+      editMessage(messages.length - 1);
+    }
+
+    function removeMessage(index) {
+      if (messages.length <= 1) return;
+      messages.splice(index, 1);
+      renderMessagesList();
+    }
+
+    function editMessage(index) {
+      currentMessageIndex = index;
+      const msg = messages[index];
+
+      document.getElementById('editorTitle').textContent =
+        `Сообщение ${index + 1} из ${messages.length}`;
+
+      document.getElementById('editorPhotoUrl').value = msg.photo_url || '';
+      document.getElementById('editorText').value = msg.text || '';
+
+      // Показать превью фото
+      onEditorPhotoInput();
+      // Обновить счётчик
+      onEditorTextInput();
+      // Отрисовать кнопки
+      renderEditorButtons();
+
+      showStep(2);
+    }
+
+    function finishEditMessage() {
+      // Сохраняем данные из редактора в messages[]
+      const msg = messages[currentMessageIndex];
+      msg.photo_url = document.getElementById('editorPhotoUrl').value.trim();
+      msg.text = document.getElementById('editorText').value;
+      // Кнопки уже сохраняются на лету в editorUpdateButton
+
+      showStep(1);
+    }
+
+    // ============================================
+    // Шаг 2: Редактор сообщения
+    // ============================================
+    function onEditorPhotoInput() {
+      const url = document.getElementById('editorPhotoUrl').value.trim();
+      const preview = document.getElementById('editorPhotoPreview');
+      const img = document.getElementById('editorPhotoImg');
+      const counter = document.getElementById('editorCharCounter');
+
+      if (url) {
+        img.src = url;
+        preview.classList.remove('hidden');
+        counter.classList.remove('hidden');
+      } else {
+        preview.classList.add('hidden');
+        counter.classList.add('hidden');
+      }
+
+      // Сохраняем на лету
+      messages[currentMessageIndex].photo_url = url;
+      onEditorTextInput();
+    }
+
+    function onEditorTextInput() {
+      const text = document.getElementById('editorText').value;
+      const hasPhoto = document.getElementById('editorPhotoUrl').value.trim();
+      const counter = document.getElementById('editorCharCounter');
+
+      // Сохраняем на лету
+      messages[currentMessageIndex].text = text;
+
+      if (hasPhoto) {
+        counter.classList.remove('hidden');
+        const len = text.length;
+        counter.textContent = `${len} / 1024`;
+        counter.classList.toggle('warning', len > 1024);
+      } else {
+        counter.classList.add('hidden');
+      }
+    }
+
+    // Кнопки редактора
+    function editorAddButton() {
+      const btns = messages[currentMessageIndex].buttons;
+      if (btns.length >= 6) {
+        showAlert('Максимум 6 кнопок');
+        return;
+      }
+      btns.push({ text: '', type: 'url', value: '' });
+      renderEditorButtons();
+    }
+
+    function editorRemoveButton(index) {
+      messages[currentMessageIndex].buttons.splice(index, 1);
+      renderEditorButtons();
+    }
+
+    function editorUpdateButton(index, field, value) {
+      messages[currentMessageIndex].buttons[index][field] = value;
+      // Если тип изменился — перерисовать для обновления placeholder
+      if (field === 'type') {
+        renderEditorButtons();
+      }
+    }
+
+    function renderEditorButtons() {
+      const btns = messages[currentMessageIndex].buttons;
+      const container = document.getElementById('editorButtonsList');
+      container.innerHTML = '';
+
+      document.getElementById('editorAddButtonBtn').classList.toggle('hidden', btns.length >= 6);
+
+      btns.forEach((btn, i) => {
+        const div = document.createElement('div');
+        div.className = 'broadcast-card mb-2 fade-in';
+
+        let placeholder = 'https://example.com';
+        if (btn.type === 'command') placeholder = '/b или /start promo';
+        else if (btn.type === 'start') placeholder = 'Параметр (например: promo_123)';
+
+        div.innerHTML = `
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-medium opacity-60">Кнопка ${i + 1}</span>
+            <button onclick="editorRemoveButton(${i})" class="text-xs text-red-500">Удалить</button>
+          </div>
+          <input type="text" placeholder="Текст кнопки" value="${escapeAttr(btn.text)}"
+            oninput="editorUpdateButton(${i}, 'text', this.value)"
+            class="input-field w-full rounded-lg px-3 py-2 text-sm mb-2" />
+          <div class="flex gap-2 mb-2">
+            <select onchange="editorUpdateButton(${i}, 'type', this.value)"
+              class="input-field rounded-lg px-3 py-2 text-sm">
+              <option value="url" ${btn.type === 'url' ? 'selected' : ''}>Ссылка (URL)</option>
+              <option value="command" ${btn.type === 'command' ? 'selected' : ''}>Команда</option>
+              <option value="start" ${btn.type === 'start' ? 'selected' : ''}>Команда (/start)</option>
+            </select>
+          </div>
+          <input type="text"
+            placeholder="${placeholder}"
+            value="${escapeAttr(btn.value)}"
+            oninput="editorUpdateButton(${i}, 'value', this.value)"
+            class="input-field w-full rounded-lg px-3 py-2 text-sm" />
+        `;
+        container.appendChild(div);
+      });
     }
 
     function formatMarkdown(text) {
@@ -509,62 +757,6 @@
         .replace(/\*([^*]+)\*/g, '<b>$1</b>')
         .replace(/_([^_]+)_/g, '<i>$1</i>')
         .replace(/`([^`]+)`/g, '<code style="background:rgba(0,0,0,0.1);padding:1px 4px;border-radius:3px;">$1</code>');
-    }
-
-    // ============================================
-    // Шаг 2: Кнопки
-    // ============================================
-    function addButton() {
-      if (buttons.length >= 6) {
-        showAlert('Максимум 6 кнопок');
-        return;
-      }
-
-      buttons.push({ text: '', type: 'url', value: '' });
-      renderButtons();
-    }
-
-    function removeButton(index) {
-      buttons.splice(index, 1);
-      renderButtons();
-    }
-
-    function updateButton(index, field, value) {
-      buttons[index][field] = value;
-    }
-
-    function renderButtons() {
-      const container = document.getElementById('buttonsList');
-      container.innerHTML = '';
-
-      document.getElementById('addButtonBtn').classList.toggle('hidden', buttons.length >= 6);
-
-      buttons.forEach((btn, i) => {
-        const div = document.createElement('div');
-        div.className = 'broadcast-card mb-2 fade-in';
-        div.innerHTML = `
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-medium opacity-60">Кнопка ${i + 1}</span>
-            <button onclick="removeButton(${i})" class="text-xs text-red-500">Удалить</button>
-          </div>
-          <input type="text" placeholder="Текст кнопки" value="${escapeAttr(btn.text)}"
-            oninput="updateButton(${i}, 'text', this.value)"
-            class="input-field w-full rounded-lg px-3 py-2 text-sm mb-2" />
-          <div class="flex gap-2 mb-2">
-            <select onchange="updateButton(${i}, 'type', this.value)"
-              class="input-field rounded-lg px-3 py-2 text-sm">
-              <option value="url" ${btn.type === 'url' ? 'selected' : ''}>Ссылка (URL)</option>
-              <option value="start" ${btn.type === 'start' ? 'selected' : ''}>Команда (/start)</option>
-            </select>
-          </div>
-          <input type="text"
-            placeholder="${btn.type === 'url' ? 'https://example.com' : 'Параметр (например: promo_123)'}"
-            value="${escapeAttr(btn.value)}"
-            oninput="updateButton(${i}, 'value', this.value)"
-            class="input-field w-full rounded-lg px-3 py-2 text-sm" />
-        `;
-        container.appendChild(div);
-      });
     }
 
     // ============================================
@@ -597,7 +789,6 @@
       const container = document.getElementById(containerId);
       container.innerHTML = '';
 
-      // Объединяем все теги (из API + пользовательские выбранные)
       const allDisplayTags = [...new Set([...tags, ...selected])];
 
       for (const tag of allDisplayTags) {
@@ -648,7 +839,6 @@
 
         if (selectedIncludeTags.length === 0 && selectedExcludeTags.length === 0) {
           el.innerHTML = '<span class="text-sm opacity-60">Будут выбраны все контакты с telegram_id</span>';
-          // Загрузим общее количество
           try {
             const r = await fetch('/api/contacts?count_only=true');
             const data = await r.json();
@@ -684,7 +874,6 @@
       document.getElementById('scheduleFields').classList.toggle('hidden', checked);
 
       if (!checked) {
-        // Установить значения по умолчанию
         const now = new Date();
         now.setHours(now.getHours() + 3); // Примерно Москва
         const dateStr = now.toISOString().split('T')[0];
@@ -699,21 +888,37 @@
     // Шаг 5: Подтверждение
     // ============================================
     function fillConfirmation() {
-      // Текст
-      const text = document.getElementById('messageText').value;
-      document.getElementById('confirmText').innerHTML = formatMarkdown(text);
+      // Сообщения
+      const container = document.getElementById('confirmMessages');
+      container.innerHTML = '';
 
-      // Кнопки
-      const confirmBtns = document.getElementById('confirmButtons');
-      const confirmBtnsList = document.getElementById('confirmButtonsList');
-      if (buttons.length > 0) {
-        confirmBtns.classList.remove('hidden');
-        confirmBtnsList.innerHTML = buttons
-          .map((b) => `<div class="mb-1">[${escapeHtml(b.text)}] → ${b.type === 'url' ? escapeHtml(b.value) : '/start ' + escapeHtml(b.value)}</div>`)
-          .join('');
-      } else {
-        confirmBtns.classList.add('hidden');
-      }
+      messages.forEach((msg, i) => {
+        const card = document.createElement('div');
+        card.className = 'broadcast-card mb-3';
+
+        let html = `<div class="text-xs opacity-50 mb-1">Сообщение ${i + 1} из ${messages.length}:</div>`;
+
+        if (msg.photo_url) {
+          html += `<img src="${escapeAttr(msg.photo_url)}" class="photo-preview mb-2"
+            onerror="this.style.display='none'" />`;
+        }
+
+        html += `<div class="text-sm preview-text mb-2">${formatMarkdown(msg.text)}</div>`;
+
+        if (msg.buttons.length > 0) {
+          html += '<div class="text-xs opacity-50 mt-1">Кнопки:</div>';
+          html += msg.buttons.map((b) => {
+            let label;
+            if (b.type === 'url') label = escapeHtml(b.value);
+            else if (b.type === 'command') label = escapeHtml(b.value);
+            else label = '/start ' + escapeHtml(b.value);
+            return `<div class="text-xs mb-0.5">[${escapeHtml(b.text)}] → ${label}</div>`;
+          }).join('');
+        }
+
+        card.innerHTML = html;
+        container.appendChild(card);
+      });
 
       // Фильтры
       const filtersHtml = [];
@@ -774,23 +979,19 @@
         } else {
           const date = document.getElementById('scheduleDate').value;
           const time = document.getElementById('scheduleTime').value;
-          // Преобразуем MSK (UTC+3) в UTC
           scheduledAt = new Date(`${date}T${time}:00+03:00`).toISOString();
         }
 
-        // Для кнопок типа start формируем deep link
-        const processedButtons = buttons.map((btn) => {
-          if (btn.type === 'start') {
-            // Значение — просто параметр, полный URL будет сформирован позже
-            // когда будем знать username бота
-            return { text: btn.text, type: 'start', value: btn.value };
-          }
-          return { ...btn };
-        });
-
         const body = {
-          text: document.getElementById('messageText').value.trim(),
-          buttons: processedButtons,
+          messages: messages.map((msg) => ({
+            photo_url: msg.photo_url || '',
+            text: msg.text.trim(),
+            buttons: msg.buttons.map((btn) => ({
+              text: btn.text,
+              type: btn.type,
+              value: btn.value,
+            })),
+          })),
           filters: {
             include_tags: selectedIncludeTags,
             exclude_tags: selectedExcludeTags,
@@ -824,13 +1025,12 @@
     }
 
     function resetForm() {
-      document.getElementById('messageText').value = '';
-      buttons = [];
+      messages = [{ photo_url: '', text: '', buttons: [] }];
+      currentMessageIndex = 0;
       selectedIncludeTags = [];
       selectedExcludeTags = [];
       document.getElementById('sendNow').checked = true;
       document.getElementById('scheduleFields').classList.add('hidden');
-      renderButtons();
       showStep(1);
     }
 
@@ -885,19 +1085,43 @@
             ? `<button onclick="deleteBroadcast('${b.id}')" class="text-xs text-red-500 mt-2">Отменить</button>`
             : '';
 
-          const textPreview = b.text.length > 80 ? b.text.slice(0, 80) + '...' : b.text;
+          // Поддержка нового формата (messages[]) и старого (text)
+          let textPreview = '';
+          let msgCount = 0;
+          let totalButtons = 0;
+          let hasPhoto = false;
+
+          if (Array.isArray(b.messages) && b.messages.length > 0) {
+            msgCount = b.messages.length;
+            textPreview = b.messages[0].text || '';
+            hasPhoto = b.messages.some((m) => m.photo_url);
+            totalButtons = b.messages.reduce((sum, m) => sum + (m.buttons?.length || 0), 0);
+          } else {
+            msgCount = 1;
+            textPreview = b.text || '';
+            totalButtons = b.buttons?.length || 0;
+          }
+
+          if (textPreview.length > 80) textPreview = textPreview.slice(0, 80) + '...';
+
           const tagsInfo = [];
           if (b.filters?.include_tags?.length) tagsInfo.push('+ ' + b.filters.include_tags.join(', '));
           if (b.filters?.exclude_tags?.length) tagsInfo.push('- ' + b.filters.exclude_tags.join(', '));
 
+          const photoLabel = hasPhoto ? '<span class="text-xs opacity-40 mr-1">📷</span>' : '';
+          const msgLabel = msgCount > 1 ? `<span class="text-xs opacity-40">${msgCount} сообщ.</span>` : '';
+
           card.innerHTML = `
             <div class="flex items-start justify-between mb-1">
-              <div class="text-sm font-medium flex-1 mr-2 preview-text">${escapeHtml(textPreview)}</div>
+              <div class="text-sm font-medium flex-1 mr-2 preview-text">${photoLabel}${escapeHtml(textPreview)}</div>
               <span class="status-badge ${statusClass}">${statusText}</span>
             </div>
             ${tagsInfo.length ? `<div class="text-xs opacity-50">${escapeHtml(tagsInfo.join(' | '))}</div>` : ''}
-            <div class="text-xs opacity-40 mt-1">${dateStr} (МСК)</div>
-            ${b.buttons?.length ? `<div class="text-xs opacity-40">Кнопок: ${b.buttons.length}</div>` : ''}
+            <div class="flex items-center gap-2 mt-1">
+              <span class="text-xs opacity-40">${dateStr} (МСК)</span>
+              ${msgLabel}
+            </div>
+            ${totalButtons ? `<div class="text-xs opacity-40">Кнопок: ${totalButtons}</div>` : ''}
             ${info}
             ${deleteBtn}
           `;

@@ -105,11 +105,8 @@ app.get('/api/contacts', async (req, res) => {
 // ============================================
 app.post('/api/broadcast/save', (req, res) => {
   try {
-    const { text, buttons, filters, scheduled_at, created_by } = req.body;
+    const { messages, text, buttons, filters, scheduled_at, created_by } = req.body;
 
-    if (!text || !text.trim()) {
-      return res.status(400).json({ error: 'Текст сообщения обязателен' });
-    }
     if (!created_by) {
       return res.status(400).json({ error: 'created_by обязателен' });
     }
@@ -119,13 +116,51 @@ app.post('/api/broadcast/save', (req, res) => {
       return res.status(403).json({ error: 'Доступ запрещён' });
     }
 
+    // Нормализация: новый формат (messages) или старый (text + buttons)
+    let normalizedMessages;
+    if (Array.isArray(messages) && messages.length > 0) {
+      if (messages.length > 5) {
+        return res.status(400).json({ error: 'Максимум 5 сообщений' });
+      }
+      for (let i = 0; i < messages.length; i++) {
+        const msg = messages[i];
+        if (!msg.text || !msg.text.trim()) {
+          return res.status(400).json({ error: `Текст сообщения ${i + 1} обязателен` });
+        }
+        if (msg.photo_url && msg.photo_url.trim()) {
+          try {
+            new URL(msg.photo_url);
+          } catch {
+            return res.status(400).json({ error: `Невалидный URL фото в сообщении ${i + 1}` });
+          }
+        }
+        if (Array.isArray(msg.buttons) && msg.buttons.length > 6) {
+          return res.status(400).json({ error: `Максимум 6 кнопок в сообщении ${i + 1}` });
+        }
+      }
+      normalizedMessages = messages.map((msg) => ({
+        photo_url: msg.photo_url?.trim() || '',
+        text: msg.text.trim(),
+        buttons: Array.isArray(msg.buttons) ? msg.buttons.slice(0, 6) : [],
+      }));
+    } else {
+      // Старый формат
+      if (!text || !text.trim()) {
+        return res.status(400).json({ error: 'Текст сообщения обязателен' });
+      }
+      normalizedMessages = [{
+        photo_url: '',
+        text: text.trim(),
+        buttons: Array.isArray(buttons) ? buttons.slice(0, 6) : [],
+      }];
+    }
+
     const id = generateId();
     const now = new Date().toISOString();
 
     const broadcast = {
       id,
-      text: text.trim(),
-      buttons: Array.isArray(buttons) ? buttons.slice(0, 6) : [],
+      messages: normalizedMessages,
       filters: {
         include_tags: filters?.include_tags || [],
         exclude_tags: filters?.exclude_tags || [],
@@ -293,42 +328,67 @@ async function sendBroadcast(broadcast) {
     console.error('Не удалось получить username бота:', e.message);
   }
 
-  const inlineKeyboard = buildKeyboard(broadcast.buttons, botUsername);
+  // Нормализация: поддержка старого формата (text + buttons) и нового (messages[])
+  let messages;
+  if (Array.isArray(broadcast.messages) && broadcast.messages.length > 0) {
+    messages = broadcast.messages;
+  } else {
+    messages = [{
+      photo_url: '',
+      text: broadcast.text || '',
+      buttons: broadcast.buttons || [],
+    }];
+  }
+
+  // Подготовим клавиатуры для каждого сообщения
+  const prepared = messages.map((msg) => ({
+    text: msg.text || '',
+    photoUrl: msg.photo_url || '',
+    keyboard: buildKeyboard(msg.buttons || [], botUsername),
+  }));
 
   let sent = 0;
   let failed = 0;
 
   for (const contact of recipients) {
-    try {
-      const body = {
-        chat_id: String(contact.telegram_id),
-        text: broadcast.text,
-        parse_mode: 'Markdown',
-      };
+    let contactFailed = false;
 
-      if (inlineKeyboard.length > 0) {
-        body.reply_markup = { inline_keyboard: inlineKeyboard };
+    for (let i = 0; i < prepared.length; i++) {
+      const msg = prepared[i];
+      try {
+        const r = await sendSingleMessage(
+          botToken,
+          contact.telegram_id,
+          msg.text,
+          msg.photoUrl,
+          msg.keyboard
+        );
+
+        if (!r.ok) {
+          const err = await r.json();
+          console.error(`Не удалось отправить ${contact.telegram_id} (msg ${i + 1}):`, err.description);
+          contactFailed = true;
+          break; // Не шлём остальные сообщения этому контакту
+        }
+      } catch (e) {
+        console.error(`Ошибка отправки ${contact.telegram_id} (msg ${i + 1}):`, e.message);
+        contactFailed = true;
+        break;
       }
 
-      const r = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-      if (r.ok) {
-        sent++;
-      } else {
-        const err = await r.json();
-        console.error(`Не удалось отправить ${contact.telegram_id}:`, err.description);
-        failed++;
+      // Пауза 500мс между сообщениями одному получателю
+      if (i < prepared.length - 1) {
+        await new Promise((r) => setTimeout(r, 500));
       }
-    } catch (e) {
-      console.error(`Ошибка отправки ${contact.telegram_id}:`, e.message);
-      failed++;
     }
 
-    // Пауза ~35мс (лимит Telegram 30 msg/sec)
+    if (contactFailed) {
+      failed++;
+    } else {
+      sent++;
+    }
+
+    // Пауза ~35мс между получателями (лимит Telegram 30 msg/sec)
     await new Promise((r) => setTimeout(r, 35));
   }
 
@@ -351,6 +411,17 @@ function buildKeyboard(buttons, botUsername) {
         ? `https://t.me/${botUsername}?start=${param}`
         : btn.value;
       button = { text: btn.text, url };
+    } else if (btn.type === 'command') {
+      // Команда → deep link: /b → start=b, /start promo → start=promo
+      let cmd = btn.value.replace(/^\//, ''); // убираем начальный /
+      if (cmd.startsWith('start ')) {
+        cmd = cmd.slice(6); // /start promo → promo
+      }
+      const param = encodeURIComponent(cmd);
+      const url = botUsername
+        ? `https://t.me/${botUsername}?start=${param}`
+        : btn.value;
+      button = { text: btn.text, url };
     } else {
       continue;
     }
@@ -364,6 +435,45 @@ function buildKeyboard(buttons, botUsername) {
 
   if (currentRow.length > 0) rows.push(currentRow);
   return rows;
+}
+
+async function sendSingleMessage(botToken, chatId, text, photoUrl, inlineKeyboard) {
+  const replyMarkup = inlineKeyboard.length > 0
+    ? { inline_keyboard: inlineKeyboard }
+    : undefined;
+
+  if (photoUrl) {
+    // sendPhoto — caption макс 1024 символов
+    const body = {
+      chat_id: String(chatId),
+      photo: photoUrl,
+      caption: text.slice(0, 1024),
+      parse_mode: 'Markdown',
+    };
+    if (replyMarkup) body.reply_markup = replyMarkup;
+
+    const r = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    return r;
+  }
+
+  // sendMessage
+  const body = {
+    chat_id: String(chatId),
+    text,
+    parse_mode: 'Markdown',
+  };
+  if (replyMarkup) body.reply_markup = replyMarkup;
+
+  const r = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return r;
 }
 
 function generateId() {
