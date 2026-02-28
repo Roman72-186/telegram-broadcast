@@ -1,0 +1,81 @@
+tls:
+  certificates:
+    - certFile: /etc/letsencrypt/live/agroprompis.tw1.ru/fullchain.pem
+      keyFile: /etc/letsencrypt/live/agroprompis.tw1.ru/privkey.pem
+    - certFile: /etc/letsencrypt/live/assaru.space/fullchain.pem
+      keyFile: /etc/letsencrypt/live/assaru.space/privkey.pem
+
+http:
+  routers:
+    agromarket:
+      rule: "Host(`agroprompis.tw1.ru`)"
+      entryPoints:
+        - websecure
+      tls: {}
+      service: agromarket
+      priority: 10
+
+    s3-upload:
+      rule: "Host(`n8n.creativeanalytic.ru`) && PathPrefix(`/s3-upload/`)"
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: cloudflare
+      service: s3-upload
+      priority: 100
+      middlewares:
+        - s3-strip-prefix
+
+    n8n:
+      rule: "Host(`n8n.creativeanalytic.ru`)"
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: cloudflare
+      service: n8n
+      priority: 1
+
+    ocr:
+      rule: "Host(`assaru.space`)"
+      entryPoints:
+        - websecure
+      tls: {}
+      service: ocr
+      priority: 10
+
+    broadcast:
+      rule: "Host(`broadcast.leadtehsms.ru`)"
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: cloudflare
+      service: broadcast
+      priority: 10
+
+  middlewares:
+    s3-strip-prefix:
+      stripPrefix:
+        prefixes:
+          - "/s3-upload"
+
+  services:
+    agromarket:
+      loadBalancer:
+        servers:
+          - url: "http://172.17.0.1:80"
+    s3-upload:
+      loadBalancer:
+        servers:
+          - url: "http://172.17.0.1:3001"
+    n8n:
+      loadBalancer:
+        servers:
+          - url: "http://n8n:5678"
+    ocr:
+      loadBalancer:
+        servers:
+          - url: "http://172.17.0.1:3005"
+    broadcast:
+      loadBalancer:
+        servers:
+          - url: "http://172.17.0.1:3000"
