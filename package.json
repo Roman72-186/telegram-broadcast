@@ -1,0 +1,15 @@
+{
+  "name": "telegram-broadcast",
+  "version": "1.0.0",
+  "description": "Telegram Mini App для отложенных авторассылок через Leadteh и Telegram Bot API",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "node-cron": "^3.0.3"
+  }
+}
