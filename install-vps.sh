@@ -2,7 +2,7 @@
 # ============================================================
 # install-vps.sh — Полная установка telegram-broadcast на VPS
 # Использование:
-#   curl -fsSL https://raw.githubusercontent.com/YOUR_USER/telegram-broadcast/main/install-vps.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/Roman72-186/telegram-broadcast/main/install-vps.sh | bash
 #   или:
 #   chmod +x install-vps.sh && ./install-vps.sh
 # ============================================================
