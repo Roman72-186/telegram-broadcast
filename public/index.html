@@ -8,88 +8,127 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     :root {
-      --tg-theme-bg-color: #ffffff;
-      --tg-theme-text-color: #000000;
-      --tg-theme-hint-color: #999999;
-      --tg-theme-link-color: #2481cc;
-      --tg-theme-button-color: #2481cc;
-      --tg-theme-button-text-color: #ffffff;
-      --tg-theme-secondary-bg-color: #f0f0f0;
+      --bg-primary: #0a1a14;
+      --bg-secondary: #122a1f;
+      --bg-tertiary: #1a3a2a;
+      --accent: #2ecc71;
+      --accent-hover: #27ae60;
+      --accent-subtle: rgba(46, 204, 113, 0.15);
+      --text-primary: #e8f5e9;
+      --text-secondary: rgba(232, 245, 233, 0.6);
+      --text-muted: rgba(232, 245, 233, 0.35);
+      --danger: #e74c3c;
+      --warning: #f39c12;
+      --success: #2ecc71;
+      --border: rgba(46, 204, 113, 0.2);
     }
 
     body {
-      background-color: var(--tg-theme-bg-color);
-      color: var(--tg-theme-text-color);
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
 
     .btn-primary {
-      background-color: var(--tg-theme-button-color);
-      color: var(--tg-theme-button-text-color);
+      background: linear-gradient(135deg, #2ecc71, #27ae60);
+      color: #fff;
     }
 
     .btn-primary:hover {
-      opacity: 0.9;
+      background: linear-gradient(135deg, #27ae60, #219a52);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
 
     .btn-secondary {
-      background-color: var(--tg-theme-secondary-bg-color);
-      color: var(--tg-theme-text-color);
+      background-color: var(--bg-tertiary);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
     }
 
     .btn-danger {
-      background-color: #e53e3e;
-      color: #ffffff;
+      background-color: rgba(231, 76, 60, 0.15);
+      color: var(--danger);
+      border: 1px solid rgba(231, 76, 60, 0.3);
     }
 
     .input-field {
-      background-color: var(--tg-theme-secondary-bg-color);
-      color: var(--tg-theme-text-color);
-      border: 1px solid transparent;
+      background-color: var(--bg-tertiary);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
     }
 
     .input-field:focus {
-      border-color: var(--tg-theme-button-color);
+      border-color: var(--accent);
       outline: none;
+      box-shadow: 0 0 0 2px var(--accent-subtle);
+    }
+
+    .input-field::placeholder {
+      color: var(--text-muted);
+    }
+
+    /* Select styling */
+    select.input-field {
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%232ecc71' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      padding-right: 28px;
+    }
+
+    select.input-field option {
+      background-color: var(--bg-secondary);
+      color: var(--text-primary);
     }
 
     .tag-chip {
       display: inline-flex;
       align-items: center;
-      padding: 4px 10px;
+      padding: 4px 12px;
       border-radius: 16px;
       font-size: 13px;
       cursor: pointer;
       transition: all 0.15s;
+      border: 1px solid var(--border);
+      background-color: transparent;
+      color: var(--text-secondary);
     }
 
     .tag-chip.selected {
-      background-color: var(--tg-theme-button-color);
-      color: var(--tg-theme-button-text-color);
+      background-color: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
     }
 
-    .tag-chip:not(.selected) {
-      background-color: var(--tg-theme-secondary-bg-color);
-      color: var(--tg-theme-text-color);
+    .tag-chip:not(.selected):hover {
+      border-color: var(--accent);
+      color: var(--text-primary);
     }
 
     .step-indicator .step {
       width: 8px;
       height: 8px;
       border-radius: 50%;
-      background-color: var(--tg-theme-secondary-bg-color);
+      background-color: var(--bg-tertiary);
+      border: 1px solid var(--border);
       transition: all 0.2s;
     }
 
     .step-indicator .step.active {
       width: 24px;
       border-radius: 4px;
-      background-color: var(--tg-theme-button-color);
+      background-color: var(--accent);
+      border-color: var(--accent);
     }
 
     .step-indicator .step.done {
-      background-color: var(--tg-theme-button-color);
-      opacity: 0.5;
+      background-color: var(--accent);
+      border-color: var(--accent);
+      opacity: 0.4;
     }
 
     .preview-text {
@@ -98,24 +137,42 @@
     }
 
     .broadcast-card {
-      background-color: var(--tg-theme-secondary-bg-color);
-      border-radius: 12px;
-      padding: 12px;
+      background-color: var(--bg-secondary);
+      border-radius: 16px;
+      padding: 14px;
       margin-bottom: 8px;
+      border: 1px solid var(--border);
     }
 
     .status-badge {
       display: inline-block;
-      padding: 2px 8px;
+      padding: 3px 10px;
       border-radius: 10px;
-      font-size: 12px;
-      font-weight: 500;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
     }
 
-    .status-pending { background: #f6e05e; color: #744210; }
-    .status-sending { background: #63b3ed; color: #1a365d; }
-    .status-sent { background: #68d391; color: #22543d; }
-    .status-error { background: #fc8181; color: #742a2a; }
+    .status-pending {
+      background: rgba(243, 156, 18, 0.15);
+      color: var(--warning);
+      border: 1px solid rgba(243, 156, 18, 0.3);
+    }
+    .status-sending {
+      background: rgba(52, 152, 219, 0.15);
+      color: #3498db;
+      border: 1px solid rgba(52, 152, 219, 0.3);
+    }
+    .status-sent {
+      background: rgba(46, 204, 113, 0.15);
+      color: var(--success);
+      border: 1px solid rgba(46, 204, 113, 0.3);
+    }
+    .status-error {
+      background: rgba(231, 76, 60, 0.15);
+      color: var(--danger);
+      border: 1px solid rgba(231, 76, 60, 0.3);
+    }
 
     .fade-in {
       animation: fadeIn 0.2s ease-in;
@@ -126,7 +183,6 @@
       to { opacity: 1; transform: translateY(0); }
     }
 
-    /* Скрыть стандартные стрелки у input type=number */
     input[type="number"]::-webkit-inner-spin-button,
     input[type="number"]::-webkit-outer-spin-button {
       -webkit-appearance: none;
@@ -135,32 +191,75 @@
     .photo-preview {
       max-width: 100%;
       max-height: 160px;
-      border-radius: 8px;
+      border-radius: 12px;
       object-fit: cover;
     }
 
     .char-counter {
       font-size: 11px;
-      opacity: 0.5;
+      color: var(--text-muted);
       text-align: right;
     }
 
     .char-counter.warning {
-      color: #e53e3e;
-      opacity: 1;
+      color: var(--danger);
     }
 
     .msg-card {
-      background-color: var(--tg-theme-secondary-bg-color);
-      border-radius: 12px;
-      padding: 12px;
+      background-color: var(--bg-secondary);
+      border-radius: 16px;
+      padding: 14px;
       margin-bottom: 8px;
       cursor: pointer;
-      transition: opacity 0.15s;
+      transition: all 0.15s;
+      border: 1px solid var(--border);
+    }
+
+    .msg-card:hover {
+      border-color: var(--accent);
     }
 
     .msg-card:active {
       opacity: 0.7;
+    }
+
+    /* Checkbox styling */
+    input[type="checkbox"] {
+      accent-color: var(--accent);
+    }
+
+    /* Date/time inputs */
+    input[type="date"],
+    input[type="time"] {
+      color-scheme: dark;
+    }
+
+    /* Section label */
+    .section-label {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: var(--bg-primary); }
+    ::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 2px; }
+
+    h2 {
+      letter-spacing: 0.3px;
+    }
+
+    .list-info {
+      font-size: 12px;
+      color: var(--text-secondary);
+      padding: 6px 10px;
+      background: var(--accent-subtle);
+      border-radius: 8px;
+      margin-top: 6px;
     }
   </style>
 </head>
@@ -169,7 +268,7 @@
   <div id="accessDenied" class="hidden flex flex-col items-center justify-center min-h-screen p-6 text-center">
     <div class="text-5xl mb-4">🔒</div>
     <h1 class="text-xl font-bold mb-2">Доступ запрещён</h1>
-    <p class="text-sm opacity-60">Это приложение доступно только администраторам.</p>
+    <p class="text-sm" style="color: var(--text-secondary)">Это приложение доступно только администраторам.</p>
   </div>
 
   <!-- Основной контент -->
@@ -188,7 +287,7 @@
 
     <!-- TAB: Создание рассылки -->
     <div id="createTab">
-      <!-- Индикатор шагов (основные: 1, 3, 4, 5 — шаг 2 подшаг) -->
+      <!-- Индикатор шагов -->
       <div class="step-indicator flex items-center justify-center gap-2 mb-6">
         <div class="step active" data-step="1"></div>
         <div class="step" data-step="3"></div>
@@ -199,7 +298,7 @@
       <!-- Шаг 1: Список сообщений -->
       <div id="step1" class="step-content fade-in">
         <h2 class="text-lg font-bold mb-1">Сообщения</h2>
-        <p class="text-xs opacity-60 mb-3">От 1 до 5 сообщений, идут подряд получателю</p>
+        <p class="text-xs mb-3" style="color: var(--text-secondary)">От 1 до 5 сообщений, идут подряд получателю</p>
 
         <div id="messagesList"></div>
 
@@ -213,7 +312,7 @@
       <div id="step2" class="step-content hidden fade-in">
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-lg font-bold" id="editorTitle">Сообщение 1 из 1</h2>
-          <button onclick="finishEditMessage()" class="text-sm btn-secondary rounded-lg px-3 py-1">Готово</button>
+          <button onclick="finishEditMessage()" class="text-sm btn-primary rounded-lg px-4 py-1.5">Готово</button>
         </div>
 
         <!-- Фото URL -->
@@ -234,7 +333,7 @@
             <label class="text-sm font-medium">Текст сообщения</label>
             <div id="editorCharCounter" class="char-counter hidden">0 / 1024</div>
           </div>
-          <p class="text-xs opacity-60 mb-1">Поддержка Markdown: *жирный*, _курсив_, `код`</p>
+          <p class="text-xs mb-1" style="color: var(--text-secondary)">Поддержка Markdown: *жирный*, _курсив_, `код`</p>
           <textarea id="editorText" rows="6" placeholder="Введите текст..."
             class="input-field w-full rounded-xl px-4 py-3 text-sm resize-none"
             oninput="onEditorTextInput()"></textarea>
@@ -251,18 +350,19 @@
         </div>
       </div>
 
-      <!-- Шаг 3: Фильтры по тегам -->
+      <!-- Шаг 3: Фильтры -->
       <div id="step3" class="step-content hidden fade-in">
-        <h2 class="text-lg font-bold mb-1">Фильтры по тегам</h2>
-        <p class="text-xs opacity-60 mb-3">Выберите теги для фильтрации получателей</p>
+        <h2 class="text-lg font-bold mb-1">Фильтры</h2>
+        <p class="text-xs mb-3" style="color: var(--text-secondary)">Выберите теги и/или список для фильтрации получателей</p>
 
         <div id="tagsLoading" class="text-center py-6">
-          <div class="text-sm opacity-60">Загрузка тегов...</div>
+          <div class="text-sm" style="color: var(--text-secondary)">Загрузка...</div>
         </div>
 
         <div id="tagsContent" class="hidden">
+          <!-- Фильтр по тегам: включить -->
           <div class="mb-4">
-            <label class="text-sm font-medium mb-2 block">Содержит тег (хотя бы один):</label>
+            <div class="section-label">Содержит тег (хотя бы один)</div>
             <div id="includeTagsContainer" class="flex flex-wrap gap-2 mb-2"></div>
             <div class="flex gap-2">
               <input id="customIncludeTag" type="text" placeholder="Свой тег..."
@@ -272,8 +372,9 @@
             </div>
           </div>
 
+          <!-- Фильтр по тегам: исключить -->
           <div class="mb-4">
-            <label class="text-sm font-medium mb-2 block">Не содержит тег (исключить):</label>
+            <div class="section-label">Не содержит тег (исключить)</div>
             <div id="excludeTagsContainer" class="flex flex-wrap gap-2 mb-2"></div>
             <div class="flex gap-2">
               <input id="customExcludeTag" type="text" placeholder="Свой тег..."
@@ -283,8 +384,19 @@
             </div>
           </div>
 
+          <!-- Фильтр по списку -->
+          <div class="mb-4">
+            <div class="section-label">Содержится в списке</div>
+            <div id="listsLoading" class="hidden text-xs" style="color: var(--text-secondary)">Загрузка списков...</div>
+            <select id="listSelect" onchange="onListSelect()"
+              class="input-field w-full rounded-lg px-3 py-2 text-sm">
+              <option value="">Не выбран (все контакты)</option>
+            </select>
+            <div id="listInfo" class="list-info hidden"></div>
+          </div>
+
           <div id="contactsCount" class="text-center py-3">
-            <span class="text-sm opacity-60">Выберите теги для подсчёта получателей</span>
+            <span class="text-sm" style="color: var(--text-secondary)">Выберите фильтры для подсчёта получателей</span>
           </div>
         </div>
       </div>
@@ -292,7 +404,7 @@
       <!-- Шаг 4: Дата и время -->
       <div id="step4" class="step-content hidden fade-in">
         <h2 class="text-lg font-bold mb-1">Дата и время</h2>
-        <p class="text-xs opacity-60 mb-3">Когда отправить рассылку</p>
+        <p class="text-xs mb-3" style="color: var(--text-secondary)">Когда отправить рассылку</p>
 
         <label class="flex items-center gap-2 mb-4 cursor-pointer">
           <input type="checkbox" id="sendNow" onchange="toggleSchedule()" checked
@@ -303,17 +415,17 @@
         <div id="scheduleFields" class="hidden">
           <div class="flex gap-3 mb-3">
             <div class="flex-1">
-              <label class="text-xs opacity-60 mb-1 block">Дата</label>
+              <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Дата</label>
               <input type="date" id="scheduleDate"
                 class="input-field w-full rounded-lg px-3 py-2 text-sm" />
             </div>
             <div class="flex-1">
-              <label class="text-xs opacity-60 mb-1 block">Время</label>
+              <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Время</label>
               <input type="time" id="scheduleTime"
                 class="input-field w-full rounded-lg px-3 py-2 text-sm" />
             </div>
           </div>
-          <p class="text-xs opacity-40">Часовой пояс: Москва (UTC+3)</p>
+          <p class="text-xs" style="color: var(--text-muted)">Часовой пояс: Москва (UTC+3)</p>
         </div>
       </div>
 
@@ -324,17 +436,17 @@
         <div id="confirmMessages"></div>
 
         <div class="broadcast-card mb-3">
-          <div class="text-xs opacity-50 mb-1">Фильтры:</div>
+          <div class="section-label">Фильтры</div>
           <div id="confirmFilters" class="text-sm"></div>
         </div>
 
         <div class="broadcast-card mb-3">
-          <div class="text-xs opacity-50 mb-1">Время отправки:</div>
+          <div class="section-label">Время отправки</div>
           <div id="confirmTime" class="text-sm"></div>
         </div>
 
         <div class="broadcast-card mb-3">
-          <div class="text-xs opacity-50 mb-1">Получатели:</div>
+          <div class="section-label">Получатели</div>
           <div id="confirmRecipients" class="text-sm"></div>
         </div>
       </div>
@@ -355,11 +467,11 @@
     <!-- TAB: Список рассылок -->
     <div id="listTab" class="hidden">
       <div id="listLoading" class="text-center py-8">
-        <div class="text-sm opacity-60">Загрузка...</div>
+        <div class="text-sm" style="color: var(--text-secondary)">Загрузка...</div>
       </div>
       <div id="listContent"></div>
       <div id="listEmpty" class="hidden text-center py-8">
-        <div class="text-sm opacity-60">Нет рассылок</div>
+        <div class="text-sm" style="color: var(--text-secondary)">Нет рассылок</div>
       </div>
     </div>
   </div>
@@ -370,7 +482,7 @@
     // ============================================
     const tg = window.Telegram?.WebApp;
     let currentStep = 1;
-    const mainSteps = [1, 3, 4, 5]; // Основные шаги (2 — подшаг)
+    const mainSteps = [1, 3, 4, 5];
     let allTags = [];
     let selectedIncludeTags = [];
     let selectedExcludeTags = [];
@@ -379,6 +491,12 @@
     // Мультисообщения
     let messages = [{ photo_url: '', text: '', buttons: [] }];
     let currentMessageIndex = 0;
+
+    // Списки
+    let allLists = [];
+    let selectedListId = '';
+    let selectedListName = '';
+    let listsLoaded = false;
 
     // Инициализация Telegram WebApp
     if (tg) {
@@ -459,8 +577,7 @@
         current.classList.add('fade-in');
       }
 
-      // Обновляем индикатор (только основные шаги)
-      const indicatorStep = step === 2 ? 1 : step; // Шаг 2 показывает индикатор шага 1
+      const indicatorStep = step === 2 ? 1 : step;
       document.querySelectorAll('.step-indicator .step').forEach((dot) => {
         const s = parseInt(dot.dataset.step);
         dot.classList.remove('active', 'done');
@@ -468,7 +585,6 @@
         else if (s < indicatorStep) dot.classList.add('done');
       });
 
-      // Навигация: скрыть при подшаге 2
       const navButtons = document.getElementById('navButtons');
       if (step === 2) {
         navButtons.classList.add('hidden');
@@ -476,7 +592,6 @@
         navButtons.classList.remove('hidden');
       }
 
-      // Кнопки навигации
       document.getElementById('prevBtn').classList.toggle('hidden', step === 1);
       const nextBtn = document.getElementById('nextBtn');
 
@@ -486,13 +601,13 @@
         nextBtn.textContent = 'Далее';
       }
 
-      // Загрузка данных для шагов
       if (step === 1) {
         renderMessagesList();
       }
 
-      if (step === 3 && allTags.length === 0) {
-        loadTags();
+      if (step === 3) {
+        if (allTags.length === 0) loadTags();
+        if (!listsLoaded) loadLists();
       }
 
       if (step === 5) {
@@ -504,14 +619,12 @@
 
     function nextStep() {
       if (currentStep === 1) {
-        // Валидация: хотя бы 1 сообщение с текстом
         for (let i = 0; i < messages.length; i++) {
           if (!messages[i].text.trim()) {
             showAlert(`Заполните текст сообщения ${i + 1}`);
             return;
           }
         }
-        // Шаг 1 → Шаг 3 (пропуская шаг 2)
         showStep(3);
         return;
       }
@@ -565,20 +678,20 @@
           ? (msg.text.length > 60 ? msg.text.slice(0, 60) + '...' : msg.text)
           : '(пустое сообщение)';
 
-        const photoIcon = msg.photo_url ? '<span class="text-xs opacity-50 mr-2">📷</span>' : '';
+        const photoIcon = msg.photo_url ? '<span class="text-xs mr-2" style="color:var(--text-muted)">📷</span>' : '';
         const btnCount = msg.buttons.length > 0
-          ? `<span class="text-xs opacity-40 ml-2">${msg.buttons.length} кн.</span>`
+          ? `<span class="text-xs ml-2" style="color:var(--text-muted)">${msg.buttons.length} кн.</span>`
           : '';
 
         const deleteBtn = messages.length > 1
-          ? `<button onclick="event.stopPropagation(); removeMessage(${i})" class="text-xs text-red-500 ml-2">✕</button>`
+          ? `<button onclick="event.stopPropagation(); removeMessage(${i})" class="text-xs ml-2" style="color:var(--danger)">✕</button>`
           : '';
 
         card.innerHTML = `
           <div class="flex items-start justify-between">
             <div class="flex-1" onclick="editMessage(${i})">
               <div class="flex items-center mb-1">
-                <span class="text-xs font-medium opacity-60">Сообщение ${i + 1}</span>
+                <span class="text-xs font-medium" style="color:var(--text-secondary)">Сообщение ${i + 1}</span>
                 ${btnCount}
                 ${deleteBtn}
               </div>
@@ -592,7 +705,6 @@
         container.appendChild(card);
       });
 
-      // Кнопка «Добавить сообщение»
       document.getElementById('addMessageBtn').classList.toggle('hidden', messages.length >= 5);
     }
 
@@ -603,7 +715,6 @@
       }
       messages.push({ photo_url: '', text: '', buttons: [] });
       renderMessagesList();
-      // Сразу открыть редактор нового сообщения
       editMessage(messages.length - 1);
     }
 
@@ -623,22 +734,17 @@
       document.getElementById('editorPhotoUrl').value = msg.photo_url || '';
       document.getElementById('editorText').value = msg.text || '';
 
-      // Показать превью фото
       onEditorPhotoInput();
-      // Обновить счётчик
       onEditorTextInput();
-      // Отрисовать кнопки
       renderEditorButtons();
 
       showStep(2);
     }
 
     function finishEditMessage() {
-      // Сохраняем данные из редактора в messages[]
       const msg = messages[currentMessageIndex];
       msg.photo_url = document.getElementById('editorPhotoUrl').value.trim();
       msg.text = document.getElementById('editorText').value;
-      // Кнопки уже сохраняются на лету в editorUpdateButton
 
       showStep(1);
     }
@@ -661,7 +767,6 @@
         counter.classList.add('hidden');
       }
 
-      // Сохраняем на лету
       messages[currentMessageIndex].photo_url = url;
       onEditorTextInput();
     }
@@ -671,7 +776,6 @@
       const hasPhoto = document.getElementById('editorPhotoUrl').value.trim();
       const counter = document.getElementById('editorCharCounter');
 
-      // Сохраняем на лету
       messages[currentMessageIndex].text = text;
 
       if (hasPhoto) {
@@ -684,7 +788,6 @@
       }
     }
 
-    // Кнопки редактора
     function editorAddButton() {
       const btns = messages[currentMessageIndex].buttons;
       if (btns.length >= 6) {
@@ -702,7 +805,6 @@
 
     function editorUpdateButton(index, field, value) {
       messages[currentMessageIndex].buttons[index][field] = value;
-      // Если тип изменился — перерисовать для обновления placeholder
       if (field === 'type') {
         renderEditorButtons();
       }
@@ -720,13 +822,19 @@
         div.className = 'broadcast-card mb-2 fade-in';
 
         let placeholder = 'https://example.com';
-        if (btn.type === 'command') placeholder = '/b или /start promo';
-        else if (btn.type === 'start') placeholder = 'Параметр (например: promo_123)';
+        let typeHint = '';
+        if (btn.type === 'command') {
+          placeholder = '/b или /start promo';
+          typeHint = '<div class="text-xs mt-1" style="color:var(--text-muted)">Отображается как обычная кнопка (без иконки ссылки)</div>';
+        } else if (btn.type === 'start') {
+          placeholder = 'Параметр (например: promo_123)';
+          typeHint = '<div class="text-xs mt-1" style="color:var(--text-muted)">Deep link через /start (иконка ссылки)</div>';
+        }
 
         div.innerHTML = `
           <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-medium opacity-60">Кнопка ${i + 1}</span>
-            <button onclick="editorRemoveButton(${i})" class="text-xs text-red-500">Удалить</button>
+            <span class="text-xs font-medium" style="color:var(--text-secondary)">Кнопка ${i + 1}</span>
+            <button onclick="editorRemoveButton(${i})" class="text-xs" style="color:var(--danger)">Удалить</button>
           </div>
           <input type="text" placeholder="Текст кнопки" value="${escapeAttr(btn.text)}"
             oninput="editorUpdateButton(${i}, 'text', this.value)"
@@ -735,8 +843,8 @@
             <select onchange="editorUpdateButton(${i}, 'type', this.value)"
               class="input-field rounded-lg px-3 py-2 text-sm">
               <option value="url" ${btn.type === 'url' ? 'selected' : ''}>Ссылка (URL)</option>
-              <option value="command" ${btn.type === 'command' ? 'selected' : ''}>Команда</option>
-              <option value="start" ${btn.type === 'start' ? 'selected' : ''}>Команда (/start)</option>
+              <option value="command" ${btn.type === 'command' ? 'selected' : ''}>Команда бота</option>
+              <option value="start" ${btn.type === 'start' ? 'selected' : ''}>Deep link (/start)</option>
             </select>
           </div>
           <input type="text"
@@ -744,6 +852,7 @@
             value="${escapeAttr(btn.value)}"
             oninput="editorUpdateButton(${i}, 'value', this.value)"
             class="input-field w-full rounded-lg px-3 py-2 text-sm" />
+          ${typeHint}
         `;
         container.appendChild(div);
       });
@@ -756,11 +865,11 @@
         .replace(/>/g, '&gt;')
         .replace(/\*([^*]+)\*/g, '<b>$1</b>')
         .replace(/_([^_]+)_/g, '<i>$1</i>')
-        .replace(/`([^`]+)`/g, '<code style="background:rgba(0,0,0,0.1);padding:1px 4px;border-radius:3px;">$1</code>');
+        .replace(/`([^`]+)`/g, '<code style="background:var(--accent-subtle);padding:1px 4px;border-radius:3px;">$1</code>');
     }
 
     // ============================================
-    // Шаг 3: Теги
+    // Шаг 3: Теги + Списки
     // ============================================
     async function loadTags() {
       document.getElementById('tagsLoading').classList.remove('hidden');
@@ -778,6 +887,63 @@
       document.getElementById('tagsLoading').classList.add('hidden');
       document.getElementById('tagsContent').classList.remove('hidden');
       renderTags();
+    }
+
+    async function loadLists() {
+      const loading = document.getElementById('listsLoading');
+      const select = document.getElementById('listSelect');
+      loading.classList.remove('hidden');
+
+      try {
+        const r = await fetch('/api/lists');
+        const data = await r.json();
+        allLists = data.lists || [];
+
+        // Заполнить select
+        select.innerHTML = '<option value="">Не выбран (все контакты)</option>';
+        for (const list of allLists) {
+          const opt = document.createElement('option');
+          opt.value = list.id;
+          opt.textContent = list.name;
+          if (list.id === selectedListId) opt.selected = true;
+          select.appendChild(opt);
+        }
+      } catch (e) {
+        console.error('Ошибка загрузки списков:', e);
+        allLists = [];
+      }
+
+      loading.classList.add('hidden');
+      listsLoaded = true;
+    }
+
+    async function onListSelect() {
+      const select = document.getElementById('listSelect');
+      const infoEl = document.getElementById('listInfo');
+      selectedListId = select.value;
+
+      if (!selectedListId) {
+        selectedListName = '';
+        infoEl.classList.add('hidden');
+        updateContactsCount();
+        return;
+      }
+
+      const selectedOpt = select.options[select.selectedIndex];
+      selectedListName = selectedOpt.textContent;
+
+      infoEl.classList.remove('hidden');
+      infoEl.textContent = 'Загрузка элементов списка...';
+
+      try {
+        const r = await fetch(`/api/lists/${selectedListId}/items`);
+        const data = await r.json();
+        infoEl.textContent = `В списке: ${data.total_items} элементов, telegram_id: ${data.count}`;
+      } catch (e) {
+        infoEl.textContent = 'Ошибка загрузки элементов';
+      }
+
+      updateContactsCount();
     }
 
     function renderTags() {
@@ -837,19 +1003,19 @@
       countTimeout = setTimeout(async () => {
         const el = document.getElementById('contactsCount');
 
-        if (selectedIncludeTags.length === 0 && selectedExcludeTags.length === 0) {
-          el.innerHTML = '<span class="text-sm opacity-60">Будут выбраны все контакты с telegram_id</span>';
+        if (selectedIncludeTags.length === 0 && selectedExcludeTags.length === 0 && !selectedListId) {
+          el.innerHTML = '<span class="text-sm" style="color:var(--text-secondary)">Будут выбраны все контакты с telegram_id</span>';
           try {
             const r = await fetch('/api/contacts?count_only=true');
             const data = await r.json();
-            el.innerHTML = `<span class="text-sm font-medium">Получателей: ~${data.count}</span>`;
+            el.innerHTML = `<span class="text-sm font-medium" style="color:var(--accent)">Получателей: ~${data.count}</span>`;
           } catch (e) {
             // ignore
           }
           return;
         }
 
-        el.innerHTML = '<span class="text-sm opacity-60">Подсчёт...</span>';
+        el.innerHTML = '<span class="text-sm" style="color:var(--text-secondary)">Подсчёт...</span>';
 
         try {
           const params = new URLSearchParams();
@@ -859,9 +1025,14 @@
 
           const r = await fetch(`/api/contacts?${params}`);
           const data = await r.json();
-          el.innerHTML = `<span class="text-sm font-medium">Будет отправлено ~${data.count} контактам</span>`;
+
+          let text = `~${data.count} контактам`;
+          if (selectedListId) {
+            text += ' (+ фильтр по списку на сервере)';
+          }
+          el.innerHTML = `<span class="text-sm font-medium" style="color:var(--accent)">Будет отправлено ${text}</span>`;
         } catch (e) {
-          el.innerHTML = '<span class="text-sm text-red-500">Ошибка подсчёта</span>';
+          el.innerHTML = '<span class="text-sm" style="color:var(--danger)">Ошибка подсчёта</span>';
         }
       }, 500);
     }
@@ -875,7 +1046,7 @@
 
       if (!checked) {
         const now = new Date();
-        now.setHours(now.getHours() + 3); // Примерно Москва
+        now.setHours(now.getHours() + 3);
         const dateStr = now.toISOString().split('T')[0];
         const timeStr = now.toTimeString().slice(0, 5);
         document.getElementById('scheduleDate').value = dateStr;
@@ -888,7 +1059,6 @@
     // Шаг 5: Подтверждение
     // ============================================
     function fillConfirmation() {
-      // Сообщения
       const container = document.getElementById('confirmMessages');
       container.innerHTML = '';
 
@@ -896,7 +1066,7 @@
         const card = document.createElement('div');
         card.className = 'broadcast-card mb-3';
 
-        let html = `<div class="text-xs opacity-50 mb-1">Сообщение ${i + 1} из ${messages.length}:</div>`;
+        let html = `<div class="section-label">Сообщение ${i + 1} из ${messages.length}</div>`;
 
         if (msg.photo_url) {
           html += `<img src="${escapeAttr(msg.photo_url)}" class="photo-preview mb-2"
@@ -906,13 +1076,13 @@
         html += `<div class="text-sm preview-text mb-2">${formatMarkdown(msg.text)}</div>`;
 
         if (msg.buttons.length > 0) {
-          html += '<div class="text-xs opacity-50 mt-1">Кнопки:</div>';
+          html += '<div class="text-xs mt-1" style="color:var(--text-muted)">Кнопки:</div>';
           html += msg.buttons.map((b) => {
             let label;
             if (b.type === 'url') label = escapeHtml(b.value);
-            else if (b.type === 'command') label = escapeHtml(b.value);
+            else if (b.type === 'command') label = 'callback: ' + escapeHtml(b.value);
             else label = '/start ' + escapeHtml(b.value);
-            return `<div class="text-xs mb-0.5">[${escapeHtml(b.text)}] → ${label}</div>`;
+            return `<div class="text-xs mb-0.5" style="color:var(--text-secondary)">[${escapeHtml(b.text)}] → ${label}</div>`;
           }).join('');
         }
 
@@ -928,6 +1098,9 @@
       if (selectedExcludeTags.length > 0) {
         filtersHtml.push('Исключить: ' + selectedExcludeTags.join(', '));
       }
+      if (selectedListId && selectedListName) {
+        filtersHtml.push('Список: ' + selectedListName);
+      }
       if (filtersHtml.length === 0) {
         filtersHtml.push('Все контакты');
       }
@@ -942,7 +1115,6 @@
         document.getElementById('confirmTime').textContent = `${date} ${time} (МСК)`;
       }
 
-      // Получатели
       updateConfirmRecipients();
     }
 
@@ -958,7 +1130,11 @@
 
         const r = await fetch(`/api/contacts?${params}`);
         const data = await r.json();
-        el.textContent = `~${data.count} получателей`;
+        let text = `~${data.count} получателей`;
+        if (selectedListId) {
+          text += ' (+ пересечение со списком)';
+        }
+        el.textContent = text;
       } catch (e) {
         el.textContent = 'Ошибка подсчёта';
       }
@@ -995,6 +1171,8 @@
           filters: {
             include_tags: selectedIncludeTags,
             exclude_tags: selectedExcludeTags,
+            list_schema_id: selectedListId || null,
+            list_name: selectedListName || null,
           },
           scheduled_at: scheduledAt,
           created_by: adminTelegramId,
@@ -1029,8 +1207,14 @@
       currentMessageIndex = 0;
       selectedIncludeTags = [];
       selectedExcludeTags = [];
+      selectedListId = '';
+      selectedListName = '';
       document.getElementById('sendNow').checked = true;
       document.getElementById('scheduleFields').classList.add('hidden');
+      const listSelect = document.getElementById('listSelect');
+      if (listSelect) listSelect.value = '';
+      const listInfo = document.getElementById('listInfo');
+      if (listInfo) listInfo.classList.add('hidden');
       showStep(1);
     }
 
@@ -1075,17 +1259,16 @@
 
           let info = '';
           if (b.status === 'sent') {
-            info = `<div class="text-xs opacity-50 mt-1">Отправлено: ${b.sent_count}, ошибок: ${b.failed_count}</div>`;
+            info = `<div class="text-xs mt-1" style="color:var(--text-secondary)">Отправлено: ${b.sent_count}, ошибок: ${b.failed_count}</div>`;
           }
           if (b.status === 'error' && b.error) {
-            info = `<div class="text-xs text-red-500 mt-1">${escapeHtml(b.error)}</div>`;
+            info = `<div class="text-xs mt-1" style="color:var(--danger)">${escapeHtml(b.error)}</div>`;
           }
 
           const deleteBtn = b.status === 'pending'
-            ? `<button onclick="deleteBroadcast('${b.id}')" class="text-xs text-red-500 mt-2">Отменить</button>`
+            ? `<button onclick="deleteBroadcast('${b.id}')" class="text-xs mt-2" style="color:var(--danger)">Отменить</button>`
             : '';
 
-          // Поддержка нового формата (messages[]) и старого (text)
           let textPreview = '';
           let msgCount = 0;
           let totalButtons = 0;
@@ -1107,21 +1290,22 @@
           const tagsInfo = [];
           if (b.filters?.include_tags?.length) tagsInfo.push('+ ' + b.filters.include_tags.join(', '));
           if (b.filters?.exclude_tags?.length) tagsInfo.push('- ' + b.filters.exclude_tags.join(', '));
+          if (b.filters?.list_name) tagsInfo.push('Список: ' + b.filters.list_name);
 
-          const photoLabel = hasPhoto ? '<span class="text-xs opacity-40 mr-1">📷</span>' : '';
-          const msgLabel = msgCount > 1 ? `<span class="text-xs opacity-40">${msgCount} сообщ.</span>` : '';
+          const photoLabel = hasPhoto ? '<span class="text-xs mr-1" style="color:var(--text-muted)">📷</span>' : '';
+          const msgLabel = msgCount > 1 ? `<span class="text-xs" style="color:var(--text-muted)">${msgCount} сообщ.</span>` : '';
 
           card.innerHTML = `
             <div class="flex items-start justify-between mb-1">
               <div class="text-sm font-medium flex-1 mr-2 preview-text">${photoLabel}${escapeHtml(textPreview)}</div>
               <span class="status-badge ${statusClass}">${statusText}</span>
             </div>
-            ${tagsInfo.length ? `<div class="text-xs opacity-50">${escapeHtml(tagsInfo.join(' | '))}</div>` : ''}
+            ${tagsInfo.length ? `<div class="text-xs" style="color:var(--text-secondary)">${escapeHtml(tagsInfo.join(' | '))}</div>` : ''}
             <div class="flex items-center gap-2 mt-1">
-              <span class="text-xs opacity-40">${dateStr} (МСК)</span>
+              <span class="text-xs" style="color:var(--text-muted)">${dateStr} (МСК)</span>
               ${msgLabel}
             </div>
-            ${totalButtons ? `<div class="text-xs opacity-40">Кнопок: ${totalButtons}</div>` : ''}
+            ${totalButtons ? `<div class="text-xs" style="color:var(--text-muted)">Кнопок: ${totalButtons}</div>` : ''}
             ${info}
             ${deleteBtn}
           `;
@@ -1130,7 +1314,7 @@
       } catch (e) {
         console.error('Ошибка загрузки рассылок:', e);
         loading.classList.add('hidden');
-        content.innerHTML = '<div class="text-center text-sm text-red-500 py-4">Ошибка загрузки</div>';
+        content.innerHTML = `<div class="text-center text-sm py-4" style="color:var(--danger)">Ошибка загрузки</div>`;
       }
     }
 

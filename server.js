@@ -101,6 +101,53 @@ app.get('/api/contacts', async (req, res) => {
 });
 
 // ============================================
+// API: Списки (Leadteh List Schemas)
+// ============================================
+app.get('/api/lists', async (req, res) => {
+  try {
+    const { fetchListSchemas } = require('./lib/leadteh');
+    const schemas = await fetchListSchemas(config);
+
+    const lists = (Array.isArray(schemas) ? schemas : []).map((s) => ({
+      id: s.id,
+      name: s.name || s.title || `Список ${s.id}`,
+      fields: s.fields || [],
+    }));
+
+    res.json({ lists });
+  } catch (e) {
+    console.error('GET /api/lists error:', e.message);
+    res.status(500).json({ error: 'Ошибка загрузки списков' });
+  }
+});
+
+app.get('/api/lists/:schemaId/items', async (req, res) => {
+  try {
+    const { fetchListItems, extractTelegramIds, fetchListSchemas } = require('./lib/leadteh');
+    const { schemaId } = req.params;
+
+    // Получаем схему для определения полей
+    const schemas = await fetchListSchemas(config);
+    const schema = (Array.isArray(schemas) ? schemas : []).find(
+      (s) => String(s.id) === String(schemaId)
+    );
+    const fields = schema?.fields || [];
+
+    const items = await fetchListItems(config, schemaId);
+    const telegramIds = extractTelegramIds(Array.isArray(items) ? items : [], fields);
+
+    res.json({
+      count: telegramIds.length,
+      telegram_ids: telegramIds,
+      total_items: Array.isArray(items) ? items.length : 0,
+    });
+  } catch (e) {
+    console.error('GET /api/lists/:id/items error:', e.message);
+    res.status(500).json({ error: 'Ошибка загрузки элементов списка' });
+  }
+});
+
+// ============================================
 // API: Сохранить рассылку
 // ============================================
 app.post('/api/broadcast/save', (req, res) => {
@@ -164,6 +211,8 @@ app.post('/api/broadcast/save', (req, res) => {
       filters: {
         include_tags: filters?.include_tags || [],
         exclude_tags: filters?.exclude_tags || [],
+        list_schema_id: filters?.list_schema_id || null,
+        list_name: filters?.list_name || null,
       },
       scheduled_at: scheduled_at || now,
       status: 'pending',
@@ -290,15 +339,39 @@ async function processPendingBroadcasts() {
 }
 
 async function sendBroadcast(broadcast) {
-  const { fetchAllContacts, extractTags } = require('./lib/leadteh');
+  const { fetchAllContacts, extractTags, fetchListItems, fetchListSchemas, extractTelegramIds } = require('./lib/leadteh');
   const botToken = config.telegramBotToken;
 
   const allContacts = await fetchAllContacts(config);
   const includeTags = broadcast.filters?.include_tags || [];
   const excludeTags = broadcast.filters?.exclude_tags || [];
+  const listSchemaId = broadcast.filters?.list_schema_id || null;
+
+  // Загрузить telegram_id из списка (если задан фильтр)
+  let listTelegramIds = null;
+  if (listSchemaId) {
+    try {
+      const schemas = await fetchListSchemas(config);
+      const schema = (Array.isArray(schemas) ? schemas : []).find(
+        (s) => String(s.id) === String(listSchemaId)
+      );
+      const fields = schema?.fields || [];
+      const items = await fetchListItems(config, listSchemaId);
+      listTelegramIds = new Set(extractTelegramIds(Array.isArray(items) ? items : [], fields));
+      console.log(`[broadcast] Фильтр по списку: ${listTelegramIds.size} telegram_id`);
+    } catch (e) {
+      console.error('[broadcast] Ошибка загрузки списка:', e.message);
+    }
+  }
 
   const recipients = allContacts.filter((contact) => {
     if (!contact.telegram_id) return false;
+
+    // Фильтр по списку
+    if (listTelegramIds && !listTelegramIds.has(String(contact.telegram_id))) {
+      return false;
+    }
+
     const contactTags = extractTags(contact);
 
     if (includeTags.length > 0) {
@@ -412,16 +485,8 @@ function buildKeyboard(buttons, botUsername) {
         : btn.value;
       button = { text: btn.text, url };
     } else if (btn.type === 'command') {
-      // Команда → deep link: /b → start=b, /start promo → start=promo
-      let cmd = btn.value.replace(/^\//, ''); // убираем начальный /
-      if (cmd.startsWith('start ')) {
-        cmd = cmd.slice(6); // /start promo → promo
-      }
-      const param = encodeURIComponent(cmd);
-      const url = botUsername
-        ? `https://t.me/${botUsername}?start=${param}`
-        : btn.value;
-      button = { text: btn.text, url };
+      // Команда → callback_data (обычная кнопка без иконки ссылки)
+      button = { text: btn.text, callback_data: btn.value };
     } else {
       continue;
     }
