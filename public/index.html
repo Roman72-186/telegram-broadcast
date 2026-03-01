@@ -231,6 +231,59 @@
     }
     .stat-value { font-size: 24px; font-weight: 700; color: var(--accent); }
     .stat-label { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+    .tooltip-trigger {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background-color: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      position: relative;
+      margin-left: 6px;
+      flex-shrink: 0;
+      line-height: 1;
+      user-select: none;
+    }
+    .tooltip-text {
+      display: none;
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: var(--bg-tertiary);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 400;
+      white-space: normal;
+      width: max-content;
+      max-width: 260px;
+      z-index: 100;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      line-height: 1.4;
+    }
+    .tooltip-text::after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 6px solid transparent;
+      border-top-color: var(--bg-tertiary);
+    }
+    .tooltip-trigger.active .tooltip-text { display: block; }
+    @media (hover: hover) {
+      .tooltip-trigger:hover .tooltip-text { display: block; }
+    }
   </style>
 </head>
 <body class="pb-24">
@@ -244,7 +297,50 @@
     <div class="text-5xl mb-4">&#128274;</div>
     <h1 class="text-xl font-bold mb-2">Доступ запрещён</h1>
     <p class="text-sm" style="color: var(--text-secondary)">Нет доступа. Обратитесь к администратору платформы.</p>
-    <p id="debugInfo" class="text-xs mt-4" style="color: var(--text-secondary); word-break: break-all;"></p>
+  </div>
+
+  <!-- Экран онбординга (первый вход без ботов) -->
+  <div id="onboardingScreen" class="hidden max-w-lg mx-auto p-4">
+    <div class="text-center mb-6 mt-4">
+      <div class="text-4xl mb-3">&#128640;</div>
+      <h1 class="text-xl font-bold mb-1">Добро пожаловать!</h1>
+      <p class="text-sm" style="color: var(--text-secondary)">Настройте бота для начала работы с рассылками</p>
+    </div>
+
+    <div class="space-y-4">
+      <div>
+        <label class="text-sm font-medium mb-1 flex items-center">Leadteh API токен<span class="tooltip-trigger">?<span class="tooltip-text">Токен из Leadteh: Настройки → API. Общий для всех ботов</span></span></label>
+        <input id="onboardLeadtehToken" type="text" placeholder="Токен из Leadteh: Настройки → API"
+          class="input-field w-full rounded-lg px-3 py-2 text-sm" />
+      </div>
+
+      <div>
+        <label class="text-sm font-medium mb-1 flex items-center">Leadteh Bot ID<span class="tooltip-trigger">?<span class="tooltip-text">ID бота в Leadteh. Найдите в настройках бота в кабинете Leadteh</span></span></label>
+        <input id="onboardLeadtehBotId" type="text" placeholder="ID бота в Leadteh"
+          class="input-field w-full rounded-lg px-3 py-2 text-sm" />
+      </div>
+
+      <div>
+        <label class="text-sm font-medium mb-1 flex items-center">Токен бота (BotFather)<span class="tooltip-trigger">?<span class="tooltip-text">Получите у @BotFather командой /newbot или /mybots</span></span></label>
+        <input id="onboardBotToken" type="text" placeholder="Например: 123456:ABC-DEF..."
+          class="input-field w-full rounded-lg px-3 py-2 text-sm"
+          onblur="validateOnboardingBot()" />
+        <div id="onboardBotStatus" class="text-xs mt-1 hidden"></div>
+      </div>
+
+      <div>
+        <label class="text-sm font-medium mb-1 flex items-center">Имя бота<span class="tooltip-trigger">?<span class="tooltip-text">Отображаемое имя в интерфейсе. Автозаполняется при проверке токена</span></span></label>
+        <input id="onboardBotName" type="text" placeholder="Отображаемое имя"
+          class="input-field w-full rounded-lg px-3 py-2 text-sm" />
+      </div>
+
+      <div id="onboardError" class="hidden text-xs text-center" style="color: var(--danger)"></div>
+
+      <button onclick="submitOnboarding()" id="onboardSubmitBtn"
+        class="w-full py-3 rounded-xl text-sm font-medium btn-primary mt-2">
+        Начать работу
+      </button>
+    </div>
   </div>
 
   <!-- Основной контент -->
@@ -280,14 +376,14 @@
         <p class="text-xs mb-3" style="color: var(--text-secondary)">От 1 до 5 сообщений, идут подряд получателю</p>
 
         <div id="step1BotSelector" class="hidden mb-3">
-          <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Бот для рассылки</label>
+          <label class="text-xs mb-1 flex items-center" style="color: var(--text-secondary)">Бот для рассылки<span class="tooltip-trigger">?<span class="tooltip-text">Выберите бота, от имени которого будет отправлена рассылка</span></span></label>
           <select id="step1BotSelect" onchange="onBotChange()"
             class="input-field w-full rounded-lg px-3 py-2 text-sm font-medium">
           </select>
         </div>
 
         <div class="mb-3">
-          <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Разметка текста</label>
+          <label class="text-xs mb-1 flex items-center" style="color: var(--text-secondary)">Разметка текста<span class="tooltip-trigger">?<span class="tooltip-text">Markdown: *жирный* _курсив_. HTML: &lt;b&gt; &lt;i&gt;. Plain — без форматирования</span></span></label>
           <select id="parseModeSelect" class="input-field w-full rounded-lg px-3 py-2 text-sm">
             <option value="Markdown">Markdown (*жирный*, _курсив_)</option>
             <option value="HTML">HTML (&lt;b&gt;жирный&lt;/b&gt;, &lt;i&gt;курсив&lt;/i&gt;)</option>
@@ -311,7 +407,7 @@
         </div>
 
         <div class="mb-3">
-          <label class="text-sm font-medium mb-1 block">Фото (необязательно)</label>
+          <label class="text-sm font-medium mb-1 flex items-center">Фото (необязательно)<span class="tooltip-trigger">?<span class="tooltip-text">Ссылка на изображение или загрузите файл (до 10 МБ). JPG, PNG, GIF, WebP</span></span></label>
           <div class="flex gap-2">
             <input type="text" id="editorPhotoUrl" placeholder="Ссылка или загрузите файл"
               class="input-field flex-1 rounded-lg px-3 py-2 text-sm"
@@ -331,7 +427,7 @@
 
         <div class="mb-3">
           <div class="flex items-center justify-between mb-1">
-            <label class="text-sm font-medium">Текст сообщения</label>
+            <label class="text-sm font-medium flex items-center">Текст сообщения<span class="tooltip-trigger">?<span class="tooltip-text">Текст сообщения. С фото — до 1024 символов, без — до 4096</span></span></label>
             <div id="editorCharCounter" class="char-counter hidden">0 / 1024</div>
           </div>
           <p class="text-xs mb-1" style="color: var(--text-secondary)">Поддержка Markdown: *жирный*, _курсив_, `код`</p>
@@ -341,7 +437,7 @@
         </div>
 
         <div class="mb-3">
-          <label class="text-sm font-medium mb-1 block">Кнопки (макс. 6)</label>
+          <label class="text-sm font-medium mb-1 flex items-center">Кнопки (макс. 6)<span class="tooltip-trigger">?<span class="tooltip-text">URL — ссылка. /start — deep link. Команда — callback. Максимум 6</span></span></label>
           <div id="editorButtonsList"></div>
           <button id="editorAddButtonBtn" onclick="editorAddButton()"
             class="w-full py-2 rounded-xl text-sm btn-secondary mt-2">
@@ -353,7 +449,7 @@
       <!-- Шаг 3: Фильтры -->
       <div id="step3" class="step-content hidden fade-in">
         <h2 class="text-lg font-bold mb-1">Фильтры</h2>
-        <p class="text-xs mb-3" style="color: var(--text-secondary)">Выберите теги и/или список для фильтрации получателей</p>
+        <p class="text-xs mb-3" style="color: var(--text-secondary)">Выберите теги ИЛИ список для фильтрации получателей</p>
 
         <div id="tagsLoading" class="text-center py-6">
           <div class="text-sm" style="color: var(--text-secondary)">Загрузка...</div>
@@ -361,7 +457,7 @@
 
         <div id="tagsContent" class="hidden">
           <div class="mb-4">
-            <div class="section-label">Содержит тег (хотя бы один)</div>
+            <div class="section-label flex items-center">Содержит тег (хотя бы один)<span class="tooltip-trigger">?<span class="tooltip-text">Отправить контактам с хотя бы одним из выбранных тегов</span></span></div>
             <div id="includeTagsContainer" class="flex flex-wrap gap-2 mb-2"></div>
             <div class="flex gap-2">
               <input id="customIncludeTag" type="text" placeholder="Свой тег..."
@@ -372,7 +468,7 @@
           </div>
 
           <div class="mb-4">
-            <div class="section-label">Не содержит тег (исключить)</div>
+            <div class="section-label flex items-center">Не содержит тег (исключить)<span class="tooltip-trigger">?<span class="tooltip-text">Исключить контактов с этими тегами</span></span></div>
             <div id="excludeTagsContainer" class="flex flex-wrap gap-2 mb-2"></div>
             <div class="flex gap-2">
               <input id="customExcludeTag" type="text" placeholder="Свой тег..."
@@ -383,7 +479,7 @@
           </div>
 
           <div class="mb-4">
-            <div class="section-label">Содержится в списке</div>
+            <div class="section-label flex items-center">Содержится в списке<span class="tooltip-trigger">?<span class="tooltip-text">Отправить только контактам из выбранного списка Leadteh</span></span></div>
             <div id="listsLoading" class="hidden text-xs" style="color: var(--text-secondary)">Загрузка списков...</div>
             <select id="listSelect" onchange="onListSelect()"
               class="input-field w-full rounded-lg px-3 py-2 text-sm">
@@ -404,7 +500,7 @@
         <p class="text-xs mb-3" style="color: var(--text-secondary)">Дайте рассылке название и выберите время</p>
 
         <div class="mb-4">
-          <label class="text-sm font-medium mb-1 block">Название рассылки</label>
+          <label class="text-sm font-medium mb-1 flex items-center">Название рассылки<span class="tooltip-trigger">?<span class="tooltip-text">Для удобства поиска в списке. Не видно получателям</span></span></label>
           <input type="text" id="broadcastName" placeholder="Например: Акция на розы"
             class="input-field w-full rounded-lg px-3 py-2 text-sm" />
         </div>
@@ -412,7 +508,7 @@
         <label class="flex items-center gap-2 mb-4 cursor-pointer">
           <input type="checkbox" id="sendNow" onchange="toggleSchedule()" checked
             class="w-4 h-4 rounded" />
-          <span class="text-sm">Отправить сейчас</span>
+          <span class="text-sm flex items-center">Отправить сейчас<span class="tooltip-trigger">?<span class="tooltip-text">Снимите галочку для отложенной отправки</span></span></span>
         </label>
 
         <div id="scheduleFields" class="hidden">
@@ -489,10 +585,17 @@
 
         <div class="p-3 rounded-lg mb-6" style="background: var(--bg-secondary); border: 1px dashed var(--border);">
           <div class="text-sm font-medium mb-2" style="color: var(--text-secondary)">Добавить бота</div>
+          <label class="text-xs mb-1 flex items-center" style="color: var(--text-secondary)">Токен бота<span class="tooltip-trigger">?<span class="tooltip-text">Получите у @BotFather командой /newbot или /mybots</span></span></label>
           <input id="newBotToken" type="text" placeholder="Токен бота" class="input-field w-full rounded-lg px-3 py-2 text-sm mb-2" />
           <div class="flex gap-2 mb-2">
-            <input id="newBotName" type="text" placeholder="Имя бота" class="input-field flex-1 rounded-lg px-3 py-2 text-sm" />
-            <input id="newBotLeadteh" type="text" placeholder="Leadteh ID" class="input-field rounded-lg px-3 py-2 text-sm" style="width: 100px;" />
+            <div class="flex-1">
+              <label class="text-xs mb-1 flex items-center" style="color: var(--text-secondary)">Имя бота<span class="tooltip-trigger">?<span class="tooltip-text">Отображаемое имя в интерфейсе. Автозаполняется при проверке токена</span></span></label>
+              <input id="newBotName" type="text" placeholder="Имя бота" class="input-field w-full rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div style="width: 120px;">
+              <label class="text-xs mb-1 flex items-center" style="color: var(--text-secondary)">Leadteh ID<span class="tooltip-trigger">?<span class="tooltip-text">ID бота в Leadteh. Найдите в настройках бота в кабинете Leadteh</span></span></label>
+              <input id="newBotLeadteh" type="text" placeholder="Leadteh ID" class="input-field w-full rounded-lg px-3 py-2 text-sm" />
+            </div>
           </div>
           <div id="newBotStatus" class="text-xs mb-2 hidden"></div>
           <div class="flex gap-2">
@@ -505,15 +608,23 @@
         <h2 class="text-lg font-bold mb-3">Администраторы</h2>
         <div id="settingsAdminsContainer" class="space-y-2 mb-3"></div>
         <div class="flex gap-2 mb-6">
-          <input id="newAdminId" type="text" placeholder="Telegram ID" class="input-field flex-1 rounded-lg px-3 py-2 text-sm" />
+          <div class="flex-1">
+            <input id="newAdminId" type="text" placeholder="Telegram ID" class="input-field w-full rounded-lg px-3 py-2 text-sm" />
+            <div class="text-xs mt-0.5 flex items-center" style="color: var(--text-muted)">
+              <span class="tooltip-trigger" style="margin-left:0;margin-right:4px">?<span class="tooltip-text">ID администратора. Узнать: отправьте /start боту @userinfobot</span></span>
+            </div>
+          </div>
           <button onclick="addAdmin()" class="btn-secondary px-3 py-1.5 rounded-lg text-xs">Добавить</button>
         </div>
 
         <!-- Leadteh API токен -->
         <h2 class="text-lg font-bold mb-3">Leadteh API</h2>
         <div class="flex gap-2 mb-6">
-          <input id="leadtehTokenInput" type="password" placeholder="API токен Leadteh"
-            class="input-field flex-1 rounded-lg px-3 py-2 text-sm" />
+          <div class="flex-1">
+            <label class="text-xs mb-1 flex items-center" style="color: var(--text-secondary)">Токен<span class="tooltip-trigger">?<span class="tooltip-text">Токен из Leadteh: Настройки → API. Общий для всех ботов</span></span></label>
+            <input id="leadtehTokenInput" type="password" placeholder="API токен Leadteh"
+              class="input-field w-full rounded-lg px-3 py-2 text-sm" />
+          </div>
           <button onclick="saveLeadtehToken()" class="btn-primary px-3 py-1.5 rounded-lg text-xs">Сохранить</button>
         </div>
 
@@ -642,12 +753,10 @@
     // ============================================
     async function init() {
       const initData = tg?.initData;
-      const debugEl = document.getElementById('debugInfo');
 
       if (!initData) {
         document.getElementById('loadingScreen').classList.add('hidden');
         document.getElementById('accessDenied').classList.remove('hidden');
-        debugEl.textContent = 'Причина: initData пустая. tg=' + (tg ? 'есть' : 'null') + ', tg.initData="' + (tg?.initData || '') + '", platform=' + (tg?.platform || 'unknown');
         return;
       }
 
@@ -662,7 +771,6 @@
         if (!data.authorized) {
           document.getElementById('loadingScreen').classList.add('hidden');
           document.getElementById('accessDenied').classList.remove('hidden');
-          debugEl.textContent = 'Причина: сервер отклонил. ' + (data.error || data.message || JSON.stringify(data));
           return;
         }
 
@@ -682,6 +790,12 @@
         // Тенант: загружаем ботов
         if (userTenantId) {
           await loadBots();
+          // Если нет ботов — показать онбординг вместо приложения
+          if (allBots.length === 0 && userRole !== 'super_admin') {
+            document.getElementById('app').classList.add('hidden');
+            document.getElementById('onboardingScreen').classList.remove('hidden');
+            return;
+          }
           renderMessagesList();
         } else if (userRole === 'super_admin') {
           // Суперадмин без тенанта — показать панель суперадмина
@@ -691,11 +805,88 @@
         console.error('Auth error:', e);
         document.getElementById('loadingScreen').classList.add('hidden');
         document.getElementById('accessDenied').classList.remove('hidden');
-        debugEl.textContent = 'Причина: ошибка fetch. ' + e.message;
       }
     }
 
     init();
+
+    // ============================================
+    // Онбординг
+    // ============================================
+    async function validateOnboardingBot() {
+      const token = document.getElementById('onboardBotToken').value.trim();
+      const statusDiv = document.getElementById('onboardBotStatus');
+      const nameInput = document.getElementById('onboardBotName');
+      if (!token) { statusDiv.classList.add('hidden'); return; }
+
+      statusDiv.classList.remove('hidden');
+      statusDiv.textContent = 'Проверка токена...';
+      statusDiv.style.color = 'var(--text-secondary)';
+
+      try {
+        const r = await apiFetch('/api/settings/validate-token', { method: 'POST', body: { token } });
+        const data = await r.json();
+        if (data.ok) {
+          statusDiv.textContent = `@${data.bot_username} — ${data.bot_name}`;
+          statusDiv.style.color = 'var(--success)';
+          if (!nameInput.value.trim()) nameInput.value = data.bot_name;
+        } else {
+          statusDiv.textContent = data.error || 'Невалидный токен';
+          statusDiv.style.color = 'var(--danger)';
+        }
+      } catch (e) {
+        statusDiv.textContent = 'Ошибка проверки';
+        statusDiv.style.color = 'var(--danger)';
+      }
+    }
+
+    async function submitOnboarding() {
+      const leadtehToken = document.getElementById('onboardLeadtehToken').value.trim();
+      const leadtehBotId = document.getElementById('onboardLeadtehBotId').value.trim();
+      const botToken = document.getElementById('onboardBotToken').value.trim();
+      const botName = document.getElementById('onboardBotName').value.trim();
+      const errorEl = document.getElementById('onboardError');
+      const btn = document.getElementById('onboardSubmitBtn');
+
+      errorEl.classList.add('hidden');
+
+      if (!leadtehToken || !leadtehBotId || !botToken || !botName) {
+        errorEl.textContent = 'Заполните все поля';
+        errorEl.classList.remove('hidden');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Настройка...';
+
+      try {
+        // 1. Сохранить Leadteh токен
+        const r1 = await apiFetch('/api/settings/leadteh-token', { method: 'POST', body: { token: leadtehToken } });
+        const d1 = await r1.json();
+        if (!d1.ok) { throw new Error(d1.error || 'Ошибка сохранения Leadteh токена'); }
+
+        // 2. Добавить бота
+        const r2 = await apiFetch('/api/settings/bot/add', {
+          method: 'POST',
+          body: { token: botToken, name: botName, leadteh_id: leadtehBotId },
+        });
+        const d2 = await r2.json();
+        if (!d2.ok) { throw new Error(d2.error || 'Ошибка добавления бота'); }
+
+        // 3. Перезагрузить ботов и показать приложение
+        await loadBots();
+        document.getElementById('onboardingScreen').classList.add('hidden');
+        document.getElementById('app').classList.remove('hidden');
+        renderMessagesList();
+        showAlert('Настройка завершена!');
+      } catch (e) {
+        errorEl.textContent = e.message;
+        errorEl.classList.remove('hidden');
+      }
+
+      btn.disabled = false;
+      btn.textContent = 'Начать работу';
+    }
 
     function setupSuperAdminUI() {
       // Добавляем кнопку суперадмина в табы
@@ -1109,6 +1300,7 @@
       document.getElementById('tagsLoading').classList.add('hidden');
       document.getElementById('tagsContent').classList.remove('hidden');
       renderTags();
+      updateFilterMode();
     }
 
     async function loadLists() {
@@ -1142,12 +1334,19 @@
       if (!selectedListId) {
         selectedListName = '';
         infoEl.classList.add('hidden');
+        updateFilterMode();
         updateContactsCount();
         return;
       }
+      // Список выбран — очищаем теги
+      selectedIncludeTags = [];
+      selectedExcludeTags = [];
+      renderTags();
+
       selectedListName = select.options[select.selectedIndex].textContent;
       infoEl.classList.remove('hidden');
       infoEl.textContent = 'Загрузка элементов списка...';
+      updateFilterMode();
       try {
         const r = await apiFetch(appendBotParam(`/api/lists/${selectedListId}/items`));
         const data = await r.json();
@@ -1176,11 +1375,59 @@
       }
     }
 
+    function updateFilterMode() {
+      const hasTags = selectedIncludeTags.length > 0 || selectedExcludeTags.length > 0;
+      const hasListSelected = !!selectedListId;
+      const listSelect = document.getElementById('listSelect');
+      const listInfo = document.getElementById('listInfo');
+      const customIncludeInput = document.getElementById('customIncludeTag');
+      const customExcludeInput = document.getElementById('customExcludeTag');
+      const customIncludeBtn = customIncludeInput?.nextElementSibling;
+      const customExcludeBtn = customExcludeInput?.nextElementSibling;
+
+      if (hasTags) {
+        // Теги выбраны — блокируем список
+        listSelect.disabled = true;
+        listSelect.style.opacity = '0.4';
+        if (listInfo) listInfo.style.opacity = '0.4';
+      } else if (hasListSelected) {
+        // Список выбран — блокируем теги
+        listSelect.disabled = false;
+        listSelect.style.opacity = '1';
+        if (listInfo) listInfo.style.opacity = '1';
+        document.querySelectorAll('#includeTagsContainer .tag-chip, #excludeTagsContainer .tag-chip').forEach(chip => {
+          chip.style.pointerEvents = 'none';
+          chip.style.opacity = '0.4';
+        });
+        if (customIncludeInput) { customIncludeInput.disabled = true; customIncludeInput.style.opacity = '0.4'; }
+        if (customExcludeInput) { customExcludeInput.disabled = true; customExcludeInput.style.opacity = '0.4'; }
+        if (customIncludeBtn) { customIncludeBtn.disabled = true; customIncludeBtn.style.opacity = '0.4'; }
+        if (customExcludeBtn) { customExcludeBtn.disabled = true; customExcludeBtn.style.opacity = '0.4'; }
+        return;
+      } else {
+        // Ничего не выбрано — всё активно
+        listSelect.disabled = false;
+        listSelect.style.opacity = '1';
+        if (listInfo) listInfo.style.opacity = '1';
+      }
+
+      // Если hasTags или ничего — теги активны
+      if (customIncludeInput) { customIncludeInput.disabled = false; customIncludeInput.style.opacity = '1'; }
+      if (customExcludeInput) { customExcludeInput.disabled = false; customExcludeInput.style.opacity = '1'; }
+      if (customIncludeBtn) { customIncludeBtn.disabled = false; customIncludeBtn.style.opacity = '1'; }
+      if (customExcludeBtn) { customExcludeBtn.disabled = false; customExcludeBtn.style.opacity = '1'; }
+      document.querySelectorAll('#includeTagsContainer .tag-chip, #excludeTagsContainer .tag-chip').forEach(chip => {
+        chip.style.pointerEvents = '';
+        chip.style.opacity = '1';
+      });
+    }
+
     function toggleTag(tag, type) {
       const arr = type === 'include' ? selectedIncludeTags : selectedExcludeTags;
       const idx = arr.indexOf(tag);
       if (idx >= 0) arr.splice(idx, 1); else arr.push(tag);
       renderTags();
+      updateFilterMode();
       updateContactsCount();
     }
 
@@ -1193,6 +1440,7 @@
       if (!arr.includes(tag)) arr.push(tag);
       input.value = '';
       renderTags();
+      updateFilterMode();
       updateContactsCount();
     }
 
@@ -1277,9 +1525,9 @@
       });
 
       const filtersHtml = [];
-      if (selectedIncludeTags.length > 0) filtersHtml.push('Содержит: ' + selectedIncludeTags.join(', '));
-      if (selectedExcludeTags.length > 0) filtersHtml.push('Исключить: ' + selectedExcludeTags.join(', '));
-      if (selectedListId && selectedListName) filtersHtml.push('Список: ' + selectedListName);
+      if (selectedIncludeTags.length > 0) filtersHtml.push('Содержит: ' + escapeHtml(selectedIncludeTags.join(', ')));
+      if (selectedExcludeTags.length > 0) filtersHtml.push('Исключить: ' + escapeHtml(selectedExcludeTags.join(', ')));
+      if (selectedListId && selectedListName) filtersHtml.push('Список: ' + escapeHtml(selectedListName));
       if (filtersHtml.length === 0) filtersHtml.push('Все контакты');
       document.getElementById('confirmFilters').innerHTML = filtersHtml.join('<br>');
 
@@ -1629,7 +1877,7 @@
         return;
       }
       container.innerHTML = settingsBots.map(bot => {
-        const canDelete = settingsBots.length > 1;
+        const canDelete = settingsBots.length > 1 || userRole === 'super_admin';
         return `
           <div class="p-3 rounded-lg flex items-center justify-between" style="background:var(--bg-secondary);border:1px solid var(--border)">
             <div class="flex-1 min-w-0">
@@ -1773,8 +2021,8 @@
     }
 
     async function loadSuperData() {
+      await loadSuperTariffs();
       loadSuperTenants();
-      loadSuperTariffs();
       loadSuperStats();
     }
 
@@ -1792,22 +2040,35 @@
         container.innerHTML = '<div class="text-sm" style="color:var(--text-muted)">Нет арендаторов</div>';
         return;
       }
-      container.innerHTML = tenants.map(t => `
+      container.innerHTML = tenants.map(t => {
+        const tariffOptions = superTariffs.map(tp =>
+          `<option value="${tp.id}" ${tp.id === t.tariff_plan_id ? 'selected' : ''}>${escapeHtml(tp.name)}</option>`
+        ).join('');
+        return `
         <div class="broadcast-card">
           <div class="flex items-center justify-between mb-1">
             <span class="text-sm font-medium">${escapeHtml(t.name || 'Без имени')}</span>
-            <span class="status-badge status-${t.status}">${t.status}</span>
+            <span class="status-badge status-${escapeAttr(t.status)}">${escapeHtml(t.status)}</span>
           </div>
-          <div class="text-xs" style="color:var(--text-muted)">TG ID: ${t.telegram_id}</div>
-          <div class="text-xs" style="color:var(--text-muted)">Тариф: ${escapeHtml(t.tariff_name || '-')} | Боты: ${t.bots_count} | Рассылки: ${t.broadcasts_count}</div>
-          <div class="flex gap-2 mt-2">
+          <div class="text-xs" style="color:var(--text-muted)">TG ID: ${escapeHtml(String(t.telegram_id))}</div>
+          <div class="text-xs mb-1" style="color:var(--text-muted)">Боты: ${escapeHtml(String(t.bots_count))} | Рассылки: ${escapeHtml(String(t.broadcasts_count))}</div>
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-xs" style="color:var(--text-muted)">Тариф:</span>
+            <select onchange="changeTenantTariff(${t.id}, this.value)" class="input-field rounded-lg px-2 py-1 text-xs flex-1">
+              <option value="">Не назначен</option>
+              ${tariffOptions}
+            </select>
+          </div>
+          <div class="flex gap-2">
             ${t.status === 'active'
               ? `<button onclick="toggleTenantStatus(${t.id},'blocked')" class="text-xs px-2 py-1 rounded btn-danger">Заблокировать</button>`
               : `<button onclick="toggleTenantStatus(${t.id},'active')" class="text-xs px-2 py-1 rounded btn-primary">Активировать</button>`
             }
             <button onclick="impersonateTenant(${t.id})" class="text-xs px-2 py-1 rounded btn-secondary">Войти как тенант</button>
+            <button onclick="confirmDeleteTenant(${t.id}, '${escapeAttr(t.name || 'Без имени')}')" class="text-xs px-2 py-1 rounded btn-danger">Удалить</button>
           </div>
-        </div>`).join('');
+        </div>`;
+      }).join('');
     }
 
     async function toggleTenantStatus(id, status) {
@@ -1815,6 +2076,28 @@
         await apiFetch(`/api/super/tenants/${id}/update`, { method: 'POST', body: { status } });
         loadSuperTenants();
       } catch (e) { showAlert('Ошибка'); }
+    }
+
+    async function changeTenantTariff(tenantId, tariffPlanId) {
+      try {
+        await apiFetch(`/api/super/tenants/${tenantId}/update`, {
+          method: 'POST',
+          body: { tariff_plan_id: tariffPlanId ? Number(tariffPlanId) : null },
+        });
+        showAlert('Тариф обновлён');
+      } catch (e) { showAlert('Ошибка смены тарифа'); }
+    }
+
+    async function confirmDeleteTenant(tenantId, name) {
+      if (!confirm(`Удалить арендатора "${name}"? Все данные (боты, рассылки, файлы) будут удалены безвозвратно.`)) return;
+      try {
+        const r = await apiFetch(`/api/super/tenants/${tenantId}/delete`, { method: 'POST' });
+        const data = await r.json();
+        if (data.ok) {
+          showAlert('Арендатор удалён');
+          loadSuperTenants();
+        } else showAlert(data.error || 'Ошибка удаления');
+      } catch (e) { showAlert('Ошибка удаления арендатора'); }
     }
 
     async function impersonateTenant(tenantId) {
@@ -1838,7 +2121,10 @@
       const select = document.getElementById('newTenantTariff');
       select.innerHTML = '<option value="">Тариф по умолчанию</option>';
       superTariffs.forEach(t => {
-        select.innerHTML += `<option value="${t.id}">${escapeHtml(t.name)} (${t.max_bots} ботов, ${t.max_broadcasts_per_month} рассылок/мес)</option>`;
+        const opt = document.createElement('option');
+        opt.value = t.id;
+        opt.textContent = `${t.name} (${t.max_bots} ботов, ${t.max_broadcasts_per_month} рассылок/мес)`;
+        select.appendChild(opt);
       });
     }
 
@@ -1935,6 +2221,21 @@
     }
 
     // ============================================
+    // Подсказки (мобильные — по клику)
+    // ============================================
+    document.addEventListener('click', function(e) {
+      const trigger = e.target.closest('.tooltip-trigger');
+      document.querySelectorAll('.tooltip-trigger.active').forEach(el => {
+        if (el !== trigger) el.classList.remove('active');
+      });
+      if (trigger) {
+        trigger.classList.toggle('active');
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    });
+
+    // ============================================
     // Утилиты
     // ============================================
     function escapeHtml(str) {
@@ -1946,8 +2247,14 @@
     }
 
     function showAlert(message) {
-      if (tg?.showAlert) tg.showAlert(message);
-      else alert(message);
+      if (tg?.showAlert) { tg.showAlert(message); return; }
+      // Fallback: toast-уведомление вместо alert()
+      const toast = document.createElement('div');
+      toast.textContent = message;
+      toast.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:9999;background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border);padding:10px 20px;border-radius:12px;font-size:13px;max-width:90%;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,0.3);animation:fadeIn 0.2s ease-in';
+      document.body.appendChild(toast);
+      setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; }, 2500);
+      setTimeout(() => toast.remove(), 2800);
     }
   </script>
 </body>

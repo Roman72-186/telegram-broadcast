@@ -11,15 +11,55 @@ const { authMiddleware, requireSuperAdmin, requireTenantAdmin, requireTenantOwne
 const app = express();
 const config = loadConfig();
 
+// ============================================
+// Rate Limiter (in-memory)
+// ============================================
+const rateLimitStore = new Map();
+
+function rateLimit(keyFn, maxRequests, windowMs) {
+  return (req, res, next) => {
+    const key = keyFn(req);
+    const now = Date.now();
+    let entry = rateLimitStore.get(key);
+    if (!entry || now - entry.start > windowMs) {
+      entry = { start: now, count: 0 };
+      rateLimitStore.set(key, entry);
+    }
+    entry.count++;
+    if (entry.count > maxRequests) {
+      return res.status(429).json({ error: 'Слишком много запросов. Попробуйте позже.' });
+    }
+    next();
+  };
+}
+
+// Очистка устаревших записей каждые 5 минут
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of rateLimitStore) {
+    if (now - entry.start > 120000) rateLimitStore.delete(key);
+  }
+}, 300000);
+
 app.use(express.json({ limit: '15mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// CORS: разрешить только Telegram WebApp
+// CORS: разрешить только Telegram WebApp и доверенные домены
 app.use((req, res, next) => {
   const origin = req.headers.origin || '';
-  // Telegram WebApp загружается через web.telegram.org или t.me
-  if (origin && !origin.includes('telegram.org') && !origin.includes('t.me') && !origin.includes('localhost') && !origin.includes('leadtehsms.ru')) {
-    return res.status(403).json({ error: 'CORS: Origin не разрешён' });
+  if (origin) {
+    try {
+      const host = new URL(origin).hostname;
+      const allowed = host === 'localhost'
+        || host === 'telegram.org' || host.endsWith('.telegram.org')
+        || host === 't.me' || host.endsWith('.t.me')
+        || host === 'leadtehsms.ru' || host.endsWith('.leadtehsms.ru');
+      if (!allowed) {
+        return res.status(403).json({ error: 'CORS: Origin не разрешён' });
+      }
+    } catch {
+      return res.status(403).json({ error: 'CORS: невалидный Origin' });
+    }
   }
   res.setHeader('Access-Control-Allow-Origin', origin || '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -31,7 +71,7 @@ app.use((req, res, next) => {
 // ============================================
 // API: Авторизация через initData
 // ============================================
-app.post('/api/auth', (req, res) => {
+app.post('/api/auth', rateLimit(req => req.ip, 5, 60000), (req, res) => {
   try {
     const { initData } = req.body;
 
@@ -40,14 +80,12 @@ app.post('/api/auth', (req, res) => {
     }
 
     const validation = validateInitData(initData, config.platformBotToken);
-    console.log('[auth] initData validation:', validation.valid ? 'OK' : validation.error, '| user:', validation.user?.id);
     if (!validation.valid) {
       return res.status(401).json({ error: validation.error });
     }
 
     const telegramId = String(validation.user.id);
     const { role, tenantId } = getUserRole(telegramId, db);
-    console.log('[auth] telegram_id:', telegramId, '| role:', role, '| tenant_id:', tenantId);
 
     if (role === 'none') {
       return res.json({
@@ -58,7 +96,6 @@ app.post('/api/auth', (req, res) => {
 
     // Создаём сессию
     const session = db.createSession(tenantId, telegramId, role);
-    console.log('[auth] session created for', telegramId, '| role:', role);
 
     res.json({
       authorized: true,
@@ -81,7 +118,7 @@ app.post('/api/auth', (req, res) => {
 // ============================================
 // Все последующие роуты требуют авторизации
 // ============================================
-app.use('/api', (req, res, next) => {
+app.use('/api', rateLimit(req => `api:${req.ip}`, 60, 60000), (req, res, next) => {
   // /api/auth не требует Bearer
   if (req.path === '/auth') return next();
   // /api/cron/send проверяется по cronSecret
@@ -92,7 +129,7 @@ app.use('/api', (req, res, next) => {
 // ============================================
 // API: Загрузка фото
 // ============================================
-app.post('/api/upload', requireTenantAdmin, (req, res) => {
+app.post('/api/upload', requireTenantAdmin, rateLimit(req => `upload:${req.telegramId}`, 3, 60000), (req, res) => {
   try {
     const { data, filename } = req.body;
     if (!data) return res.status(400).json({ error: 'Нет данных' });
@@ -130,7 +167,12 @@ app.get('/api/uploads/:tenantDir/:filename', (req, res) => {
   if (!isSuperAdmin(req.telegramId) && tenantDir !== String(req.tenantId)) {
     return res.status(403).json({ error: 'Доступ запрещён' });
   }
-  const filePath = path.join(__dirname, 'data', 'uploads', tenantDir, filename);
+  // Path traversal protection
+  const uploadsBase = path.resolve(__dirname, 'data', 'uploads');
+  const filePath = path.resolve(uploadsBase, tenantDir, filename);
+  if (!filePath.startsWith(uploadsBase + path.sep)) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Файл не найден' });
   res.sendFile(filePath);
 });
@@ -501,9 +543,9 @@ app.post('/api/settings/bot/remove', requireTenantOwner, (req, res) => {
       return res.status(404).json({ error: 'Бот не найден' });
     }
 
-    // Проверяем что остаётся хотя бы 1 бот
+    // Проверяем что остаётся хотя бы 1 бот (суперадмин может удалить любого)
     const bots = db.getBotsByTenant(req.tenantId);
-    if (bots.length <= 1) {
+    if (bots.length <= 1 && !isSuperAdmin(req.telegramId)) {
       return res.status(400).json({ error: 'Нужен минимум 1 бот' });
     }
 
@@ -721,6 +763,28 @@ app.post('/api/super/tenants/:id/update', requireSuperAdmin, (req, res) => {
   } catch (e) {
     console.error('POST /api/super/tenants/:id/update error:', e.message);
     res.status(500).json({ error: 'Ошибка обновления тенанта' });
+  }
+});
+
+// --- Удалить тенанта ---
+app.post('/api/super/tenants/:id/delete', requireSuperAdmin, (req, res) => {
+  try {
+    const { id } = req.params;
+    const tenant = db.getTenantById(Number(id));
+    if (!tenant) return res.status(404).json({ error: 'Тенант не найден' });
+
+    db.deleteTenant(Number(id));
+
+    // Удалить файлы загрузок тенанта
+    const uploadsDir = path.join(__dirname, 'data', 'uploads', String(id));
+    if (fs.existsSync(uploadsDir)) {
+      fs.rmSync(uploadsDir, { recursive: true, force: true });
+    }
+
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('POST /api/super/tenants/:id/delete error:', e.message);
+    res.status(500).json({ error: 'Ошибка удаления тенанта' });
   }
 });
 
@@ -1079,7 +1143,13 @@ async function sendSingleMessage(botToken, chatId, text, photoUrl, inlineKeyboar
 async function sendLocalPhoto(botToken, chatId, text, localPath, replyMarkup, parseMode) {
   // localPath = /api/uploads/{tenantId}/{filename}
   const parts = localPath.replace('/api/uploads/', '').split('/');
-  const filePath = path.join(__dirname, 'data', 'uploads', ...parts);
+  const uploadsBase = path.resolve(__dirname, 'data', 'uploads');
+  const filePath = path.resolve(uploadsBase, ...parts);
+
+  // Path traversal protection
+  if (!filePath.startsWith(uploadsBase + path.sep)) {
+    return { ok: false, json: async () => ({ description: 'Forbidden: invalid path' }) };
+  }
 
   if (!fs.existsSync(filePath)) {
     return { ok: false, json: async () => ({ description: 'Файл не найден: ' + localPath }) };
