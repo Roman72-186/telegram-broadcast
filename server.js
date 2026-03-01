@@ -1,5 +1,6 @@
 // server.js — Express-сервер для рассылок
 const express = require('express');
+const fs = require('fs');
 const path = require('path');
 const cron = require('node-cron');
 const { loadConfig, getBotById } = require('./lib/config');
@@ -36,6 +37,166 @@ function getBotConfig(req) {
     telegramBotToken: bot.token,
   };
 }
+
+// ============================================
+// Хелперы настроек
+// ============================================
+function requireAdmin(req, res) {
+  const adminId = req.query.admin_id || req.body?.admin_id;
+  if (!adminId || !config.adminTelegramIds.includes(String(adminId))) {
+    res.status(403).json({ error: 'Доступ запрещён' });
+    return false;
+  }
+  return true;
+}
+
+function maskToken(token) {
+  if (!token || token.length < 10) return '***';
+  return token.slice(0, 4) + '...' + token.slice(-3);
+}
+
+function readPreservedEnvKeys(envPath) {
+  const preserved = {};
+  if (!fs.existsSync(envPath)) return preserved;
+  const lines = fs.readFileSync(envPath, 'utf-8').split('\n');
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eqIdx = trimmed.indexOf('=');
+    if (eqIdx < 0) continue;
+    const key = trimmed.slice(0, eqIdx).trim();
+    const value = trimmed.slice(eqIdx + 1).trim();
+    if (['PORT', 'LEADTEH_API_TOKEN', 'CRON_SECRET'].includes(key)) {
+      preserved[key] = value;
+    }
+  }
+  return preserved;
+}
+
+// ============================================
+// API: Настройки — получить
+// ============================================
+app.get('/api/settings', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+
+  const bots = config.bots.map((b, i) => ({
+    id: b.id,
+    name: b.name,
+    token_masked: maskToken(b.token),
+    leadteh_id: b.leadtehBotId || '',
+    index: i,
+  }));
+
+  res.json({
+    bots,
+    admin_ids: config.adminTelegramIds,
+  });
+});
+
+// ============================================
+// API: Настройки — сохранить
+// ============================================
+app.post('/api/settings/save', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+
+  const { admin_id, bots: newBots, admin_ids: newAdminIds } = req.body;
+
+  // Валидация
+  if (!Array.isArray(newBots) || newBots.length === 0) {
+    return res.status(400).json({ error: 'Нужен минимум 1 бот' });
+  }
+  if (!Array.isArray(newAdminIds) || newAdminIds.length === 0) {
+    return res.status(400).json({ error: 'Нужен минимум 1 админ' });
+  }
+  if (!newAdminIds.includes(String(admin_id))) {
+    return res.status(400).json({ error: 'Нельзя удалить себя из админов' });
+  }
+
+  // Собираем токены ботов
+  const resolvedBots = [];
+  for (let i = 0; i < newBots.length; i++) {
+    const bot = newBots[i];
+    let token = bot.token || '';
+
+    // Существующий бот без нового токена — берём из текущего конфига
+    if (!token && bot.is_existing && bot.original_index != null) {
+      const origBot = config.bots[bot.original_index];
+      if (origBot) {
+        token = origBot.token;
+      }
+    }
+
+    if (!token) {
+      return res.status(400).json({ error: `Бот "${bot.name || i + 1}" — токен не задан` });
+    }
+
+    resolvedBots.push({
+      name: bot.name || `Бот ${i + 1}`,
+      token,
+      leadteh_id: bot.leadteh_id || '',
+    });
+  }
+
+  // Читаем сохраняемые переменные из текущего .env
+  const envPath = path.join(__dirname, '.env');
+  const preserved = readPreservedEnvKeys(envPath);
+
+  // Бэкап
+  if (fs.existsSync(envPath)) {
+    fs.copyFileSync(envPath, envPath + '.backup');
+  }
+
+  // Генерация нового .env
+  let envContent = '';
+  envContent += `PORT=${preserved.PORT || config.port || 3000}\n`;
+  envContent += `LEADTEH_API_TOKEN=${preserved.LEADTEH_API_TOKEN || config.leadtehApiToken || ''}\n`;
+  envContent += `CRON_SECRET=${preserved.CRON_SECRET || config.cronSecret || ''}\n`;
+  envContent += `ADMIN_TELEGRAM_IDS=${newAdminIds.join(',')}\n\n`;
+
+  for (let i = 0; i < resolvedBots.length; i++) {
+    const n = i + 1;
+    const bot = resolvedBots[i];
+    envContent += `BOT_${n}_NAME=${bot.name}\n`;
+    envContent += `BOT_${n}_TOKEN=${bot.token}\n`;
+    envContent += `BOT_${n}_LEADTEH_ID=${bot.leadteh_id}\n`;
+    if (i < resolvedBots.length - 1) envContent += '\n';
+  }
+
+  fs.writeFileSync(envPath, envContent, 'utf-8');
+
+  res.json({ ok: true, message: 'Настройки сохранены. Сервер перезагружается...' });
+
+  // PM2 автоматически рестартует процесс
+  setTimeout(() => process.exit(0), 1500);
+});
+
+// ============================================
+// API: Настройки — проверить токен бота
+// ============================================
+app.post('/api/settings/validate-token', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+
+  const { token } = req.body;
+  if (!token) {
+    return res.status(400).json({ ok: false, error: 'Токен не указан' });
+  }
+
+  try {
+    const r = await fetch(`https://api.telegram.org/bot${token}/getMe`);
+    const data = await r.json();
+    if (data.ok) {
+      res.json({
+        ok: true,
+        bot_username: data.result.username,
+        bot_name: `${data.result.first_name}${data.result.last_name ? ' ' + data.result.last_name : ''}`,
+      });
+    } else {
+      res.json({ ok: false, error: data.description || 'Невалидный токен' });
+    }
+  } catch (e) {
+    res.json({ ok: false, error: 'Ошибка проверки токена' });
+  }
+});
 
 // ============================================
 // API: Список ботов

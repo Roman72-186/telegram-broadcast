@@ -280,7 +280,7 @@
       </select>
     </div>
 
-    <!-- Переключатель: создать / список -->
+    <!-- Переключатель: создать / список / настройки -->
     <div class="flex gap-2 mb-4">
       <button id="tabCreate" onclick="showTab('create')"
         class="flex-1 py-2 px-3 rounded-lg text-sm font-medium btn-primary">
@@ -289,6 +289,10 @@
       <button id="tabList" onclick="showTab('list')"
         class="flex-1 py-2 px-3 rounded-lg text-sm font-medium btn-secondary">
         Мои рассылки
+      </button>
+      <button id="tabSettings" onclick="showTab('settings')"
+        class="py-2 px-3 rounded-lg text-sm font-medium btn-secondary" title="Настройки">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
     </div>
 
@@ -481,6 +485,49 @@
         <div class="text-sm" style="color: var(--text-secondary)">Нет рассылок</div>
       </div>
     </div>
+
+    <!-- TAB: Настройки -->
+    <div id="settingsTab" class="hidden">
+      <div id="settingsLoading" class="text-center py-8">
+        <div class="text-sm" style="color: var(--text-secondary)">Загрузка настроек...</div>
+      </div>
+      <div id="settingsContent" class="hidden">
+        <!-- Боты -->
+        <h2 class="text-lg font-bold mb-3">Боты</h2>
+        <div id="settingsBotsContainer" class="space-y-2 mb-3"></div>
+
+        <!-- Форма добавления бота -->
+        <div class="p-3 rounded-lg mb-6" style="background: var(--bg-secondary); border: 1px dashed var(--border);">
+          <div class="text-sm font-medium mb-2" style="color: var(--text-secondary)">Добавить бота</div>
+          <input id="newBotToken" type="text" placeholder="Токен бота" class="input-field w-full rounded-lg px-3 py-2 text-sm mb-2" />
+          <div class="flex gap-2 mb-2">
+            <input id="newBotName" type="text" placeholder="Имя бота" class="input-field flex-1 rounded-lg px-3 py-2 text-sm" />
+            <input id="newBotLeadteh" type="text" placeholder="Leadteh ID" class="input-field rounded-lg px-3 py-2 text-sm" style="width: 100px;" />
+          </div>
+          <div id="newBotStatus" class="text-xs mb-2 hidden"></div>
+          <div class="flex gap-2">
+            <button onclick="validateNewBot()" class="btn-secondary px-3 py-1.5 rounded-lg text-xs">Проверить</button>
+            <button onclick="addBot()" id="addBotBtn" class="btn-primary px-3 py-1.5 rounded-lg text-xs" disabled>Добавить</button>
+          </div>
+        </div>
+
+        <!-- Админы -->
+        <h2 class="text-lg font-bold mb-3">Администраторы</h2>
+        <div id="settingsAdminsContainer" class="space-y-2 mb-3"></div>
+
+        <!-- Форма добавления админа -->
+        <div class="flex gap-2 mb-6">
+          <input id="newAdminId" type="text" placeholder="Telegram ID" class="input-field flex-1 rounded-lg px-3 py-2 text-sm" />
+          <button onclick="addAdmin()" class="btn-secondary px-3 py-1.5 rounded-lg text-xs">Добавить</button>
+        </div>
+
+        <!-- Кнопка сохранения -->
+        <button onclick="saveSettings()" id="saveSettingsBtn" class="btn-primary w-full py-3 rounded-lg text-sm font-medium">
+          Применить настройки
+        </button>
+        <p class="text-xs text-center mt-2" style="color: var(--text-muted)">Сервер будет перезагружен</p>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -613,23 +660,35 @@
     // Табы
     // ============================================
     function showTab(tab) {
-      const createTab = document.getElementById('createTab');
-      const listTab = document.getElementById('listTab');
-      const tabCreate = document.getElementById('tabCreate');
-      const tabList = document.getElementById('tabList');
+      const tabs = {
+        create: document.getElementById('createTab'),
+        list: document.getElementById('listTab'),
+        settings: document.getElementById('settingsTab'),
+      };
+      const buttons = {
+        create: document.getElementById('tabCreate'),
+        list: document.getElementById('tabList'),
+        settings: document.getElementById('tabSettings'),
+      };
 
-      if (tab === 'create') {
-        createTab.classList.remove('hidden');
-        listTab.classList.add('hidden');
-        tabCreate.className = 'flex-1 py-2 px-3 rounded-lg text-sm font-medium btn-primary';
-        tabList.className = 'flex-1 py-2 px-3 rounded-lg text-sm font-medium btn-secondary';
-      } else {
-        createTab.classList.add('hidden');
-        listTab.classList.remove('hidden');
-        tabCreate.className = 'flex-1 py-2 px-3 rounded-lg text-sm font-medium btn-secondary';
-        tabList.className = 'flex-1 py-2 px-3 rounded-lg text-sm font-medium btn-primary';
-        loadBroadcasts();
+      for (const key in tabs) {
+        tabs[key].classList.add('hidden');
+        if (key === 'settings') {
+          buttons[key].className = 'py-2 px-3 rounded-lg text-sm font-medium btn-secondary';
+        } else {
+          buttons[key].className = 'flex-1 py-2 px-3 rounded-lg text-sm font-medium btn-secondary';
+        }
       }
+
+      tabs[tab].classList.remove('hidden');
+      if (tab === 'settings') {
+        buttons[tab].className = 'py-2 px-3 rounded-lg text-sm font-medium btn-primary';
+      } else {
+        buttons[tab].className = 'flex-1 py-2 px-3 rounded-lg text-sm font-medium btn-primary';
+      }
+
+      if (tab === 'list') loadBroadcasts();
+      if (tab === 'settings') loadSettings();
     }
 
     // ============================================
@@ -1412,6 +1471,253 @@
       } catch (e) {
         showAlert('Ошибка удаления рассылки');
       }
+    }
+
+    // ============================================
+    // Настройки
+    // ============================================
+    let settingsBots = [];
+    let settingsAdminIds = [];
+    let newBotValidated = false;
+
+    async function loadSettings() {
+      const loading = document.getElementById('settingsLoading');
+      const content = document.getElementById('settingsContent');
+      loading.classList.remove('hidden');
+      content.classList.add('hidden');
+
+      try {
+        const r = await fetch(`/api/settings?admin_id=${adminTelegramId}`);
+        if (!r.ok) {
+          const err = await r.json();
+          showAlert(err.error || 'Ошибка загрузки настроек');
+          return;
+        }
+        const data = await r.json();
+        settingsBots = (data.bots || []).map(b => ({
+          name: b.name,
+          token: '',
+          token_masked: b.token_masked,
+          leadteh_id: b.leadteh_id,
+          is_existing: true,
+          original_index: b.index,
+        }));
+        settingsAdminIds = data.admin_ids || [];
+        renderSettingsBots();
+        renderSettingsAdmins();
+        loading.classList.add('hidden');
+        content.classList.remove('hidden');
+      } catch (e) {
+        console.error('Ошибка загрузки настроек:', e);
+        showAlert('Ошибка загрузки настроек');
+      }
+    }
+
+    function renderSettingsBots() {
+      const container = document.getElementById('settingsBotsContainer');
+      if (settingsBots.length === 0) {
+        container.innerHTML = '<div class="text-sm" style="color:var(--text-muted)">Нет ботов</div>';
+        return;
+      }
+      container.innerHTML = settingsBots.map((bot, i) => {
+        const tokenDisplay = bot.is_existing ? bot.token_masked : 'новый';
+        const canDelete = settingsBots.length > 1;
+        return `
+          <div class="p-3 rounded-lg flex items-center justify-between" style="background:var(--bg-secondary);border:1px solid var(--border)">
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-medium truncate">${escapeHtml(bot.name)}</div>
+              <div class="text-xs" style="color:var(--text-muted)">Токен: ${escapeHtml(tokenDisplay)}</div>
+              ${bot.leadteh_id ? `<div class="text-xs" style="color:var(--text-muted)">Leadteh: ${escapeHtml(bot.leadteh_id)}</div>` : ''}
+            </div>
+            ${canDelete ? `<button onclick="removeBot(${i})" class="ml-2 text-xs px-2 py-1 rounded" style="color:var(--danger)">✕</button>` : ''}
+          </div>`;
+      }).join('');
+    }
+
+    function renderSettingsAdmins() {
+      const container = document.getElementById('settingsAdminsContainer');
+      container.innerHTML = settingsAdminIds.map((id, i) => {
+        const isSelf = String(id) === String(adminTelegramId);
+        return `
+          <div class="p-2 px-3 rounded-lg flex items-center justify-between" style="background:var(--bg-secondary);border:1px solid var(--border)">
+            <span class="text-sm">${escapeHtml(id)}${isSelf ? ' <span style="color:var(--text-muted)">(вы)</span>' : ''}</span>
+            ${!isSelf ? `<button onclick="removeAdmin(${i})" class="text-xs px-2 py-1 rounded" style="color:var(--danger)">✕</button>` : ''}
+          </div>`;
+      }).join('');
+    }
+
+    function removeBot(i) {
+      if (settingsBots.length <= 1) {
+        showAlert('Нужен минимум один бот');
+        return;
+      }
+      settingsBots.splice(i, 1);
+      renderSettingsBots();
+    }
+
+    function removeAdmin(i) {
+      if (String(settingsAdminIds[i]) === String(adminTelegramId)) {
+        showAlert('Нельзя удалить себя');
+        return;
+      }
+      settingsAdminIds.splice(i, 1);
+      renderSettingsAdmins();
+    }
+
+    async function validateNewBot() {
+      const tokenInput = document.getElementById('newBotToken');
+      const nameInput = document.getElementById('newBotName');
+      const statusDiv = document.getElementById('newBotStatus');
+      const addBtn = document.getElementById('addBotBtn');
+      const token = tokenInput.value.trim();
+
+      if (!token) {
+        showAlert('Введите токен бота');
+        return;
+      }
+
+      statusDiv.classList.remove('hidden');
+      statusDiv.textContent = 'Проверяю...';
+      statusDiv.style.color = 'var(--text-secondary)';
+      addBtn.disabled = true;
+      newBotValidated = false;
+
+      try {
+        const r = await fetch('/api/settings/validate-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, admin_id: adminTelegramId }),
+        });
+        const data = await r.json();
+
+        if (data.ok) {
+          statusDiv.textContent = `@${data.bot_username} — ${data.bot_name}`;
+          statusDiv.style.color = 'var(--success)';
+          if (!nameInput.value.trim()) {
+            nameInput.value = data.bot_name;
+          }
+          addBtn.disabled = false;
+          newBotValidated = true;
+        } else {
+          statusDiv.textContent = data.error || 'Невалидный токен';
+          statusDiv.style.color = 'var(--danger)';
+        }
+      } catch (e) {
+        statusDiv.textContent = 'Ошибка проверки';
+        statusDiv.style.color = 'var(--danger)';
+      }
+    }
+
+    function addBot() {
+      if (!newBotValidated) {
+        showAlert('Сначала проверьте токен');
+        return;
+      }
+      const token = document.getElementById('newBotToken').value.trim();
+      const name = document.getElementById('newBotName').value.trim() || 'Новый бот';
+      const leadtehId = document.getElementById('newBotLeadteh').value.trim();
+
+      settingsBots.push({
+        name,
+        token,
+        token_masked: maskTokenFront(token),
+        leadteh_id: leadtehId,
+        is_existing: false,
+        original_index: null,
+      });
+
+      // Очистить форму
+      document.getElementById('newBotToken').value = '';
+      document.getElementById('newBotName').value = '';
+      document.getElementById('newBotLeadteh').value = '';
+      document.getElementById('newBotStatus').classList.add('hidden');
+      document.getElementById('addBotBtn').disabled = true;
+      newBotValidated = false;
+
+      renderSettingsBots();
+    }
+
+    function maskTokenFront(token) {
+      if (!token || token.length < 10) return '***';
+      return token.slice(0, 4) + '...' + token.slice(-3);
+    }
+
+    function addAdmin() {
+      const input = document.getElementById('newAdminId');
+      const id = input.value.trim();
+      if (!id) {
+        showAlert('Введите Telegram ID');
+        return;
+      }
+      if (!/^\d+$/.test(id)) {
+        showAlert('Telegram ID должен содержать только цифры');
+        return;
+      }
+      if (settingsAdminIds.includes(id)) {
+        showAlert('Этот админ уже в списке');
+        return;
+      }
+      settingsAdminIds.push(id);
+      input.value = '';
+      renderSettingsAdmins();
+    }
+
+    async function saveSettings() {
+      const btn = document.getElementById('saveSettingsBtn');
+      btn.disabled = true;
+      btn.textContent = 'Сохранение...';
+
+      try {
+        const body = {
+          admin_id: adminTelegramId,
+          bots: settingsBots.map(b => ({
+            name: b.name,
+            token: b.is_existing ? '' : b.token,
+            leadteh_id: b.leadteh_id,
+            is_existing: b.is_existing,
+            original_index: b.original_index,
+          })),
+          admin_ids: settingsAdminIds,
+        };
+
+        const r = await fetch('/api/settings/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+
+        const data = await r.json();
+
+        if (data.ok) {
+          btn.textContent = 'Перезагрузка...';
+          setTimeout(() => waitAndReload(0), 2000);
+        } else {
+          showAlert(data.error || 'Ошибка сохранения');
+          btn.disabled = false;
+          btn.textContent = 'Применить настройки';
+        }
+      } catch (e) {
+        showAlert('Ошибка сохранения настроек');
+        btn.disabled = false;
+        btn.textContent = 'Применить настройки';
+      }
+    }
+
+    async function waitAndReload(attempts) {
+      if (attempts > 15) {
+        showAlert('Сервер не отвечает. Попробуйте обновить страницу вручную.');
+        return;
+      }
+      try {
+        const r = await fetch('/api/bots');
+        if (r.ok) {
+          location.reload();
+          return;
+        }
+      } catch (e) {
+        // сервер ещё не поднялся
+      }
+      setTimeout(() => waitAndReload(attempts + 1), 1000);
     }
 
     // ============================================
