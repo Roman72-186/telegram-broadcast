@@ -1,4 +1,6 @@
 node_modules/
 data/broadcasts.json
+data/broadcast.db
+data/uploads/
 .env
 public/uploads/

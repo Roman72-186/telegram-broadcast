@@ -71,7 +71,6 @@
       color: var(--text-muted);
     }
 
-    /* Select styling */
     select.input-field {
       appearance: none;
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%232ecc71' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
@@ -153,26 +152,12 @@
       letter-spacing: 0.3px;
     }
 
-    .status-pending {
-      background: rgba(243, 156, 18, 0.15);
-      color: var(--warning);
-      border: 1px solid rgba(243, 156, 18, 0.3);
-    }
-    .status-sending {
-      background: rgba(52, 152, 219, 0.15);
-      color: #3498db;
-      border: 1px solid rgba(52, 152, 219, 0.3);
-    }
-    .status-sent {
-      background: rgba(46, 204, 113, 0.15);
-      color: var(--success);
-      border: 1px solid rgba(46, 204, 113, 0.3);
-    }
-    .status-error {
-      background: rgba(231, 76, 60, 0.15);
-      color: var(--danger);
-      border: 1px solid rgba(231, 76, 60, 0.3);
-    }
+    .status-pending { background: rgba(243, 156, 18, 0.15); color: var(--warning); border: 1px solid rgba(243, 156, 18, 0.3); }
+    .status-sending { background: rgba(52, 152, 219, 0.15); color: #3498db; border: 1px solid rgba(52, 152, 219, 0.3); }
+    .status-sent { background: rgba(46, 204, 113, 0.15); color: var(--success); border: 1px solid rgba(46, 204, 113, 0.3); }
+    .status-error { background: rgba(231, 76, 60, 0.15); color: var(--danger); border: 1px solid rgba(231, 76, 60, 0.3); }
+    .status-active { background: rgba(46, 204, 113, 0.15); color: var(--success); border: 1px solid rgba(46, 204, 113, 0.3); }
+    .status-blocked { background: rgba(231, 76, 60, 0.15); color: var(--danger); border: 1px solid rgba(231, 76, 60, 0.3); }
 
     .fade-in {
       animation: fadeIn 0.2s ease-in;
@@ -195,15 +180,8 @@
       object-fit: cover;
     }
 
-    .char-counter {
-      font-size: 11px;
-      color: var(--text-muted);
-      text-align: right;
-    }
-
-    .char-counter.warning {
-      color: var(--danger);
-    }
+    .char-counter { font-size: 11px; color: var(--text-muted); text-align: right; }
+    .char-counter.warning { color: var(--danger); }
 
     .msg-card {
       background-color: var(--bg-secondary);
@@ -214,27 +192,12 @@
       transition: all 0.15s;
       border: 1px solid var(--border);
     }
+    .msg-card:hover { border-color: var(--accent); }
+    .msg-card:active { opacity: 0.7; }
 
-    .msg-card:hover {
-      border-color: var(--accent);
-    }
+    input[type="checkbox"] { accent-color: var(--accent); }
+    input[type="date"], input[type="time"] { color-scheme: dark; }
 
-    .msg-card:active {
-      opacity: 0.7;
-    }
-
-    /* Checkbox styling */
-    input[type="checkbox"] {
-      accent-color: var(--accent);
-    }
-
-    /* Date/time inputs */
-    input[type="date"],
-    input[type="time"] {
-      color-scheme: dark;
-    }
-
-    /* Section label */
     .section-label {
       font-size: 12px;
       font-weight: 600;
@@ -244,14 +207,11 @@
       margin-bottom: 8px;
     }
 
-    /* Scrollbar */
     ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-track { background: var(--bg-primary); }
     ::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 2px; }
 
-    h2 {
-      letter-spacing: 0.3px;
-    }
+    h2 { letter-spacing: 0.3px; }
 
     .list-info {
       font-size: 12px;
@@ -261,20 +221,35 @@
       border-radius: 8px;
       margin-top: 6px;
     }
+
+    .stat-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      text-align: center;
+    }
+    .stat-value { font-size: 24px; font-weight: 700; color: var(--accent); }
+    .stat-label { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
   </style>
 </head>
 <body class="pb-24">
+  <!-- Экран загрузки -->
+  <div id="loadingScreen" class="flex flex-col items-center justify-center min-h-screen p-6 text-center">
+    <div class="text-sm" style="color: var(--text-secondary)">Авторизация...</div>
+  </div>
+
   <!-- Экран «Доступ запрещён» -->
   <div id="accessDenied" class="hidden flex flex-col items-center justify-center min-h-screen p-6 text-center">
-    <div class="text-5xl mb-4">🔒</div>
+    <div class="text-5xl mb-4">&#128274;</div>
     <h1 class="text-xl font-bold mb-2">Доступ запрещён</h1>
-    <p class="text-sm" style="color: var(--text-secondary)">Это приложение доступно только администраторам.</p>
+    <p class="text-sm" style="color: var(--text-secondary)">Нет доступа. Обратитесь к администратору платформы.</p>
   </div>
 
   <!-- Основной контент -->
   <div id="app" class="hidden max-w-lg mx-auto p-4">
-    <!-- Переключатель: создать / список / настройки -->
-    <div class="flex gap-2 mb-4">
+    <!-- Переключатель табов -->
+    <div id="mainTabs" class="flex gap-2 mb-4">
       <button id="tabCreate" onclick="showTab('create')"
         class="flex-1 py-2 px-3 rounded-lg text-sm font-medium btn-primary">
         Создать рассылку
@@ -291,7 +266,6 @@
 
     <!-- TAB: Создание рассылки -->
     <div id="createTab">
-      <!-- Индикатор шагов -->
       <div class="step-indicator flex items-center justify-center gap-2 mb-6">
         <div class="step active" data-step="1"></div>
         <div class="step" data-step="3"></div>
@@ -304,7 +278,6 @@
         <h2 class="text-lg font-bold mb-1">Сообщения</h2>
         <p class="text-xs mb-3" style="color: var(--text-secondary)">От 1 до 5 сообщений, идут подряд получателю</p>
 
-        <!-- Выбор бота (если несколько) -->
         <div id="step1BotSelector" class="hidden mb-3">
           <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Бот для рассылки</label>
           <select id="step1BotSelect" onchange="onBotChange()"
@@ -312,7 +285,6 @@
           </select>
         </div>
 
-        <!-- Выбор разметки -->
         <div class="mb-3">
           <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Разметка текста</label>
           <select id="parseModeSelect" class="input-field w-full rounded-lg px-3 py-2 text-sm">
@@ -330,14 +302,13 @@
         </button>
       </div>
 
-      <!-- Шаг 2: Редактор сообщения (подшаг) -->
+      <!-- Шаг 2: Редактор сообщения -->
       <div id="step2" class="step-content hidden fade-in">
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-lg font-bold" id="editorTitle">Сообщение 1 из 1</h2>
           <button onclick="finishEditMessage()" class="text-sm btn-primary rounded-lg px-4 py-1.5">Готово</button>
         </div>
 
-        <!-- Фото -->
         <div class="mb-3">
           <label class="text-sm font-medium mb-1 block">Фото (необязательно)</label>
           <div class="flex gap-2">
@@ -357,7 +328,6 @@
           </div>
         </div>
 
-        <!-- Текст -->
         <div class="mb-3">
           <div class="flex items-center justify-between mb-1">
             <label class="text-sm font-medium">Текст сообщения</label>
@@ -369,7 +339,6 @@
             oninput="onEditorTextInput()"></textarea>
         </div>
 
-        <!-- Кнопки -->
         <div class="mb-3">
           <label class="text-sm font-medium mb-1 block">Кнопки (макс. 6)</label>
           <div id="editorButtonsList"></div>
@@ -390,7 +359,6 @@
         </div>
 
         <div id="tagsContent" class="hidden">
-          <!-- Фильтр по тегам: включить -->
           <div class="mb-4">
             <div class="section-label">Содержит тег (хотя бы один)</div>
             <div id="includeTagsContainer" class="flex flex-wrap gap-2 mb-2"></div>
@@ -402,7 +370,6 @@
             </div>
           </div>
 
-          <!-- Фильтр по тегам: исключить -->
           <div class="mb-4">
             <div class="section-label">Не содержит тег (исключить)</div>
             <div id="excludeTagsContainer" class="flex flex-wrap gap-2 mb-2"></div>
@@ -414,7 +381,6 @@
             </div>
           </div>
 
-          <!-- Фильтр по списку -->
           <div class="mb-4">
             <div class="section-label">Содержится в списке</div>
             <div id="listsLoading" class="hidden text-xs" style="color: var(--text-secondary)">Загрузка списков...</div>
@@ -468,19 +434,15 @@
       <!-- Шаг 5: Подтверждение -->
       <div id="step5" class="step-content hidden fade-in">
         <h2 class="text-lg font-bold mb-3">Подтверждение</h2>
-
         <div id="confirmMessages"></div>
-
         <div class="broadcast-card mb-3">
           <div class="section-label">Фильтры</div>
           <div id="confirmFilters" class="text-sm"></div>
         </div>
-
         <div class="broadcast-card mb-3">
           <div class="section-label">Время отправки</div>
           <div id="confirmTime" class="text-sm"></div>
         </div>
-
         <div class="broadcast-card mb-3">
           <div class="section-label">Получатели</div>
           <div id="confirmRecipients" class="text-sm"></div>
@@ -517,11 +479,13 @@
         <div class="text-sm" style="color: var(--text-secondary)">Загрузка настроек...</div>
       </div>
       <div id="settingsContent" class="hidden">
+        <!-- Тариф и использование -->
+        <div id="usageInfo" class="broadcast-card mb-4"></div>
+
         <!-- Боты -->
         <h2 class="text-lg font-bold mb-3">Боты</h2>
         <div id="settingsBotsContainer" class="space-y-2 mb-3"></div>
 
-        <!-- Форма добавления бота -->
         <div class="p-3 rounded-lg mb-6" style="background: var(--bg-secondary); border: 1px dashed var(--border);">
           <div class="text-sm font-medium mb-2" style="color: var(--text-secondary)">Добавить бота</div>
           <input id="newBotToken" type="text" placeholder="Токен бота" class="input-field w-full rounded-lg px-3 py-2 text-sm mb-2" />
@@ -536,14 +500,20 @@
           </div>
         </div>
 
-        <!-- Админы -->
+        <!-- Администраторы -->
         <h2 class="text-lg font-bold mb-3">Администраторы</h2>
         <div id="settingsAdminsContainer" class="space-y-2 mb-3"></div>
-
-        <!-- Форма добавления админа -->
         <div class="flex gap-2 mb-6">
           <input id="newAdminId" type="text" placeholder="Telegram ID" class="input-field flex-1 rounded-lg px-3 py-2 text-sm" />
           <button onclick="addAdmin()" class="btn-secondary px-3 py-1.5 rounded-lg text-xs">Добавить</button>
+        </div>
+
+        <!-- Leadteh API токен -->
+        <h2 class="text-lg font-bold mb-3">Leadteh API</h2>
+        <div class="flex gap-2 mb-6">
+          <input id="leadtehTokenInput" type="password" placeholder="API токен Leadteh"
+            class="input-field flex-1 rounded-lg px-3 py-2 text-sm" />
+          <button onclick="saveLeadtehToken()" class="btn-primary px-3 py-1.5 rounded-lg text-xs">Сохранить</button>
         </div>
 
         <!-- Списки для ботов -->
@@ -553,16 +523,62 @@
           <div class="text-sm" style="color:var(--text-muted)">Загрузка...</div>
         </div>
 
-        <!-- Кнопки сохранения -->
-        <div class="space-y-2">
-          <button onclick="saveBotLists()" id="saveBotListsBtn" class="btn-secondary w-full py-2.5 rounded-lg text-sm font-medium">
-            Сохранить привязку списков
-          </button>
-          <button onclick="saveSettings()" id="saveSettingsBtn" class="btn-primary w-full py-3 rounded-lg text-sm font-medium">
-            Применить настройки (перезагрузка)
-          </button>
-          <p class="text-xs text-center" style="color: var(--text-muted)">«Применить настройки» перезагружает сервер (боты, админы). Привязка списков — без перезагрузки.</p>
+        <button onclick="saveBotLists()" id="saveBotListsBtn" class="btn-secondary w-full py-2.5 rounded-lg text-sm font-medium">
+          Сохранить привязку списков
+        </button>
+      </div>
+    </div>
+
+    <!-- TAB: Суперадмин (скрыт для обычных тенантов) -->
+    <div id="superTab" class="hidden">
+      <!-- Подтабы суперадмина -->
+      <div class="flex gap-2 mb-4">
+        <button onclick="showSuperSub('tenants')" id="superSubTenants" class="flex-1 py-1.5 px-2 rounded-lg text-xs font-medium btn-primary">Тенанты</button>
+        <button onclick="showSuperSub('tariffs')" id="superSubTariffs" class="flex-1 py-1.5 px-2 rounded-lg text-xs font-medium btn-secondary">Тарифы</button>
+        <button onclick="showSuperSub('stats')" id="superSubStats" class="flex-1 py-1.5 px-2 rounded-lg text-xs font-medium btn-secondary">Статистика</button>
+      </div>
+
+      <!-- Тенанты -->
+      <div id="superTenants">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-lg font-bold">Арендаторы</h2>
+          <button onclick="showAddTenantForm()" class="btn-primary px-3 py-1.5 rounded-lg text-xs">+ Добавить</button>
         </div>
+        <div id="addTenantForm" class="hidden broadcast-card mb-3">
+          <input id="newTenantTgId" type="text" placeholder="Telegram ID" class="input-field w-full rounded-lg px-3 py-2 text-sm mb-2" />
+          <input id="newTenantName" type="text" placeholder="Имя / Название" class="input-field w-full rounded-lg px-3 py-2 text-sm mb-2" />
+          <input id="newTenantLeadteh" type="text" placeholder="Leadteh API токен (необяз.)" class="input-field w-full rounded-lg px-3 py-2 text-sm mb-2" />
+          <select id="newTenantTariff" class="input-field w-full rounded-lg px-3 py-2 text-sm mb-2"></select>
+          <div class="flex gap-2">
+            <button onclick="createTenant()" class="btn-primary px-3 py-1.5 rounded-lg text-xs">Создать</button>
+            <button onclick="document.getElementById('addTenantForm').classList.add('hidden')" class="btn-secondary px-3 py-1.5 rounded-lg text-xs">Отмена</button>
+          </div>
+        </div>
+        <div id="tenantsListContainer" class="space-y-2"></div>
+      </div>
+
+      <!-- Тарифы -->
+      <div id="superTariffs" class="hidden">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-lg font-bold">Тарифные планы</h2>
+          <button onclick="showAddTariffForm()" class="btn-primary px-3 py-1.5 rounded-lg text-xs">+ Добавить</button>
+        </div>
+        <div id="addTariffForm" class="hidden broadcast-card mb-3">
+          <input id="newTariffName" type="text" placeholder="Название" class="input-field w-full rounded-lg px-3 py-2 text-sm mb-2" />
+          <div class="grid grid-cols-3 gap-2 mb-2">
+            <input id="newTariffBots" type="number" placeholder="Макс.ботов" class="input-field rounded-lg px-3 py-2 text-sm" />
+            <input id="newTariffBroadcasts" type="number" placeholder="Макс.рассылок/мес" class="input-field rounded-lg px-3 py-2 text-sm" />
+            <input id="newTariffContacts" type="number" placeholder="Макс.контактов" class="input-field rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <button onclick="createTariff()" class="btn-primary px-3 py-1.5 rounded-lg text-xs">Создать</button>
+        </div>
+        <div id="tariffsListContainer" class="space-y-2"></div>
+      </div>
+
+      <!-- Статистика -->
+      <div id="superStats" class="hidden">
+        <h2 class="text-lg font-bold mb-3">Статистика платформы</h2>
+        <div id="statsContainer" class="grid grid-cols-2 gap-3"></div>
       </div>
     </div>
   </div>
@@ -572,75 +588,128 @@
     // Инициализация
     // ============================================
     const tg = window.Telegram?.WebApp;
+    let authToken = null;
+    let userRole = null;
+    let userTenantId = null;
+    let currentUser = null;
+
     let currentStep = 1;
     const mainSteps = [1, 3, 4, 5];
     let allTags = [];
     let selectedIncludeTags = [];
     let selectedExcludeTags = [];
-    let adminTelegramId = null;
 
-    // Мультисообщения
     let messages = [{ photo_url: '', text: '', buttons: [] }];
     let currentMessageIndex = 0;
 
-    // Списки
     let allLists = [];
     let selectedListId = '';
     let selectedListName = '';
     let listsLoaded = false;
 
-    // Мультибот
     let allBots = [];
     let selectedBotId = '';
 
-    // Инициализация Telegram WebApp
     if (tg) {
       tg.ready();
       tg.expand();
     }
 
-    // Проверка доступа
-    async function init() {
-      const userId = tg?.initDataUnsafe?.user?.id;
+    // ============================================
+    // apiFetch — обёртка с Bearer token
+    // ============================================
+    async function apiFetch(url, options = {}) {
+      if (!options.headers) options.headers = {};
+      if (authToken) {
+        options.headers['Authorization'] = `Bearer ${authToken}`;
+      }
+      if (options.body && typeof options.body === 'object' && !(options.body instanceof FormData)) {
+        options.headers['Content-Type'] = 'application/json';
+        options.body = JSON.stringify(options.body);
+      }
+      const r = await fetch(url, options);
+      if (r.status === 401) {
+        // Сессия истекла
+        showAlert('Сессия истекла. Перезагрузите приложение.');
+        return r;
+      }
+      return r;
+    }
 
-      if (!userId) {
-        if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
-          adminTelegramId = 'dev';
-          document.getElementById('app').classList.remove('hidden');
-          await loadBots();
-          renderMessagesList();
-          return;
-        }
+    // ============================================
+    // Авторизация
+    // ============================================
+    async function init() {
+      const initData = tg?.initData;
+
+      if (!initData) {
+        document.getElementById('loadingScreen').classList.add('hidden');
         document.getElementById('accessDenied').classList.remove('hidden');
         return;
       }
 
       try {
-        const r = await fetch(`/api/auth?telegram_id=${userId}`);
+        const r = await fetch('/api/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ initData }),
+        });
         const data = await r.json();
-        if (!data.admin) {
+
+        if (!data.authorized) {
+          document.getElementById('loadingScreen').classList.add('hidden');
           document.getElementById('accessDenied').classList.remove('hidden');
           return;
         }
-      } catch (e) {
-        document.getElementById('accessDenied').classList.remove('hidden');
-        return;
-      }
 
-      adminTelegramId = String(userId);
-      document.getElementById('app').classList.remove('hidden');
-      await loadBots();
-      renderMessagesList();
+        authToken = data.token;
+        userRole = data.role;
+        userTenantId = data.tenantId;
+        currentUser = data.user;
+
+        document.getElementById('loadingScreen').classList.add('hidden');
+        document.getElementById('app').classList.remove('hidden');
+
+        // Суперадмин: показать таб суперадмина
+        if (userRole === 'super_admin') {
+          setupSuperAdminUI();
+        }
+
+        // Тенант: загружаем ботов
+        if (userTenantId) {
+          await loadBots();
+          renderMessagesList();
+        } else if (userRole === 'super_admin') {
+          // Суперадмин без тенанта — показать панель суперадмина
+          showTab('super');
+        }
+      } catch (e) {
+        console.error('Auth error:', e);
+        document.getElementById('loadingScreen').classList.add('hidden');
+        document.getElementById('accessDenied').classList.remove('hidden');
+      }
     }
 
     init();
+
+    function setupSuperAdminUI() {
+      // Добавляем кнопку суперадмина в табы
+      const tabs = document.getElementById('mainTabs');
+      const superBtn = document.createElement('button');
+      superBtn.id = 'tabSuper';
+      superBtn.onclick = () => showTab('super');
+      superBtn.className = 'py-2 px-3 rounded-lg text-sm font-medium btn-secondary';
+      superBtn.title = 'Суперадмин';
+      superBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>';
+      tabs.appendChild(superBtn);
+    }
 
     // ============================================
     // Мультибот
     // ============================================
     async function loadBots() {
       try {
-        const r = await fetch('/api/bots');
+        const r = await apiFetch('/api/bots');
         const data = await r.json();
         allBots = data.bots || [];
       } catch (e) {
@@ -665,10 +734,7 @@
     }
 
     function onBotChange() {
-      const select = document.getElementById('step1BotSelect');
-      selectedBotId = select.value;
-
-      // Сбрасываем кешированные данные
+      selectedBotId = document.getElementById('step1BotSelect').value;
       allTags = [];
       allLists = [];
       listsLoaded = false;
@@ -676,8 +742,6 @@
       selectedExcludeTags = [];
       selectedListId = '';
       selectedListName = '';
-
-      // Если на шаге фильтров — перезагрузить
       if (currentStep === 3) {
         loadTags();
         loadLists();
@@ -701,31 +765,38 @@
         create: document.getElementById('createTab'),
         list: document.getElementById('listTab'),
         settings: document.getElementById('settingsTab'),
+        super: document.getElementById('superTab'),
       };
       const buttons = {
         create: document.getElementById('tabCreate'),
         list: document.getElementById('tabList'),
         settings: document.getElementById('tabSettings'),
+        super: document.getElementById('tabSuper'),
       };
 
       for (const key in tabs) {
-        tabs[key].classList.add('hidden');
-        if (key === 'settings') {
-          buttons[key].className = 'py-2 px-3 rounded-lg text-sm font-medium btn-secondary';
-        } else {
-          buttons[key].className = 'flex-1 py-2 px-3 rounded-lg text-sm font-medium btn-secondary';
+        if (tabs[key]) tabs[key].classList.add('hidden');
+        if (buttons[key]) {
+          if (key === 'settings' || key === 'super') {
+            buttons[key].className = 'py-2 px-3 rounded-lg text-sm font-medium btn-secondary';
+          } else {
+            buttons[key].className = 'flex-1 py-2 px-3 rounded-lg text-sm font-medium btn-secondary';
+          }
         }
       }
 
-      tabs[tab].classList.remove('hidden');
-      if (tab === 'settings') {
-        buttons[tab].className = 'py-2 px-3 rounded-lg text-sm font-medium btn-primary';
-      } else {
-        buttons[tab].className = 'flex-1 py-2 px-3 rounded-lg text-sm font-medium btn-primary';
+      if (tabs[tab]) tabs[tab].classList.remove('hidden');
+      if (buttons[tab]) {
+        if (tab === 'settings' || tab === 'super') {
+          buttons[tab].className = 'py-2 px-3 rounded-lg text-sm font-medium btn-primary';
+        } else {
+          buttons[tab].className = 'flex-1 py-2 px-3 rounded-lg text-sm font-medium btn-primary';
+        }
       }
 
       if (tab === 'list') loadBroadcasts();
       if (tab === 'settings') loadSettings();
+      if (tab === 'super') loadSuperData();
     }
 
     // ============================================
@@ -745,7 +816,7 @@
       }
 
       const indicatorStep = step === 2 ? 1 : step;
-      document.querySelectorAll('.step-indicator .step').forEach((dot) => {
+      document.querySelectorAll('.step-indicator .step').forEach(dot => {
         const s = parseInt(dot.dataset.step);
         dot.classList.remove('active', 'done');
         if (s === indicatorStep) dot.classList.add('active');
@@ -761,25 +832,14 @@
 
       document.getElementById('prevBtn').classList.toggle('hidden', step === 1);
       const nextBtn = document.getElementById('nextBtn');
+      nextBtn.textContent = step === 5 ? 'Запланировать рассылку' : 'Далее';
 
-      if (step === 5) {
-        nextBtn.textContent = 'Запланировать рассылку';
-      } else {
-        nextBtn.textContent = 'Далее';
-      }
-
-      if (step === 1) {
-        renderMessagesList();
-      }
-
+      if (step === 1) renderMessagesList();
       if (step === 3) {
         if (allTags.length === 0) loadTags();
         if (!listsLoaded) loadLists();
       }
-
-      if (step === 5) {
-        fillConfirmation();
-      }
+      if (step === 5) fillConfirmation();
 
       currentStep = step;
     }
@@ -795,22 +855,14 @@
         showStep(3);
         return;
       }
-
-      if (currentStep === 3) {
-        showStep(4);
-        return;
-      }
-
+      if (currentStep === 3) { showStep(4); return; }
       if (currentStep === 4) {
-        const bName = document.getElementById('broadcastName').value.trim();
-        if (!bName) {
+        if (!document.getElementById('broadcastName').value.trim()) {
           showAlert('Введите название рассылки');
           return;
         }
         if (!document.getElementById('sendNow').checked) {
-          const date = document.getElementById('scheduleDate').value;
-          const time = document.getElementById('scheduleTime').value;
-          if (!date || !time) {
+          if (!document.getElementById('scheduleDate').value || !document.getElementById('scheduleTime').value) {
             showAlert('Выберите дату и время');
             return;
           }
@@ -818,21 +870,13 @@
         showStep(5);
         return;
       }
-
-      if (currentStep === 5) {
-        saveBroadcast();
-        return;
-      }
+      if (currentStep === 5) { saveBroadcast(); return; }
     }
 
     function prevStep() {
-      if (currentStep === 3) {
-        showStep(1);
-      } else if (currentStep === 4) {
-        showStep(3);
-      } else if (currentStep === 5) {
-        showStep(4);
-      }
+      if (currentStep === 3) showStep(1);
+      else if (currentStep === 4) showStep(3);
+      else if (currentStep === 5) showStep(4);
     }
 
     // ============================================
@@ -841,50 +885,37 @@
     function renderMessagesList() {
       const container = document.getElementById('messagesList');
       container.innerHTML = '';
-
       messages.forEach((msg, i) => {
         const card = document.createElement('div');
         card.className = 'msg-card fade-in';
-
         const textPreview = msg.text
           ? (msg.text.length > 60 ? msg.text.slice(0, 60) + '...' : msg.text)
           : '(пустое сообщение)';
-
-        const photoIcon = msg.photo_url ? '<span class="text-xs mr-2" style="color:var(--text-muted)">📷</span>' : '';
+        const photoIcon = msg.photo_url ? '<span class="text-xs mr-2" style="color:var(--text-muted)">&#128247;</span>' : '';
         const btnCount = msg.buttons.length > 0
           ? `<span class="text-xs ml-2" style="color:var(--text-muted)">${msg.buttons.length} кн.</span>`
           : '';
-
         const deleteBtn = messages.length > 1
-          ? `<button onclick="event.stopPropagation(); removeMessage(${i})" class="text-xs ml-2" style="color:var(--danger)">✕</button>`
+          ? `<button onclick="event.stopPropagation(); removeMessage(${i})" class="text-xs ml-2" style="color:var(--danger)">&#10005;</button>`
           : '';
-
         card.innerHTML = `
           <div class="flex items-start justify-between">
             <div class="flex-1" onclick="editMessage(${i})">
               <div class="flex items-center mb-1">
                 <span class="text-xs font-medium" style="color:var(--text-secondary)">Сообщение ${i + 1}</span>
-                ${btnCount}
-                ${deleteBtn}
+                ${btnCount}${deleteBtn}
               </div>
               <div class="text-sm preview-text">${photoIcon}${escapeHtml(textPreview)}</div>
             </div>
-            <button onclick="editMessage(${i})" class="text-xs btn-secondary rounded-lg px-3 py-1 ml-2 shrink-0">
-              Редактировать
-            </button>
-          </div>
-        `;
+            <button onclick="editMessage(${i})" class="text-xs btn-secondary rounded-lg px-3 py-1 ml-2 shrink-0">Редактировать</button>
+          </div>`;
         container.appendChild(card);
       });
-
       document.getElementById('addMessageBtn').classList.toggle('hidden', messages.length >= 5);
     }
 
     function addMessage() {
-      if (messages.length >= 5) {
-        showAlert('Максимум 5 сообщений');
-        return;
-      }
+      if (messages.length >= 5) { showAlert('Максимум 5 сообщений'); return; }
       messages.push({ photo_url: '', text: '', buttons: [] });
       renderMessagesList();
       editMessage(messages.length - 1);
@@ -899,17 +930,12 @@
     function editMessage(index) {
       currentMessageIndex = index;
       const msg = messages[index];
-
-      document.getElementById('editorTitle').textContent =
-        `Сообщение ${index + 1} из ${messages.length}`;
-
+      document.getElementById('editorTitle').textContent = `Сообщение ${index + 1} из ${messages.length}`;
       document.getElementById('editorPhotoUrl').value = msg.photo_url || '';
       document.getElementById('editorText').value = msg.text || '';
-
       onEditorPhotoInput();
       onEditorTextInput();
       renderEditorButtons();
-
       showStep(2);
     }
 
@@ -917,7 +943,6 @@
       const msg = messages[currentMessageIndex];
       msg.photo_url = document.getElementById('editorPhotoUrl').value.trim();
       msg.text = document.getElementById('editorText').value;
-
       showStep(1);
     }
 
@@ -929,7 +954,6 @@
       const preview = document.getElementById('editorPhotoPreview');
       const img = document.getElementById('editorPhotoImg');
       const counter = document.getElementById('editorCharCounter');
-
       if (url) {
         img.src = url;
         preview.classList.remove('hidden');
@@ -938,7 +962,6 @@
         preview.classList.add('hidden');
         counter.classList.add('hidden');
       }
-
       messages[currentMessageIndex].photo_url = url;
       onEditorTextInput();
     }
@@ -946,7 +969,6 @@
     async function onPhotoFileSelect(input) {
       const file = input.files[0];
       if (!file) return;
-
       if (file.size > 10 * 1024 * 1024) {
         showAlert('Файл слишком большой (макс. 10 МБ)');
         input.value = '';
@@ -964,14 +986,11 @@
           reader.readAsDataURL(file);
         });
 
-        const r = await fetch('/api/upload', {
+        const r = await apiFetch('/api/upload', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ data: base64, filename: file.name }),
+          body: { data: base64, filename: file.name },
         });
-
         const data = await r.json();
-
         if (data.ok && data.url) {
           document.getElementById('editorPhotoUrl').value = data.url;
           onEditorPhotoInput();
@@ -982,7 +1001,6 @@
         console.error('Upload error:', e);
         showAlert('Ошибка загрузки файла');
       }
-
       uploading.classList.add('hidden');
       input.value = '';
     }
@@ -991,14 +1009,11 @@
       const text = document.getElementById('editorText').value;
       const hasPhoto = document.getElementById('editorPhotoUrl').value.trim();
       const counter = document.getElementById('editorCharCounter');
-
       messages[currentMessageIndex].text = text;
-
       if (hasPhoto) {
         counter.classList.remove('hidden');
-        const len = text.length;
-        counter.textContent = `${len} / 1024`;
-        counter.classList.toggle('warning', len > 1024);
+        counter.textContent = `${text.length} / 1024`;
+        counter.classList.toggle('warning', text.length > 1024);
       } else {
         counter.classList.add('hidden');
       }
@@ -1006,10 +1021,7 @@
 
     function editorAddButton() {
       const btns = messages[currentMessageIndex].buttons;
-      if (btns.length >= 6) {
-        showAlert('Максимум 6 кнопок');
-        return;
-      }
+      if (btns.length >= 6) { showAlert('Максимум 6 кнопок'); return; }
       btns.push({ text: '', type: 'url', value: '' });
       renderEditorButtons();
     }
@@ -1021,22 +1033,18 @@
 
     function editorUpdateButton(index, field, value) {
       messages[currentMessageIndex].buttons[index][field] = value;
-      if (field === 'type') {
-        renderEditorButtons();
-      }
+      if (field === 'type') renderEditorButtons();
     }
 
     function renderEditorButtons() {
       const btns = messages[currentMessageIndex].buttons;
       const container = document.getElementById('editorButtonsList');
       container.innerHTML = '';
-
       document.getElementById('editorAddButtonBtn').classList.toggle('hidden', btns.length >= 6);
 
       btns.forEach((btn, i) => {
         const div = document.createElement('div');
         div.className = 'broadcast-card mb-2 fade-in';
-
         let placeholder = 'https://example.com';
         let typeHint = '';
         if (btn.type === 'command') {
@@ -1063,22 +1071,17 @@
               <option value="start" ${btn.type === 'start' ? 'selected' : ''}>Deep link (/start)</option>
             </select>
           </div>
-          <input type="text"
-            placeholder="${placeholder}"
-            value="${escapeAttr(btn.value)}"
+          <input type="text" placeholder="${placeholder}" value="${escapeAttr(btn.value)}"
             oninput="editorUpdateButton(${i}, 'value', this.value)"
             class="input-field w-full rounded-lg px-3 py-2 text-sm" />
-          ${typeHint}
-        `;
+          ${typeHint}`;
         container.appendChild(div);
       });
     }
 
     function formatMarkdown(text) {
       return text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         .replace(/\*([^*]+)\*/g, '<b>$1</b>')
         .replace(/_([^_]+)_/g, '<i>$1</i>')
         .replace(/`([^`]+)`/g, '<code style="background:var(--accent-subtle);padding:1px 4px;border-radius:3px;">$1</code>');
@@ -1090,16 +1093,14 @@
     async function loadTags() {
       document.getElementById('tagsLoading').classList.remove('hidden');
       document.getElementById('tagsContent').classList.add('hidden');
-
       try {
-        const r = await fetch(appendBotParam('/api/tags'));
+        const r = await apiFetch(appendBotParam('/api/tags'));
         const data = await r.json();
         allTags = data.tags || [];
       } catch (e) {
         console.error('Ошибка загрузки тегов:', e);
         allTags = [];
       }
-
       document.getElementById('tagsLoading').classList.add('hidden');
       document.getElementById('tagsContent').classList.remove('hidden');
       renderTags();
@@ -1109,13 +1110,10 @@
       const loading = document.getElementById('listsLoading');
       const select = document.getElementById('listSelect');
       loading.classList.remove('hidden');
-
       try {
-        const r = await fetch(appendBotParam('/api/lists'));
+        const r = await apiFetch(appendBotParam('/api/lists'));
         const data = await r.json();
         allLists = data.lists || [];
-
-        // Заполнить select
         select.innerHTML = '<option value="">Не выбран (все контакты)</option>';
         for (const list of allLists) {
           const opt = document.createElement('option');
@@ -1128,7 +1126,6 @@
         console.error('Ошибка загрузки списков:', e);
         allLists = [];
       }
-
       loading.classList.add('hidden');
       listsLoaded = true;
     }
@@ -1137,28 +1134,22 @@
       const select = document.getElementById('listSelect');
       const infoEl = document.getElementById('listInfo');
       selectedListId = select.value;
-
       if (!selectedListId) {
         selectedListName = '';
         infoEl.classList.add('hidden');
         updateContactsCount();
         return;
       }
-
-      const selectedOpt = select.options[select.selectedIndex];
-      selectedListName = selectedOpt.textContent;
-
+      selectedListName = select.options[select.selectedIndex].textContent;
       infoEl.classList.remove('hidden');
       infoEl.textContent = 'Загрузка элементов списка...';
-
       try {
-        const r = await fetch(appendBotParam(`/api/lists/${selectedListId}/items`));
+        const r = await apiFetch(appendBotParam(`/api/lists/${selectedListId}/items`));
         const data = await r.json();
         infoEl.textContent = `В списке: ${data.total_items} элементов, telegram_id: ${data.count}`;
       } catch (e) {
         infoEl.textContent = 'Ошибка загрузки элементов';
       }
-
       updateContactsCount();
     }
 
@@ -1170,9 +1161,7 @@
     function renderTagList(containerId, tags, selected, type) {
       const container = document.getElementById(containerId);
       container.innerHTML = '';
-
       const allDisplayTags = [...new Set([...tags, ...selected])];
-
       for (const tag of allDisplayTags) {
         const chip = document.createElement('span');
         chip.className = 'tag-chip' + (selected.includes(tag) ? ' selected' : '');
@@ -1185,13 +1174,7 @@
     function toggleTag(tag, type) {
       const arr = type === 'include' ? selectedIncludeTags : selectedExcludeTags;
       const idx = arr.indexOf(tag);
-
-      if (idx >= 0) {
-        arr.splice(idx, 1);
-      } else {
-        arr.push(tag);
-      }
-
+      if (idx >= 0) arr.splice(idx, 1); else arr.push(tag);
       renderTags();
       updateContactsCount();
     }
@@ -1200,14 +1183,9 @@
       const inputId = type === 'include' ? 'customIncludeTag' : 'customExcludeTag';
       const input = document.getElementById(inputId);
       const tag = input.value.trim();
-
       if (!tag) return;
-
       const arr = type === 'include' ? selectedIncludeTags : selectedExcludeTags;
-      if (!arr.includes(tag)) {
-        arr.push(tag);
-      }
-
+      if (!arr.includes(tag)) arr.push(tag);
       input.value = '';
       renderTags();
       updateContactsCount();
@@ -1218,25 +1196,20 @@
       clearTimeout(countTimeout);
       countTimeout = setTimeout(async () => {
         const el = document.getElementById('contactsCount');
-
         if (selectedIncludeTags.length === 0 && selectedExcludeTags.length === 0 && !selectedListId) {
           el.innerHTML = '<span class="text-sm" style="color:var(--text-secondary)">Будут выбраны все контакты с telegram_id</span>';
           try {
-            const r = await fetch(appendBotParam('/api/contacts?count_only=true'));
+            const r = await apiFetch(appendBotParam('/api/contacts?count_only=true'));
             const data = await r.json();
             el.innerHTML = `<span class="text-sm font-medium" style="color:var(--accent)">Получателей: ~${data.count}</span>`;
-          } catch (e) {
-            // ignore
-          }
+          } catch (e) { /* ignore */ }
           return;
         }
-
         el.innerHTML = '<span class="text-sm" style="color:var(--text-secondary)">Подсчёт...</span>';
-
         try {
           let count;
           if (selectedListId) {
-            const r = await fetch(appendBotParam(`/api/lists/${selectedListId}/items`));
+            const r = await apiFetch(appendBotParam(`/api/lists/${selectedListId}/items`));
             const data = await r.json();
             count = data.count || 0;
           } else {
@@ -1244,11 +1217,10 @@
             if (selectedIncludeTags.length) params.set('include', selectedIncludeTags.join(','));
             if (selectedExcludeTags.length) params.set('exclude', selectedExcludeTags.join(','));
             params.set('count_only', 'true');
-            const r = await fetch(appendBotParam(`/api/contacts?${params}`));
+            const r = await apiFetch(appendBotParam(`/api/contacts?${params}`));
             const data = await r.json();
             count = data.count || 0;
           }
-
           el.innerHTML = `<span class="text-sm font-medium" style="color:var(--accent)">Будет отправлено ~${count} контактам</span>`;
         } catch (e) {
           el.innerHTML = '<span class="text-sm" style="color:var(--danger)">Ошибка подсчёта</span>';
@@ -1262,14 +1234,11 @@
     function toggleSchedule() {
       const checked = document.getElementById('sendNow').checked;
       document.getElementById('scheduleFields').classList.toggle('hidden', checked);
-
       if (!checked) {
         const now = new Date();
         now.setHours(now.getHours() + 3);
-        const dateStr = now.toISOString().split('T')[0];
-        const timeStr = now.toTimeString().slice(0, 5);
-        document.getElementById('scheduleDate').value = dateStr;
-        document.getElementById('scheduleTime').value = timeStr;
+        document.getElementById('scheduleDate').value = now.toISOString().split('T')[0];
+        document.getElementById('scheduleTime').value = now.toTimeString().slice(0, 5);
         document.getElementById('scheduleDate').min = new Date().toISOString().split('T')[0];
       }
     }
@@ -1280,23 +1249,17 @@
     function fillConfirmation() {
       const container = document.getElementById('confirmMessages');
       container.innerHTML = '';
-
       messages.forEach((msg, i) => {
         const card = document.createElement('div');
         card.className = 'broadcast-card mb-3';
-
         let html = `<div class="section-label">Сообщение ${i + 1} из ${messages.length}</div>`;
-
         if (msg.photo_url) {
-          html += `<img src="${escapeAttr(msg.photo_url)}" class="photo-preview mb-2"
-            onerror="this.style.display='none'" />`;
+          html += `<img src="${escapeAttr(msg.photo_url)}" class="photo-preview mb-2" onerror="this.style.display='none'" />`;
         }
-
         html += `<div class="text-sm preview-text mb-2">${formatMarkdown(msg.text)}</div>`;
-
         if (msg.buttons.length > 0) {
           html += '<div class="text-xs mt-1" style="color:var(--text-muted)">Кнопки:</div>';
-          html += msg.buttons.map((b) => {
+          html += msg.buttons.map(b => {
             let label;
             if (b.type === 'url') label = escapeHtml(b.value);
             else if (b.type === 'command') label = 'callback: ' + escapeHtml(b.value);
@@ -1304,47 +1267,33 @@
             return `<div class="text-xs mb-0.5" style="color:var(--text-secondary)">[${escapeHtml(b.text)}] → ${label}</div>`;
           }).join('');
         }
-
         card.innerHTML = html;
         container.appendChild(card);
       });
 
-      // Фильтры
       const filtersHtml = [];
-      if (selectedIncludeTags.length > 0) {
-        filtersHtml.push('Содержит: ' + selectedIncludeTags.join(', '));
-      }
-      if (selectedExcludeTags.length > 0) {
-        filtersHtml.push('Исключить: ' + selectedExcludeTags.join(', '));
-      }
-      if (selectedListId && selectedListName) {
-        filtersHtml.push('Список: ' + selectedListName);
-      }
-      if (filtersHtml.length === 0) {
-        filtersHtml.push('Все контакты');
-      }
+      if (selectedIncludeTags.length > 0) filtersHtml.push('Содержит: ' + selectedIncludeTags.join(', '));
+      if (selectedExcludeTags.length > 0) filtersHtml.push('Исключить: ' + selectedExcludeTags.join(', '));
+      if (selectedListId && selectedListName) filtersHtml.push('Список: ' + selectedListName);
+      if (filtersHtml.length === 0) filtersHtml.push('Все контакты');
       document.getElementById('confirmFilters').innerHTML = filtersHtml.join('<br>');
 
-      // Время
       if (document.getElementById('sendNow').checked) {
         document.getElementById('confirmTime').textContent = 'Сейчас';
       } else {
-        const date = document.getElementById('scheduleDate').value;
-        const time = document.getElementById('scheduleTime').value;
-        document.getElementById('confirmTime').textContent = `${date} ${time} (МСК)`;
+        document.getElementById('confirmTime').textContent =
+          `${document.getElementById('scheduleDate').value} ${document.getElementById('scheduleTime').value} (МСК)`;
       }
-
       updateConfirmRecipients();
     }
 
     async function updateConfirmRecipients() {
       const el = document.getElementById('confirmRecipients');
       el.textContent = 'Подсчёт...';
-
       try {
         let count;
         if (selectedListId) {
-          const r = await fetch(appendBotParam(`/api/lists/${selectedListId}/items`));
+          const r = await apiFetch(appendBotParam(`/api/lists/${selectedListId}/items`));
           const data = await r.json();
           count = data.count || 0;
         } else {
@@ -1352,7 +1301,7 @@
           if (selectedIncludeTags.length) params.set('include', selectedIncludeTags.join(','));
           if (selectedExcludeTags.length) params.set('exclude', selectedExcludeTags.join(','));
           params.set('count_only', 'true');
-          const r = await fetch(appendBotParam(`/api/contacts?${params}`));
+          const r = await apiFetch(appendBotParam(`/api/contacts?${params}`));
           const data = await r.json();
           count = data.count || 0;
         }
@@ -1369,7 +1318,6 @@
       const nextBtn = document.getElementById('nextBtn');
       nextBtn.disabled = true;
       nextBtn.textContent = 'Сохранение...';
-
       try {
         let scheduledAt;
         if (document.getElementById('sendNow').checked) {
@@ -1380,37 +1328,27 @@
           scheduledAt = new Date(`${date}T${time}:00+03:00`).toISOString();
         }
 
-        const body = {
-          name: document.getElementById('broadcastName').value.trim(),
-          parse_mode: document.getElementById('parseModeSelect').value || null,
-          messages: messages.map((msg) => ({
-            photo_url: msg.photo_url || '',
-            text: msg.text.trim(),
-            buttons: msg.buttons.map((btn) => ({
-              text: btn.text,
-              type: btn.type,
-              value: btn.value,
-            })),
-          })),
-          filters: {
-            include_tags: selectedIncludeTags,
-            exclude_tags: selectedExcludeTags,
-            list_schema_id: selectedListId || null,
-            list_name: selectedListName || null,
-          },
-          scheduled_at: scheduledAt,
-          created_by: adminTelegramId,
-          bot_id: selectedBotId || undefined,
-        };
-
-        const r = await fetch('/api/broadcast/save', {
+        const r = await apiFetch('/api/broadcast/save', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
+          body: {
+            name: document.getElementById('broadcastName').value.trim(),
+            parse_mode: document.getElementById('parseModeSelect').value || null,
+            messages: messages.map(msg => ({
+              photo_url: msg.photo_url || '',
+              text: msg.text.trim(),
+              buttons: msg.buttons.map(btn => ({ text: btn.text, type: btn.type, value: btn.value })),
+            })),
+            filters: {
+              include_tags: selectedIncludeTags,
+              exclude_tags: selectedExcludeTags,
+              list_schema_id: selectedListId || null,
+              list_name: selectedListName || null,
+            },
+            scheduled_at: scheduledAt,
+            bot_id: selectedBotId || undefined,
+          },
         });
-
         const data = await r.json();
-
         if (data.ok) {
           showAlert('Рассылка запланирована!');
           resetForm();
@@ -1422,7 +1360,6 @@
         console.error('Ошибка сохранения:', e);
         showAlert('Ошибка сохранения рассылки');
       }
-
       nextBtn.disabled = false;
       nextBtn.textContent = 'Запланировать рассылку';
     }
@@ -1452,138 +1389,80 @@
       const loading = document.getElementById('listLoading');
       const content = document.getElementById('listContent');
       const empty = document.getElementById('listEmpty');
-
       loading.classList.remove('hidden');
       content.innerHTML = '';
       empty.classList.add('hidden');
-
       try {
-        const r = await fetch('/api/broadcast/list');
+        const r = await apiFetch('/api/broadcast/list');
         const data = await r.json();
         const list = data.broadcasts || [];
-
         loading.classList.add('hidden');
-
-        if (list.length === 0) {
-          empty.classList.remove('hidden');
-          return;
-        }
+        if (list.length === 0) { empty.classList.remove('hidden'); return; }
 
         for (const b of list) {
           const card = document.createElement('div');
           card.className = 'broadcast-card fade-in';
           card.style.cursor = 'pointer';
 
-          const statusClass = `status-${b.status}`;
-          const statusText = {
-            pending: 'Запланирована',
-            sending: 'Отправляется...',
-            sent: 'Отправлена',
-            error: 'Ошибка',
-          }[b.status] || b.status;
-
+          const statusText = { pending: 'Запланирована', sending: 'Отправляется...', sent: 'Отправлена', error: 'Ошибка' }[b.status] || b.status;
           const scheduledDate = new Date(b.scheduled_at);
           const dateStr = scheduledDate.toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow', day: 'numeric', month: 'short' });
           const timeStr = scheduledDate.toLocaleTimeString('ru-RU', { timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit' });
-
-          const title = b.name || (b.messages?.[0]?.text?.slice(0, 40) || b.text?.slice(0, 40) || 'Без названия');
+          const title = b.name || (b.messages?.[0]?.text?.slice(0, 40) || 'Без названия');
           const botLabel = (allBots.length > 1 && b.bot_name) ? `<span class="text-xs" style="color:var(--text-muted)">  ${escapeHtml(b.bot_name)}</span>` : '';
 
-          // --- Детали (скрыты) ---
-          let details = '';
+          let details = `<div class="mt-3 pt-3" style="border-top:1px solid var(--border)">`;
 
-          // Текст сообщений
-          let msgCount = 0;
-          let totalButtons = 0;
-          let hasPhoto = false;
-          if (Array.isArray(b.messages) && b.messages.length > 0) {
-            msgCount = b.messages.length;
-            hasPhoto = b.messages.some((m) => m.photo_url);
-            totalButtons = b.messages.reduce((sum, m) => sum + (m.buttons?.length || 0), 0);
-          } else {
-            msgCount = 1;
-            totalButtons = b.buttons?.length || 0;
-          }
-
-          // Фильтры
-          const tagsInfo = [];
-          if (b.filters?.include_tags?.length) tagsInfo.push('+ ' + b.filters.include_tags.join(', '));
-          if (b.filters?.exclude_tags?.length) tagsInfo.push('- ' + b.filters.exclude_tags.join(', '));
-          if (b.filters?.list_name) tagsInfo.push('Список: ' + b.filters.list_name);
-
-          details += `<div class="mt-3 pt-3" style="border-top:1px solid var(--border)">`;
-
-          // Инфо о содержимом
+          const msgCount = b.messages?.length || 1;
+          const hasPhoto = b.messages?.some(m => m.photo_url);
+          const totalButtons = (b.messages || []).reduce((sum, m) => sum + (m.buttons?.length || 0), 0);
           const contentParts = [];
           if (msgCount > 1) contentParts.push(`${msgCount} сообщ.`);
           if (hasPhoto) contentParts.push('с фото');
           if (totalButtons) contentParts.push(`${totalButtons} кнопок`);
-          if (contentParts.length) {
-            details += `<div class="text-xs mb-1" style="color:var(--text-secondary)">Содержимое: ${contentParts.join(', ')}</div>`;
-          }
+          if (contentParts.length) details += `<div class="text-xs mb-1" style="color:var(--text-secondary)">Содержимое: ${contentParts.join(', ')}</div>`;
 
-          // Превью текста
-          const previewText = b.messages?.[0]?.text || b.text || '';
+          const previewText = b.messages?.[0]?.text || '';
           if (previewText) {
             const preview = previewText.length > 120 ? previewText.slice(0, 120) + '...' : previewText;
             details += `<div class="text-xs mb-2 p-2 rounded" style="background:var(--bg-primary);color:var(--text-secondary);white-space:pre-wrap">${escapeHtml(preview)}</div>`;
           }
 
-          if (tagsInfo.length) {
-            details += `<div class="text-xs mb-1" style="color:var(--text-secondary)">Фильтры: ${escapeHtml(tagsInfo.join(' | '))}</div>`;
-          }
+          const tagsInfo = [];
+          if (b.filters?.include_tags?.length) tagsInfo.push('+ ' + b.filters.include_tags.join(', '));
+          if (b.filters?.exclude_tags?.length) tagsInfo.push('- ' + b.filters.exclude_tags.join(', '));
+          if (b.filters?.list_name) tagsInfo.push('Список: ' + b.filters.list_name);
+          if (tagsInfo.length) details += `<div class="text-xs mb-1" style="color:var(--text-secondary)">Фильтры: ${escapeHtml(tagsInfo.join(' | '))}</div>`;
 
-          // Полное время
           const fullDateStr = scheduledDate.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' });
           details += `<div class="text-xs mb-2" style="color:var(--text-muted)">Запланировано: ${fullDateStr} (МСК)</div>`;
 
-          // Статистика
           if (b.status === 'sent' || b.status === 'error') {
             const total = b.total_recipients || (b.sent_count + b.failed_count) || 0;
             const sentOk = b.sent_count || 0;
             const failedN = b.failed_count || 0;
             const pct = total > 0 ? Math.round((sentOk / total) * 100) : 0;
-
             details += `<div class="p-2 rounded-lg" style="background:var(--bg-tertiary)">`;
-            details += `<div class="flex items-center justify-between mb-1">`;
-            details += `<span class="text-xs font-medium" style="color:var(--text-primary)">Статистика</span>`;
+            details += `<div class="flex items-center justify-between mb-1"><span class="text-xs font-medium">Статистика</span>`;
             if (b.sent_at) {
               const sentDate = new Date(b.sent_at).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' });
               details += `<span class="text-xs" style="color:var(--text-muted)">Отправлено: ${sentDate}</span>`;
             }
             details += `</div>`;
-
             if (total > 0) {
               const okW = Math.round((sentOk / total) * 100);
-              details += `<div class="w-full rounded-full h-2 mb-2 mt-1" style="background:var(--bg-primary)">`;
-              details += `<div class="h-2 rounded-full" style="width:${okW}%;background:${failedN > 0 ? 'linear-gradient(90deg, var(--success) ' + okW + '%, var(--danger) ' + okW + '%)' : 'var(--success)'}"></div>`;
-              details += `</div>`;
+              details += `<div class="w-full rounded-full h-2 mb-2 mt-1" style="background:var(--bg-primary)"><div class="h-2 rounded-full" style="width:${okW}%;background:var(--success)"></div></div>`;
             }
-
             details += `<div class="flex gap-4">`;
-            details += `<div class="text-center"><div class="text-lg font-bold" style="color:var(--text-primary)">${total}</div><div class="text-xs" style="color:var(--text-muted)">Всего</div></div>`;
+            details += `<div class="text-center"><div class="text-lg font-bold">${total}</div><div class="text-xs" style="color:var(--text-muted)">Всего</div></div>`;
             details += `<div class="text-center"><div class="text-lg font-bold" style="color:var(--success)">${sentOk}</div><div class="text-xs" style="color:var(--text-muted)">Доставлено</div></div>`;
-            if (failedN > 0) {
-              details += `<div class="text-center"><div class="text-lg font-bold" style="color:var(--danger)">${failedN}</div><div class="text-xs" style="color:var(--text-muted)">Ошибок</div></div>`;
-            }
-            if (total > 0) {
-              details += `<div class="text-center"><div class="text-lg font-bold" style="color:var(--text-primary)">${pct}%</div><div class="text-xs" style="color:var(--text-muted)">Успех</div></div>`;
-            }
-            details += `</div>`;
-            details += `</div>`;
+            if (failedN > 0) details += `<div class="text-center"><div class="text-lg font-bold" style="color:var(--danger)">${failedN}</div><div class="text-xs" style="color:var(--text-muted)">Ошибок</div></div>`;
+            if (total > 0) details += `<div class="text-center"><div class="text-lg font-bold">${pct}%</div><div class="text-xs" style="color:var(--text-muted)">Успех</div></div>`;
+            details += `</div></div>`;
           }
 
-          if (b.status === 'sending') {
-            details += `<div class="text-xs" style="color:var(--warning)">Идёт отправка...</div>`;
-          }
-          if (b.status === 'error' && b.error) {
-            details += `<div class="text-xs mt-1" style="color:var(--danger)">${escapeHtml(b.error)}</div>`;
-          }
-
-          if (b.status === 'pending') {
-            details += `<button onclick="event.stopPropagation();deleteBroadcast('${b.id}')" class="text-xs mt-2" style="color:var(--danger)">Отменить рассылку</button>`;
-          }
-
+          if (b.status === 'error' && b.error) details += `<div class="text-xs mt-1" style="color:var(--danger)">${escapeHtml(b.error)}</div>`;
+          if (b.status === 'pending') details += `<button onclick="event.stopPropagation();deleteBroadcast('${b.id}')" class="text-xs mt-2" style="color:var(--danger)">Отменить рассылку</button>`;
           details += `</div>`;
 
           card.innerHTML = `
@@ -1595,16 +1474,11 @@
                   ${botLabel}
                 </div>
               </div>
-              <span class="status-badge ${statusClass} flex-shrink-0">${statusText}</span>
+              <span class="status-badge status-${b.status} flex-shrink-0">${statusText}</span>
             </div>
-            <div class="broadcast-details hidden">${details}</div>
-          `;
+            <div class="broadcast-details hidden">${details}</div>`;
 
-          card.onclick = () => {
-            const det = card.querySelector('.broadcast-details');
-            det.classList.toggle('hidden');
-          };
-
+          card.onclick = () => card.querySelector('.broadcast-details').classList.toggle('hidden');
           content.appendChild(card);
         }
       } catch (e) {
@@ -1616,21 +1490,11 @@
 
     async function deleteBroadcast(id) {
       if (!confirm('Отменить эту рассылку?')) return;
-
       try {
-        const r = await fetch('/api/broadcast/delete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id }),
-        });
-
+        const r = await apiFetch('/api/broadcast/delete', { method: 'POST', body: { id } });
         const data = await r.json();
-
-        if (data.ok) {
-          loadBroadcasts();
-        } else {
-          showAlert(data.error || 'Ошибка удаления');
-        }
+        if (data.ok) loadBroadcasts();
+        else showAlert(data.error || 'Ошибка удаления');
       } catch (e) {
         showAlert('Ошибка удаления рассылки');
       }
@@ -1650,30 +1514,20 @@
       const content = document.getElementById('settingsContent');
       loading.classList.remove('hidden');
       content.classList.add('hidden');
-
       try {
-        const r = await fetch(`/api/settings?admin_id=${adminTelegramId}`);
-        if (!r.ok) {
-          const err = await r.json();
-          showAlert(err.error || 'Ошибка загрузки настроек');
-          return;
-        }
+        const r = await apiFetch('/api/settings');
+        if (!r.ok) { showAlert('Ошибка загрузки настроек'); return; }
         const data = await r.json();
-        settingsBots = (data.bots || []).map(b => ({
-          name: b.name,
-          token: '',
-          token_masked: b.token_masked,
-          leadteh_id: b.leadteh_id,
-          is_existing: true,
-          original_index: b.index,
-        }));
+        settingsBots = data.bots || [];
         settingsAdminIds = data.admin_ids || [];
+
         renderSettingsBots();
         renderSettingsAdmins();
+        renderUsageInfo(data.limits, data.tenant);
+
         loading.classList.add('hidden');
         content.classList.remove('hidden');
 
-        // Загружаем привязку списков к ботам
         loadBotListsMapping();
       } catch (e) {
         console.error('Ошибка загрузки настроек:', e);
@@ -1681,10 +1535,25 @@
       }
     }
 
+    function renderUsageInfo(limits, tenant) {
+      const el = document.getElementById('usageInfo');
+      if (!limits) {
+        el.innerHTML = `<div class="text-sm" style="color:var(--text-muted)">Тариф не назначен</div>`;
+        return;
+      }
+      el.innerHTML = `
+        <div class="section-label">Тариф и использование</div>
+        <div class="grid grid-cols-3 gap-3 text-center">
+          <div><div class="text-sm font-bold">${limits.current_bots}/${limits.max_bots}</div><div class="text-xs" style="color:var(--text-muted)">Ботов</div></div>
+          <div><div class="text-sm font-bold">${limits.current_broadcasts}/${limits.max_broadcasts_per_month}</div><div class="text-xs" style="color:var(--text-muted)">Рассылок/мес</div></div>
+          <div><div class="text-sm font-bold">${limits.max_contacts}</div><div class="text-xs" style="color:var(--text-muted)">Макс.контактов</div></div>
+        </div>`;
+    }
+
     async function loadBotListsMapping() {
       const container = document.getElementById('settingsBotListsContainer');
       try {
-        const r = await fetch(`/api/settings/bot-lists?admin_id=${adminTelegramId}`);
+        const r = await apiFetch('/api/settings/bot-lists');
         const data = await r.json();
         allLeadtehLists = data.lists || [];
         botListsMapping = data.mapping || {};
@@ -1700,22 +1569,16 @@
         container.innerHTML = '<div class="text-xs" style="color:var(--text-muted)">Нет списков или ботов</div>';
         return;
       }
-
-      container.innerHTML = settingsBots.map((bot, i) => {
-        const botId = bot.is_existing ? String(bot.original_index + 1) : `new_${i}`;
-        const assigned = botListsMapping[botId] || [];
-
+      container.innerHTML = settingsBots.map(bot => {
+        const assigned = botListsMapping[bot.id] || [];
         const listCheckboxes = allLeadtehLists.map(l => {
-          const checked = assigned.includes(l.id) ? 'checked' : '';
+          const checked = assigned.includes(String(l.id)) ? 'checked' : '';
           return `<label class="flex items-center gap-2 text-xs py-0.5 cursor-pointer">
-            <input type="checkbox" ${checked} onchange="toggleBotList('${botId}','${l.id}')" class="rounded" style="accent-color:var(--accent)" />
+            <input type="checkbox" ${checked} onchange="toggleBotList('${bot.id}','${l.id}')" class="rounded" style="accent-color:var(--accent)" />
             <span style="color:var(--text-secondary)">${escapeHtml(l.name)}</span>
           </label>`;
         }).join('');
-
-        const assignedCount = assigned.length;
-        const label = assignedCount > 0 ? `${assignedCount} из ${allLeadtehLists.length}` : 'все списки';
-
+        const label = assigned.length > 0 ? `${assigned.length} из ${allLeadtehLists.length}` : 'все списки';
         return `<div class="p-3 rounded-lg" style="background:var(--bg-secondary);border:1px solid var(--border)">
           <div class="flex items-center justify-between mb-2">
             <span class="text-sm font-medium">${escapeHtml(bot.name)}</span>
@@ -1732,13 +1595,8 @@
     function toggleBotList(botId, listId) {
       if (!botListsMapping[botId]) botListsMapping[botId] = [];
       const arr = botListsMapping[botId];
-      const idx = arr.indexOf(listId);
-      if (idx >= 0) {
-        arr.splice(idx, 1);
-      } else {
-        arr.push(listId);
-      }
-      // Обновить label без полной перерисовки
+      const idx = arr.indexOf(String(listId));
+      if (idx >= 0) arr.splice(idx, 1); else arr.push(String(listId));
       renderBotListsMapping();
     }
 
@@ -1746,25 +1604,15 @@
       const btn = document.getElementById('saveBotListsBtn');
       btn.disabled = true;
       btn.textContent = 'Сохранение...';
-
       try {
-        const r = await fetch('/api/settings/bot-lists', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ admin_id: adminTelegramId, mapping: botListsMapping }),
-        });
+        const r = await apiFetch('/api/settings/bot-lists', { method: 'POST', body: { mapping: botListsMapping } });
         const data = await r.json();
         if (data.ok) {
           showAlert('Привязка списков сохранена');
-          // Сбросить кэш списков чтобы при создании рассылки загрузились заново
           allLists = [];
           listsLoaded = false;
-        } else {
-          showAlert(data.error || 'Ошибка сохранения');
-        }
-      } catch (e) {
-        showAlert('Ошибка сохранения');
-      }
+        } else showAlert(data.error || 'Ошибка сохранения');
+      } catch (e) { showAlert('Ошибка сохранения'); }
       btn.disabled = false;
       btn.textContent = 'Сохранить привязку списков';
     }
@@ -1775,49 +1623,50 @@
         container.innerHTML = '<div class="text-sm" style="color:var(--text-muted)">Нет ботов</div>';
         return;
       }
-      container.innerHTML = settingsBots.map((bot, i) => {
-        const tokenDisplay = bot.is_existing ? bot.token_masked : 'новый';
+      container.innerHTML = settingsBots.map(bot => {
         const canDelete = settingsBots.length > 1;
         return `
           <div class="p-3 rounded-lg flex items-center justify-between" style="background:var(--bg-secondary);border:1px solid var(--border)">
             <div class="flex-1 min-w-0">
               <div class="text-sm font-medium truncate">${escapeHtml(bot.name)}</div>
-              <div class="text-xs" style="color:var(--text-muted)">Токен: ${escapeHtml(tokenDisplay)}</div>
+              <div class="text-xs" style="color:var(--text-muted)">Токен: ${escapeHtml(bot.token_masked)}</div>
               ${bot.leadteh_id ? `<div class="text-xs" style="color:var(--text-muted)">Leadteh: ${escapeHtml(bot.leadteh_id)}</div>` : ''}
             </div>
-            ${canDelete ? `<button onclick="removeBot(${i})" class="ml-2 text-xs px-2 py-1 rounded" style="color:var(--danger)">✕</button>` : ''}
+            ${canDelete ? `<button onclick="removeBot(${bot.id})" class="ml-2 text-xs px-2 py-1 rounded" style="color:var(--danger)">&#10005;</button>` : ''}
           </div>`;
       }).join('');
     }
 
     function renderSettingsAdmins() {
       const container = document.getElementById('settingsAdminsContainer');
-      container.innerHTML = settingsAdminIds.map((id, i) => {
-        const isSelf = String(id) === String(adminTelegramId);
+      container.innerHTML = settingsAdminIds.map(id => {
+        const isSelf = currentUser && String(id) === String(currentUser.id);
         return `
           <div class="p-2 px-3 rounded-lg flex items-center justify-between" style="background:var(--bg-secondary);border:1px solid var(--border)">
             <span class="text-sm">${escapeHtml(id)}${isSelf ? ' <span style="color:var(--text-muted)">(вы)</span>' : ''}</span>
-            ${!isSelf ? `<button onclick="removeAdmin(${i})" class="text-xs px-2 py-1 rounded" style="color:var(--danger)">✕</button>` : ''}
+            ${!isSelf ? `<button onclick="removeAdmin('${escapeAttr(id)}')" class="text-xs px-2 py-1 rounded" style="color:var(--danger)">&#10005;</button>` : ''}
           </div>`;
       }).join('');
     }
 
-    function removeBot(i) {
-      if (settingsBots.length <= 1) {
-        showAlert('Нужен минимум один бот');
-        return;
-      }
-      settingsBots.splice(i, 1);
-      renderSettingsBots();
+    async function removeBot(botId) {
+      if (!confirm('Удалить этого бота?')) return;
+      try {
+        const r = await apiFetch('/api/settings/bot/remove', { method: 'POST', body: { bot_id: botId } });
+        const data = await r.json();
+        if (data.ok) { loadSettings(); loadBots(); }
+        else showAlert(data.error || 'Ошибка');
+      } catch (e) { showAlert('Ошибка удаления бота'); }
     }
 
-    function removeAdmin(i) {
-      if (String(settingsAdminIds[i]) === String(adminTelegramId)) {
-        showAlert('Нельзя удалить себя');
-        return;
-      }
-      settingsAdminIds.splice(i, 1);
-      renderSettingsAdmins();
+    async function removeAdmin(telegramId) {
+      if (!confirm('Удалить этого админа?')) return;
+      try {
+        const r = await apiFetch('/api/settings/admin/remove', { method: 'POST', body: { telegram_id: telegramId } });
+        const data = await r.json();
+        if (data.ok) loadSettings();
+        else showAlert(data.error || 'Ошибка');
+      } catch (e) { showAlert('Ошибка удаления админа'); }
     }
 
     async function validateNewBot() {
@@ -1826,11 +1675,7 @@
       const statusDiv = document.getElementById('newBotStatus');
       const addBtn = document.getElementById('addBotBtn');
       const token = tokenInput.value.trim();
-
-      if (!token) {
-        showAlert('Введите токен бота');
-        return;
-      }
+      if (!token) { showAlert('Введите токен бота'); return; }
 
       statusDiv.classList.remove('hidden');
       statusDiv.textContent = 'Проверяю...';
@@ -1839,19 +1684,12 @@
       newBotValidated = false;
 
       try {
-        const r = await fetch('/api/settings/validate-token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token, admin_id: adminTelegramId }),
-        });
+        const r = await apiFetch('/api/settings/validate-token', { method: 'POST', body: { token } });
         const data = await r.json();
-
         if (data.ok) {
           statusDiv.textContent = `@${data.bot_username} — ${data.bot_name}`;
           statusDiv.style.color = 'var(--success)';
-          if (!nameInput.value.trim()) {
-            nameInput.value = data.bot_name;
-          }
+          if (!nameInput.value.trim()) nameInput.value = data.bot_name;
           addBtn.disabled = false;
           newBotValidated = true;
         } else {
@@ -1864,143 +1702,247 @@
       }
     }
 
-    function addBot() {
-      if (!newBotValidated) {
-        showAlert('Сначала проверьте токен');
-        return;
-      }
+    async function addBot() {
+      if (!newBotValidated) { showAlert('Сначала проверьте токен'); return; }
       const token = document.getElementById('newBotToken').value.trim();
       const name = document.getElementById('newBotName').value.trim() || 'Новый бот';
       const leadtehId = document.getElementById('newBotLeadteh').value.trim();
 
-      settingsBots.push({
-        name,
-        token,
-        token_masked: maskTokenFront(token),
-        leadteh_id: leadtehId,
-        is_existing: false,
-        original_index: null,
-      });
-
-      // Очистить форму
-      document.getElementById('newBotToken').value = '';
-      document.getElementById('newBotName').value = '';
-      document.getElementById('newBotLeadteh').value = '';
-      document.getElementById('newBotStatus').classList.add('hidden');
-      document.getElementById('addBotBtn').disabled = true;
-      newBotValidated = false;
-
-      renderSettingsBots();
+      try {
+        const r = await apiFetch('/api/settings/bot/add', { method: 'POST', body: { token, name, leadteh_id: leadtehId } });
+        const data = await r.json();
+        if (data.ok) {
+          showAlert('Бот добавлен');
+          document.getElementById('newBotToken').value = '';
+          document.getElementById('newBotName').value = '';
+          document.getElementById('newBotLeadteh').value = '';
+          document.getElementById('newBotStatus').classList.add('hidden');
+          document.getElementById('addBotBtn').disabled = true;
+          newBotValidated = false;
+          loadSettings();
+          loadBots();
+        } else {
+          showAlert(data.error || 'Ошибка');
+        }
+      } catch (e) { showAlert('Ошибка добавления бота'); }
     }
 
-    function maskTokenFront(token) {
-      if (!token || token.length < 10) return '***';
-      return token.slice(0, 4) + '...' + token.slice(-3);
-    }
-
-    function addAdmin() {
+    async function addAdmin() {
       const input = document.getElementById('newAdminId');
       const id = input.value.trim();
-      if (!id) {
-        showAlert('Введите Telegram ID');
-        return;
-      }
-      if (!/^\d+$/.test(id)) {
-        showAlert('Telegram ID должен содержать только цифры');
-        return;
-      }
-      if (settingsAdminIds.includes(id)) {
-        showAlert('Этот админ уже в списке');
-        return;
-      }
-      settingsAdminIds.push(id);
-      input.value = '';
-      renderSettingsAdmins();
-    }
-
-    async function saveSettings() {
-      const btn = document.getElementById('saveSettingsBtn');
-      btn.disabled = true;
-      btn.textContent = 'Сохранение...';
+      if (!id) { showAlert('Введите Telegram ID'); return; }
+      if (!/^\d+$/.test(id)) { showAlert('Telegram ID должен содержать только цифры'); return; }
 
       try {
-        const body = {
-          admin_id: adminTelegramId,
-          bots: settingsBots.map(b => ({
-            name: b.name,
-            token: b.is_existing ? '' : b.token,
-            leadteh_id: b.leadteh_id,
-            is_existing: b.is_existing,
-            original_index: b.original_index,
-          })),
-          admin_ids: settingsAdminIds,
-        };
-
-        const r = await fetch('/api/settings/save', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        });
-
+        const r = await apiFetch('/api/settings/admin/add', { method: 'POST', body: { telegram_id: id } });
         const data = await r.json();
-
-        if (data.ok) {
-          btn.textContent = 'Перезагрузка...';
-          setTimeout(() => waitAndReload(0), 2000);
-        } else {
-          showAlert(data.error || 'Ошибка сохранения');
-          btn.disabled = false;
-          btn.textContent = 'Применить настройки';
-        }
-      } catch (e) {
-        showAlert('Ошибка сохранения настроек');
-        btn.disabled = false;
-        btn.textContent = 'Применить настройки';
-      }
+        if (data.ok) { input.value = ''; loadSettings(); }
+        else showAlert(data.error || 'Ошибка');
+      } catch (e) { showAlert('Ошибка добавления админа'); }
     }
 
-    async function waitAndReload(attempts) {
-      if (attempts > 15) {
-        showAlert('Сервер не отвечает. Попробуйте обновить страницу вручную.');
+    async function saveLeadtehToken() {
+      const input = document.getElementById('leadtehTokenInput');
+      const token = input.value.trim();
+      if (!token) { showAlert('Введите токен'); return; }
+      try {
+        const r = await apiFetch('/api/settings/leadteh-token', { method: 'POST', body: { token } });
+        const data = await r.json();
+        if (data.ok) { showAlert('Leadteh API токен сохранён'); input.value = ''; }
+        else showAlert(data.error || 'Ошибка');
+      } catch (e) { showAlert('Ошибка сохранения'); }
+    }
+
+    // ============================================
+    // Суперадмин
+    // ============================================
+    let superTariffs = [];
+
+    function showSuperSub(sub) {
+      ['tenants', 'tariffs', 'stats'].forEach(s => {
+        const el = document.getElementById(`super${s.charAt(0).toUpperCase() + s.slice(1)}`);
+        const btn = document.getElementById(`superSub${s.charAt(0).toUpperCase() + s.slice(1)}`);
+        if (el) el.classList.toggle('hidden', s !== sub);
+        if (btn) btn.className = `flex-1 py-1.5 px-2 rounded-lg text-xs font-medium ${s === sub ? 'btn-primary' : 'btn-secondary'}`;
+      });
+    }
+
+    async function loadSuperData() {
+      loadSuperTenants();
+      loadSuperTariffs();
+      loadSuperStats();
+    }
+
+    async function loadSuperTenants() {
+      try {
+        const r = await apiFetch('/api/super/tenants');
+        const data = await r.json();
+        renderSuperTenants(data.tenants || []);
+      } catch (e) { console.error(e); }
+    }
+
+    function renderSuperTenants(tenants) {
+      const container = document.getElementById('tenantsListContainer');
+      if (tenants.length === 0) {
+        container.innerHTML = '<div class="text-sm" style="color:var(--text-muted)">Нет арендаторов</div>';
         return;
       }
+      container.innerHTML = tenants.map(t => `
+        <div class="broadcast-card">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-sm font-medium">${escapeHtml(t.name || 'Без имени')}</span>
+            <span class="status-badge status-${t.status}">${t.status}</span>
+          </div>
+          <div class="text-xs" style="color:var(--text-muted)">TG ID: ${t.telegram_id}</div>
+          <div class="text-xs" style="color:var(--text-muted)">Тариф: ${escapeHtml(t.tariff_name || '-')} | Боты: ${t.bots_count} | Рассылки: ${t.broadcasts_count}</div>
+          <div class="flex gap-2 mt-2">
+            ${t.status === 'active'
+              ? `<button onclick="toggleTenantStatus(${t.id},'blocked')" class="text-xs px-2 py-1 rounded btn-danger">Заблокировать</button>`
+              : `<button onclick="toggleTenantStatus(${t.id},'active')" class="text-xs px-2 py-1 rounded btn-primary">Активировать</button>`
+            }
+            <button onclick="impersonateTenant(${t.id})" class="text-xs px-2 py-1 rounded btn-secondary">Войти как тенант</button>
+          </div>
+        </div>`).join('');
+    }
+
+    async function toggleTenantStatus(id, status) {
       try {
-        const r = await fetch('/api/bots');
-        if (r.ok) {
-          location.reload();
-          return;
-        }
-      } catch (e) {
-        // сервер ещё не поднялся
+        await apiFetch(`/api/super/tenants/${id}/update`, { method: 'POST', body: { status } });
+        loadSuperTenants();
+      } catch (e) { showAlert('Ошибка'); }
+    }
+
+    async function impersonateTenant(tenantId) {
+      try {
+        const r = await apiFetch('/api/super/impersonate', { method: 'POST', body: { tenant_id: tenantId } });
+        const data = await r.json();
+        if (data.ok) {
+          authToken = data.token;
+          userTenantId = tenantId;
+          showAlert(`Вы вошли как тенант: ${data.tenant_name || tenantId}`);
+          await loadBots();
+          renderMessagesList();
+          showTab('create');
+        } else showAlert(data.error || 'Ошибка');
+      } catch (e) { showAlert('Ошибка'); }
+    }
+
+    function showAddTenantForm() {
+      document.getElementById('addTenantForm').classList.remove('hidden');
+      // Загрузить тарифы для выбора
+      const select = document.getElementById('newTenantTariff');
+      select.innerHTML = '<option value="">Тариф по умолчанию</option>';
+      superTariffs.forEach(t => {
+        select.innerHTML += `<option value="${t.id}">${escapeHtml(t.name)} (${t.max_bots} ботов, ${t.max_broadcasts_per_month} рассылок/мес)</option>`;
+      });
+    }
+
+    async function createTenant() {
+      const tgId = document.getElementById('newTenantTgId').value.trim();
+      const name = document.getElementById('newTenantName').value.trim();
+      const leadteh = document.getElementById('newTenantLeadteh').value.trim();
+      const tariffId = document.getElementById('newTenantTariff').value;
+
+      if (!tgId) { showAlert('Введите Telegram ID'); return; }
+
+      try {
+        const r = await apiFetch('/api/super/tenants', {
+          method: 'POST',
+          body: { telegram_id: tgId, name, leadteh_api_token: leadteh, tariff_plan_id: tariffId ? Number(tariffId) : undefined },
+        });
+        const data = await r.json();
+        if (data.ok) {
+          showAlert('Тенант создан');
+          document.getElementById('addTenantForm').classList.add('hidden');
+          document.getElementById('newTenantTgId').value = '';
+          document.getElementById('newTenantName').value = '';
+          document.getElementById('newTenantLeadteh').value = '';
+          loadSuperTenants();
+        } else showAlert(data.error || 'Ошибка');
+      } catch (e) { showAlert('Ошибка создания'); }
+    }
+
+    async function loadSuperTariffs() {
+      try {
+        const r = await apiFetch('/api/super/tariffs');
+        const data = await r.json();
+        superTariffs = data.tariffs || [];
+        renderSuperTariffs(superTariffs);
+      } catch (e) { console.error(e); }
+    }
+
+    function renderSuperTariffs(tariffs) {
+      const container = document.getElementById('tariffsListContainer');
+      if (tariffs.length === 0) {
+        container.innerHTML = '<div class="text-sm" style="color:var(--text-muted)">Нет тарифов</div>';
+        return;
       }
-      setTimeout(() => waitAndReload(attempts + 1), 1000);
+      container.innerHTML = tariffs.map(t => `
+        <div class="broadcast-card">
+          <div class="text-sm font-medium mb-1">${escapeHtml(t.name)} ${t.is_default ? '<span class="text-xs" style="color:var(--accent)">(по умолч.)</span>' : ''}</div>
+          <div class="grid grid-cols-3 gap-2 text-center text-xs" style="color:var(--text-secondary)">
+            <div>${t.max_bots} ботов</div>
+            <div>${t.max_broadcasts_per_month} рассыл./мес</div>
+            <div>${t.max_contacts} контактов</div>
+          </div>
+        </div>`).join('');
+    }
+
+    function showAddTariffForm() {
+      document.getElementById('addTariffForm').classList.remove('hidden');
+    }
+
+    async function createTariff() {
+      const name = document.getElementById('newTariffName').value.trim();
+      const maxBots = parseInt(document.getElementById('newTariffBots').value) || 3;
+      const maxBroadcasts = parseInt(document.getElementById('newTariffBroadcasts').value) || 100;
+      const maxContacts = parseInt(document.getElementById('newTariffContacts').value) || 5000;
+
+      if (!name) { showAlert('Введите название'); return; }
+
+      try {
+        const r = await apiFetch('/api/super/tariffs', {
+          method: 'POST',
+          body: { name, max_bots: maxBots, max_broadcasts_per_month: maxBroadcasts, max_contacts: maxContacts },
+        });
+        const data = await r.json();
+        if (data.ok) {
+          showAlert('Тариф создан');
+          document.getElementById('addTariffForm').classList.add('hidden');
+          document.getElementById('newTariffName').value = '';
+          loadSuperTariffs();
+        } else showAlert(data.error || 'Ошибка');
+      } catch (e) { showAlert('Ошибка'); }
+    }
+
+    async function loadSuperStats() {
+      try {
+        const r = await apiFetch('/api/super/stats');
+        const data = await r.json();
+        document.getElementById('statsContainer').innerHTML = `
+          <div class="stat-card"><div class="stat-value">${data.total_tenants}</div><div class="stat-label">Всего тенантов</div></div>
+          <div class="stat-card"><div class="stat-value">${data.active_tenants}</div><div class="stat-label">Активных</div></div>
+          <div class="stat-card"><div class="stat-value">${data.total_bots}</div><div class="stat-label">Всего ботов</div></div>
+          <div class="stat-card"><div class="stat-value">${data.total_broadcasts}</div><div class="stat-label">Всего рассылок</div></div>
+          <div class="stat-card"><div class="stat-value">${data.sent_broadcasts}</div><div class="stat-label">Отправлено</div></div>
+          <div class="stat-card"><div class="stat-value">${data.month_broadcasts}</div><div class="stat-label">Рассылок за ${data.month}</div></div>`;
+      } catch (e) { console.error(e); }
     }
 
     // ============================================
     // Утилиты
     // ============================================
     function escapeHtml(str) {
-      return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
     function escapeAttr(str) {
-      return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/"/g, '&quot;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
+      return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
     function showAlert(message) {
-      if (tg?.showAlert) {
-        tg.showAlert(message);
-      } else {
-        alert(message);
-      }
+      if (tg?.showAlert) tg.showAlert(message);
+      else alert(message);
     }
   </script>
 </body>
