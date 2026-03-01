@@ -423,15 +423,7 @@ app.get('/api/lists/:schemaId/items', async (req, res) => {
     const fields = schema?.fields || [];
 
     const items = await fetchListItems(botConfig, schemaId);
-
-    // DEBUG: структура данных списка
-    console.log('[DEBUG lists] schema fields:', JSON.stringify(fields, null, 2));
-    if (Array.isArray(items) && items.length > 0) {
-      console.log('[DEBUG lists] first item:', JSON.stringify(items[0], null, 2));
-    }
-
     const telegramIds = extractTelegramIds(Array.isArray(items) ? items : [], fields);
-    console.log('[DEBUG lists] extracted telegramIds:', telegramIds);
 
     res.json({
       count: telegramIds.length,
