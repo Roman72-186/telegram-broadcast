@@ -244,6 +244,7 @@
     <div class="text-5xl mb-4">&#128274;</div>
     <h1 class="text-xl font-bold mb-2">Доступ запрещён</h1>
     <p class="text-sm" style="color: var(--text-secondary)">Нет доступа. Обратитесь к администратору платформы.</p>
+    <p id="debugInfo" class="text-xs mt-4" style="color: var(--text-secondary); word-break: break-all;"></p>
   </div>
 
   <!-- Основной контент -->
@@ -641,10 +642,12 @@
     // ============================================
     async function init() {
       const initData = tg?.initData;
+      const debugEl = document.getElementById('debugInfo');
 
       if (!initData) {
         document.getElementById('loadingScreen').classList.add('hidden');
         document.getElementById('accessDenied').classList.remove('hidden');
+        debugEl.textContent = 'Причина: initData пустая. tg=' + (tg ? 'есть' : 'null') + ', tg.initData="' + (tg?.initData || '') + '", platform=' + (tg?.platform || 'unknown');
         return;
       }
 
@@ -659,6 +662,7 @@
         if (!data.authorized) {
           document.getElementById('loadingScreen').classList.add('hidden');
           document.getElementById('accessDenied').classList.remove('hidden');
+          debugEl.textContent = 'Причина: сервер отклонил. ' + (data.error || data.message || JSON.stringify(data));
           return;
         }
 
@@ -687,6 +691,7 @@
         console.error('Auth error:', e);
         document.getElementById('loadingScreen').classList.add('hidden');
         document.getElementById('accessDenied').classList.remove('hidden');
+        debugEl.textContent = 'Причина: ошибка fetch. ' + e.message;
       }
     }
 
