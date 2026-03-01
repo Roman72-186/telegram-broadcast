@@ -40,12 +40,14 @@ app.post('/api/auth', (req, res) => {
     }
 
     const validation = validateInitData(initData, config.platformBotToken);
+    console.log('[auth] initData validation:', validation.valid ? 'OK' : validation.error, '| user:', validation.user?.id);
     if (!validation.valid) {
       return res.status(401).json({ error: validation.error });
     }
 
     const telegramId = String(validation.user.id);
     const { role, tenantId } = getUserRole(telegramId, db);
+    console.log('[auth] telegram_id:', telegramId, '| role:', role, '| tenant_id:', tenantId);
 
     if (role === 'none') {
       return res.json({
@@ -56,6 +58,7 @@ app.post('/api/auth', (req, res) => {
 
     // Создаём сессию
     const session = db.createSession(tenantId, telegramId, role);
+    console.log('[auth] session created for', telegramId, '| role:', role);
 
     res.json({
       authorized: true,
