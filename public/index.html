@@ -311,6 +311,16 @@
         <h2 class="text-lg font-bold mb-1">Сообщения</h2>
         <p class="text-xs mb-3" style="color: var(--text-secondary)">От 1 до 5 сообщений, идут подряд получателю</p>
 
+        <!-- Выбор разметки -->
+        <div class="mb-3">
+          <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Разметка текста</label>
+          <select id="parseModeSelect" class="input-field w-full rounded-lg px-3 py-2 text-sm">
+            <option value="Markdown">Markdown (*жирный*, _курсив_)</option>
+            <option value="HTML">HTML (&lt;b&gt;жирный&lt;/b&gt;, &lt;i&gt;курсив&lt;/i&gt;)</option>
+            <option value="">Без разметки (plain text)</option>
+          </select>
+        </div>
+
         <div id="messagesList"></div>
 
         <button id="addMessageBtn" onclick="addMessage()"
@@ -1313,6 +1323,7 @@
 
         const body = {
           name: document.getElementById('broadcastName').value.trim(),
+          parse_mode: document.getElementById('parseModeSelect').value || null,
           messages: messages.map((msg) => ({
             photo_url: msg.photo_url || '',
             text: msg.text.trim(),
@@ -1365,6 +1376,7 @@
       selectedListId = '';
       selectedListName = '';
       document.getElementById('broadcastName').value = '';
+      document.getElementById('parseModeSelect').value = 'Markdown';
       document.getElementById('sendNow').checked = true;
       document.getElementById('scheduleFields').classList.add('hidden');
       const listSelect = document.getElementById('listSelect');

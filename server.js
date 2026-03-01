@@ -409,7 +409,7 @@ app.get('/api/lists/:schemaId/items', async (req, res) => {
 // ============================================
 app.post('/api/broadcast/save', (req, res) => {
   try {
-    const { name, messages, text, buttons, filters, scheduled_at, created_by, bot_id } = req.body;
+    const { name, parse_mode, messages, text, buttons, filters, scheduled_at, created_by, bot_id } = req.body;
 
     if (!created_by) {
       return res.status(400).json({ error: 'created_by обязателен' });
@@ -470,6 +470,7 @@ app.post('/api/broadcast/save', (req, res) => {
     const broadcast = {
       id,
       name: name || '',
+      parse_mode: parse_mode || null,
       messages: normalizedMessages,
       filters: {
         include_tags: filters?.include_tags || [],
@@ -711,7 +712,8 @@ async function sendBroadcast(broadcast) {
           contact.telegram_id,
           msg.text,
           msg.photoUrl,
-          msg.keyboard
+          msg.keyboard,
+          broadcast.parse_mode
         );
 
         if (!r.ok) {
@@ -779,18 +781,21 @@ function buildKeyboard(buttons, botUsername) {
   return rows;
 }
 
-async function sendSingleMessage(botToken, chatId, text, photoUrl, inlineKeyboard) {
+async function sendSingleMessage(botToken, chatId, text, photoUrl, inlineKeyboard, parseMode) {
   const replyMarkup = inlineKeyboard.length > 0
     ? { inline_keyboard: inlineKeyboard }
     : undefined;
+
+  // parseMode: 'Markdown', 'HTML', null (без разметки)
+  const usedParseMode = parseMode || undefined;
 
   if (photoUrl) {
     const body = {
       chat_id: String(chatId),
       photo: photoUrl,
       caption: text.slice(0, 1024),
-      parse_mode: 'Markdown',
     };
+    if (usedParseMode) body.parse_mode = usedParseMode;
     if (replyMarkup) body.reply_markup = replyMarkup;
 
     let r = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
@@ -799,8 +804,8 @@ async function sendSingleMessage(botToken, chatId, text, photoUrl, inlineKeyboar
       body: JSON.stringify(body),
     });
 
-    // При ошибке парсинга Markdown — повторить без parse_mode
-    if (!r.ok) {
+    // При ошибке парсинга — повторить без parse_mode
+    if (!r.ok && usedParseMode) {
       const err = await r.json().catch(() => ({}));
       if (err.description && err.description.includes("can't parse entities")) {
         delete body.parse_mode;
@@ -810,7 +815,6 @@ async function sendSingleMessage(botToken, chatId, text, photoUrl, inlineKeyboar
           body: JSON.stringify(body),
         });
       } else {
-        // Вернуть фейковый Response с уже распарсенной ошибкой
         return { ok: false, json: async () => err };
       }
     }
@@ -821,8 +825,8 @@ async function sendSingleMessage(botToken, chatId, text, photoUrl, inlineKeyboar
   const body = {
     chat_id: String(chatId),
     text,
-    parse_mode: 'Markdown',
   };
+  if (usedParseMode) body.parse_mode = usedParseMode;
   if (replyMarkup) body.reply_markup = replyMarkup;
 
   let r = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
@@ -831,8 +835,8 @@ async function sendSingleMessage(botToken, chatId, text, photoUrl, inlineKeyboar
     body: JSON.stringify(body),
   });
 
-  // При ошибке парсинга Markdown — повторить без parse_mode
-  if (!r.ok) {
+  // При ошибке парсинга — повторить без parse_mode
+  if (!r.ok && usedParseMode) {
     const err = await r.json().catch(() => ({}));
     if (err.description && err.description.includes("can't parse entities")) {
       delete body.parse_mode;
