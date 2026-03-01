@@ -255,8 +255,9 @@
       display: none;
       position: absolute;
       bottom: calc(100% + 8px);
-      left: 50%;
-      transform: translateX(-50%);
+      right: -8px;
+      left: auto;
+      transform: none;
       background-color: var(--bg-tertiary);
       color: var(--text-primary);
       border: 1px solid var(--border);
@@ -266,7 +267,7 @@
       font-weight: 400;
       white-space: normal;
       width: max-content;
-      max-width: 260px;
+      max-width: min(260px, calc(100vw - 32px));
       z-index: 100;
       box-shadow: 0 4px 12px rgba(0,0,0,0.3);
       line-height: 1.4;
@@ -275,8 +276,9 @@
       content: '';
       position: absolute;
       top: 100%;
-      left: 50%;
-      transform: translateX(-50%);
+      left: auto;
+      right: 10px;
+      transform: none;
       border: 6px solid transparent;
       border-top-color: var(--bg-tertiary);
     }
@@ -458,8 +460,12 @@
         <div id="tagsContent" class="hidden">
           <div class="mb-4">
             <div class="section-label flex items-center">Содержит тег (хотя бы один)<span class="tooltip-trigger">?<span class="tooltip-text">Отправить контактам с хотя бы одним из выбранных тегов</span></span></div>
-            <div id="includeTagsContainer" class="flex flex-wrap gap-2 mb-2"></div>
-            <div class="flex gap-2">
+            <div id="includeSelectedChips" class="flex flex-wrap gap-1 mb-2"></div>
+            <details id="includeTagsDetails">
+              <summary class="btn-secondary rounded-lg px-3 py-1.5 text-sm cursor-pointer inline-block">Выбрать теги</summary>
+              <div id="includeTagsContainer" class="mt-2 max-h-48 overflow-y-auto rounded-lg" style="border:1px solid var(--border);background:var(--bg-secondary)"></div>
+            </details>
+            <div class="flex gap-2 mt-2">
               <input id="customIncludeTag" type="text" placeholder="Свой тег..."
                 class="input-field flex-1 rounded-lg px-3 py-1.5 text-sm" />
               <button onclick="addCustomTag('include')"
@@ -469,8 +475,12 @@
 
           <div class="mb-4">
             <div class="section-label flex items-center">Не содержит тег (исключить)<span class="tooltip-trigger">?<span class="tooltip-text">Исключить контактов с этими тегами</span></span></div>
-            <div id="excludeTagsContainer" class="flex flex-wrap gap-2 mb-2"></div>
-            <div class="flex gap-2">
+            <div id="excludeSelectedChips" class="flex flex-wrap gap-1 mb-2"></div>
+            <details id="excludeTagsDetails">
+              <summary class="btn-secondary rounded-lg px-3 py-1.5 text-sm cursor-pointer inline-block">Выбрать теги</summary>
+              <div id="excludeTagsContainer" class="mt-2 max-h-48 overflow-y-auto rounded-lg" style="border:1px solid var(--border);background:var(--bg-secondary)"></div>
+            </details>
+            <div class="flex gap-2 mt-2">
               <input id="customExcludeTag" type="text" placeholder="Свой тег..."
                 class="input-field flex-1 rounded-lg px-3 py-1.5 text-sm" />
               <button onclick="addCustomTag('exclude')"
@@ -618,17 +628,6 @@
             </div>
           </div>
           <button onclick="addAdmin()" class="btn-secondary px-3 py-1.5 rounded-lg text-xs">Добавить</button>
-        </div>
-
-        <!-- Leadteh API токен -->
-        <h2 class="text-lg font-bold mb-3">Leadteh API</h2>
-        <div class="flex gap-2 mb-6">
-          <div class="flex-1">
-            <label class="text-xs mb-1 flex items-center" style="color: var(--text-secondary)">Токен<span class="tooltip-trigger">?<span class="tooltip-text">Токен из Leadteh: Настройки → API. Общий для всех ботов</span></span></label>
-            <input id="leadtehTokenInput" type="password" placeholder="API токен Leadteh"
-              class="input-field w-full rounded-lg px-3 py-2 text-sm" />
-          </div>
-          <button onclick="saveLeadtehToken()" class="btn-primary px-3 py-1.5 rounded-lg text-xs">Сохранить</button>
         </div>
 
         <!-- Списки для ботов -->
@@ -1376,6 +1375,8 @@
     function renderTags() {
       renderTagList('includeTagsContainer', allTags, selectedIncludeTags, 'include');
       renderTagList('excludeTagsContainer', allTags, selectedExcludeTags, 'exclude');
+      renderSelectedChips('includeSelectedChips', selectedIncludeTags, 'include');
+      renderSelectedChips('excludeSelectedChips', selectedExcludeTags, 'exclude');
     }
 
     function renderTagList(containerId, tags, selected, type) {
@@ -1383,10 +1384,35 @@
       container.innerHTML = '';
       const allDisplayTags = [...new Set([...tags, ...selected])];
       for (const tag of allDisplayTags) {
+        const row = document.createElement('div');
+        row.className = 'px-3 py-2 text-sm cursor-pointer flex items-center gap-2';
+        row.style.cssText = selected.includes(tag)
+          ? 'background:var(--accent-bg, rgba(59,130,246,0.15));color:var(--text-primary)'
+          : 'color:var(--text-secondary)';
+        row.onmouseenter = () => { if (!selected.includes(tag)) row.style.background = 'var(--bg-tertiary)'; };
+        row.onmouseleave = () => { if (!selected.includes(tag)) row.style.background = ''; };
+        const check = document.createElement('span');
+        check.textContent = selected.includes(tag) ? '✓' : '';
+        check.style.cssText = 'width:16px;text-align:center;flex-shrink:0;font-size:12px';
+        const text = document.createElement('span');
+        text.textContent = tag;
+        text.style.cssText = 'overflow:hidden;text-overflow:ellipsis';
+        row.appendChild(check);
+        row.appendChild(text);
+        row.onclick = () => toggleTag(tag, type);
+        container.appendChild(row);
+      }
+    }
+
+    function renderSelectedChips(containerId, selected, type) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = '';
+      for (const tag of selected) {
         const chip = document.createElement('span');
-        chip.className = 'tag-chip' + (selected.includes(tag) ? ' selected' : '');
-        chip.textContent = tag;
-        chip.onclick = () => toggleTag(tag, type);
+        chip.className = 'tag-chip selected';
+        chip.style.cssText = 'display:inline-flex;align-items:center;gap:4px';
+        chip.innerHTML = `<span>${tag}</span><span style="cursor:pointer;opacity:0.7;font-size:10px">✕</span>`;
+        chip.querySelector('span:last-child').onclick = (e) => { e.stopPropagation(); toggleTag(tag, type); };
         container.appendChild(chip);
       }
     }
@@ -1411,9 +1437,13 @@
         listSelect.disabled = false;
         listSelect.style.opacity = '1';
         if (listInfo) listInfo.style.opacity = '1';
-        document.querySelectorAll('#includeTagsContainer .tag-chip, #excludeTagsContainer .tag-chip').forEach(chip => {
-          chip.style.pointerEvents = 'none';
-          chip.style.opacity = '0.4';
+        document.querySelectorAll('#includeTagsContainer > div, #excludeTagsContainer > div').forEach(el => {
+          el.style.pointerEvents = 'none';
+          el.style.opacity = '0.4';
+        });
+        ['includeTagsDetails', 'excludeTagsDetails'].forEach(id => {
+          const d = document.getElementById(id);
+          if (d) { d.style.pointerEvents = 'none'; d.style.opacity = '0.4'; }
         });
         if (customIncludeInput) { customIncludeInput.disabled = true; customIncludeInput.style.opacity = '0.4'; }
         if (customExcludeInput) { customExcludeInput.disabled = true; customExcludeInput.style.opacity = '0.4'; }
@@ -1432,9 +1462,13 @@
       if (customExcludeInput) { customExcludeInput.disabled = false; customExcludeInput.style.opacity = '1'; }
       if (customIncludeBtn) { customIncludeBtn.disabled = false; customIncludeBtn.style.opacity = '1'; }
       if (customExcludeBtn) { customExcludeBtn.disabled = false; customExcludeBtn.style.opacity = '1'; }
-      document.querySelectorAll('#includeTagsContainer .tag-chip, #excludeTagsContainer .tag-chip').forEach(chip => {
-        chip.style.pointerEvents = '';
-        chip.style.opacity = '1';
+      document.querySelectorAll('#includeTagsContainer > div, #excludeTagsContainer > div').forEach(el => {
+        el.style.pointerEvents = '';
+        el.style.opacity = '1';
+      });
+      ['includeTagsDetails', 'excludeTagsDetails'].forEach(id => {
+        const d = document.getElementById(id);
+        if (d) { d.style.pointerEvents = ''; d.style.opacity = '1'; }
       });
     }
 
@@ -2008,18 +2042,6 @@
         if (data.ok) { input.value = ''; loadSettings(); }
         else showAlert(data.error || 'Ошибка');
       } catch (e) { showAlert('Ошибка добавления админа'); }
-    }
-
-    async function saveLeadtehToken() {
-      const input = document.getElementById('leadtehTokenInput');
-      const token = input.value.trim();
-      if (!token) { showAlert('Введите токен'); return; }
-      try {
-        const r = await apiFetch('/api/settings/leadteh-token', { method: 'POST', body: { token } });
-        const data = await r.json();
-        if (data.ok) { showAlert('Leadteh API токен сохранён'); input.value = ''; }
-        else showAlert(data.error || 'Ошибка');
-      } catch (e) { showAlert('Ошибка сохранения'); }
     }
 
     // ============================================

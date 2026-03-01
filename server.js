@@ -309,10 +309,15 @@ app.get('/api/lists', requireTenantAdmin, async (req, res) => {
       fields: s.fields || [],
     }));
 
-    // Фильтрация по привязке списков к боту
-    const botId = req.query.bot_id;
-    if (botId) {
-      const assigned = db.getBotListMappings(Number(botId));
+    // Фильтрация по привязке списков к боту (всегда, fallback на первого бота)
+    const bots = db.getBotsByTenant(req.tenantId);
+    const botIdParam = req.query.bot_id;
+    const filterBot = botIdParam
+      ? bots.find(b => b.id === Number(botIdParam))
+      : bots[0];
+
+    if (filterBot) {
+      const assigned = db.getBotListMappings(filterBot.id);
       if (assigned.length > 0) {
         lists = lists.filter(l => assigned.includes(String(l.id)));
       } else {
