@@ -2,7 +2,7 @@
 const express = require('express');
 const path = require('path');
 const cron = require('node-cron');
-const { loadConfig } = require('./lib/config');
+const { loadConfig, getBotById } = require('./lib/config');
 const storage = require('./lib/storage');
 
 const app = express();
@@ -24,12 +24,35 @@ app.get('/api/auth', (req, res) => {
 });
 
 // ============================================
+// Хелпер: конфиг бота из запроса
+// ============================================
+function getBotConfig(req) {
+  const botId = req.query.bot_id || req.body?.bot_id;
+  const bot = getBotById(config, botId);
+  if (!bot) return null;
+  return {
+    leadtehApiToken: config.leadtehApiToken,
+    leadtehBotId: bot.leadtehBotId,
+    telegramBotToken: bot.token,
+  };
+}
+
+// ============================================
+// API: Список ботов
+// ============================================
+app.get('/api/bots', (req, res) => {
+  const bots = config.bots.map((b) => ({ id: b.id, name: b.name }));
+  res.json({ bots });
+});
+
+// ============================================
 // API: Теги
 // ============================================
 app.get('/api/tags', async (req, res) => {
   try {
     const { fetchAllContacts, extractTags } = require('./lib/leadteh');
-    const allContacts = await fetchAllContacts(config);
+    const botConfig = getBotConfig(req) || config;
+    const allContacts = await fetchAllContacts(botConfig);
 
     const tagsSet = new Set();
     for (const contact of allContacts) {
@@ -51,6 +74,7 @@ app.get('/api/tags', async (req, res) => {
 app.get('/api/contacts', async (req, res) => {
   try {
     const { fetchAllContacts, extractTags } = require('./lib/leadteh');
+    const botConfig = getBotConfig(req) || config;
 
     const includeTags = req.query.include
       ? req.query.include.split(',').map((t) => t.trim()).filter(Boolean)
@@ -60,7 +84,7 @@ app.get('/api/contacts', async (req, res) => {
       : [];
     const countOnly = req.query.count_only === 'true';
 
-    const allContacts = await fetchAllContacts(config);
+    const allContacts = await fetchAllContacts(botConfig);
 
     const filtered = allContacts.filter((contact) => {
       if (!contact.telegram_id) return false;
@@ -106,7 +130,8 @@ app.get('/api/contacts', async (req, res) => {
 app.get('/api/lists', async (req, res) => {
   try {
     const { fetchListSchemas } = require('./lib/leadteh');
-    const schemas = await fetchListSchemas(config);
+    const botConfig = getBotConfig(req) || config;
+    const schemas = await fetchListSchemas(botConfig);
 
     const lists = (Array.isArray(schemas) ? schemas : []).map((s) => ({
       id: s.id,
@@ -124,16 +149,17 @@ app.get('/api/lists', async (req, res) => {
 app.get('/api/lists/:schemaId/items', async (req, res) => {
   try {
     const { fetchListItems, extractTelegramIds, fetchListSchemas } = require('./lib/leadteh');
+    const botConfig = getBotConfig(req) || config;
     const { schemaId } = req.params;
 
     // Получаем схему для определения полей
-    const schemas = await fetchListSchemas(config);
+    const schemas = await fetchListSchemas(botConfig);
     const schema = (Array.isArray(schemas) ? schemas : []).find(
       (s) => String(s.id) === String(schemaId)
     );
     const fields = schema?.fields || [];
 
-    const items = await fetchListItems(config, schemaId);
+    const items = await fetchListItems(botConfig, schemaId);
     const telegramIds = extractTelegramIds(Array.isArray(items) ? items : [], fields);
 
     res.json({
@@ -152,7 +178,7 @@ app.get('/api/lists/:schemaId/items', async (req, res) => {
 // ============================================
 app.post('/api/broadcast/save', (req, res) => {
   try {
-    const { messages, text, buttons, filters, scheduled_at, created_by } = req.body;
+    const { messages, text, buttons, filters, scheduled_at, created_by, bot_id } = req.body;
 
     if (!created_by) {
       return res.status(400).json({ error: 'created_by обязателен' });
@@ -205,6 +231,11 @@ app.post('/api/broadcast/save', (req, res) => {
     const id = generateId();
     const now = new Date().toISOString();
 
+    // Определяем бота для рассылки
+    const bot = getBotById(config, bot_id);
+    const broadcastBotId = bot ? bot.id : (config.bots[0]?.id || '1');
+    const broadcastBotName = bot ? bot.name : (config.bots[0]?.name || '');
+
     const broadcast = {
       id,
       messages: normalizedMessages,
@@ -214,6 +245,8 @@ app.post('/api/broadcast/save', (req, res) => {
         list_schema_id: filters?.list_schema_id || null,
         list_name: filters?.list_name || null,
       },
+      bot_id: broadcastBotId,
+      bot_name: broadcastBotName,
       scheduled_at: scheduled_at || now,
       status: 'pending',
       created_at: now,
@@ -340,9 +373,17 @@ async function processPendingBroadcasts() {
 
 async function sendBroadcast(broadcast) {
   const { fetchAllContacts, extractTags, fetchListItems, fetchListSchemas, extractTelegramIds } = require('./lib/leadteh');
-  const botToken = config.telegramBotToken;
 
-  const allContacts = await fetchAllContacts(config);
+  // Определяем бота из рассылки
+  const bot = getBotById(config, broadcast.bot_id);
+  const botToken = bot ? bot.token : config.telegramBotToken;
+  const botConfig = {
+    leadtehApiToken: config.leadtehApiToken,
+    leadtehBotId: bot ? bot.leadtehBotId : config.leadtehBotId,
+    telegramBotToken: botToken,
+  };
+
+  const allContacts = await fetchAllContacts(botConfig);
   const includeTags = broadcast.filters?.include_tags || [];
   const excludeTags = broadcast.filters?.exclude_tags || [];
   const listSchemaId = broadcast.filters?.list_schema_id || null;
@@ -351,12 +392,12 @@ async function sendBroadcast(broadcast) {
   let listTelegramIds = null;
   if (listSchemaId) {
     try {
-      const schemas = await fetchListSchemas(config);
+      const schemas = await fetchListSchemas(botConfig);
       const schema = (Array.isArray(schemas) ? schemas : []).find(
         (s) => String(s.id) === String(listSchemaId)
       );
       const fields = schema?.fields || [];
-      const items = await fetchListItems(config, listSchemaId);
+      const items = await fetchListItems(botConfig, listSchemaId);
       listTelegramIds = new Set(extractTelegramIds(Array.isArray(items) ? items : [], fields));
       console.log(`[broadcast] Фильтр по списку: ${listTelegramIds.size} telegram_id`);
     } catch (e) {
@@ -556,5 +597,6 @@ const PORT = config.port;
 app.listen(PORT, () => {
   console.log(`Сервер запущен: http://localhost:${PORT}`);
   console.log(`Админы: ${config.adminTelegramIds.join(', ') || '(не заданы)'}`);
+  console.log(`Боты: ${config.bots.map((b) => `${b.name} (id=${b.id})`).join(', ') || '(не заданы)'}`);
   console.log('Cron: каждую минуту');
 });
