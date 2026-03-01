@@ -1364,7 +1364,12 @@
       try {
         const r = await fetch('/api/broadcast/list');
         const data = await r.json();
-        const list = data.broadcasts || [];
+        let list = data.broadcasts || [];
+
+        // Фильтр по выбранному боту
+        if (selectedBotId && allBots.length > 1) {
+          list = list.filter(b => String(b.bot_id) === String(selectedBotId));
+        }
 
         loading.classList.add('hidden');
 
