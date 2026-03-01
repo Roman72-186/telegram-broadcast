@@ -676,9 +676,9 @@ async function sendBroadcast(broadcast) {
   const recipients = allContacts.filter((contact) => {
     if (!contact.telegram_id) return false;
 
-    // Фильтр по списку
-    if (listTelegramIds && !listTelegramIds.has(String(contact.telegram_id))) {
-      return false;
+    // Фильтр по списку — если выбран, теги не учитываются
+    if (listTelegramIds) {
+      return listTelegramIds.has(String(contact.telegram_id));
     }
 
     const contactTags = extractTags(contact);
