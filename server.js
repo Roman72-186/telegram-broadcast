@@ -7,9 +7,12 @@ const { loadConfig } = require('./lib/config');
 const db = require('./lib/db');
 const { validateInitData, getUserRole, isSuperAdmin } = require('./lib/auth');
 const { authMiddleware, requireSuperAdmin, requireTenantAdmin, requireTenantOwner } = require('./lib/middleware');
+const { fetchAllContacts, extractTags, fetchListSchemas, fetchListItems, extractTelegramIds } = require('./lib/leadteh');
 
 const app = express();
 const config = loadConfig();
+
+const VALID_PARSE_MODES = ['Markdown', 'MarkdownV2', 'HTML'];
 
 // ============================================
 // Rate Limiter (in-memory)
@@ -66,6 +69,13 @@ app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
+});
+
+// ============================================
+// Health check (без авторизации)
+// ============================================
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', uptime: process.uptime() });
 });
 
 // ============================================
@@ -214,7 +224,7 @@ function getBotConfigForLeadteh(req) {
 // ============================================
 app.get('/api/tags', requireTenantAdmin, async (req, res) => {
   try {
-    const { fetchAllContacts, extractTags } = require('./lib/leadteh');
+
     const botConfig = getBotConfigForLeadteh(req);
     if (!botConfig) return res.status(400).json({ error: 'Нет настроенных ботов' });
 
@@ -237,7 +247,7 @@ app.get('/api/tags', requireTenantAdmin, async (req, res) => {
 // ============================================
 app.get('/api/contacts', requireTenantAdmin, async (req, res) => {
   try {
-    const { fetchAllContacts, extractTags } = require('./lib/leadteh');
+
     const botConfig = getBotConfigForLeadteh(req);
     if (!botConfig) return res.status(400).json({ error: 'Нет настроенных ботов' });
 
@@ -288,7 +298,7 @@ app.get('/api/contacts', requireTenantAdmin, async (req, res) => {
 // ============================================
 app.get('/api/lists', requireTenantAdmin, async (req, res) => {
   try {
-    const { fetchListSchemas } = require('./lib/leadteh');
+
     const botConfig = getBotConfigForLeadteh(req);
     if (!botConfig) return res.status(400).json({ error: 'Нет настроенных ботов' });
 
@@ -317,7 +327,7 @@ app.get('/api/lists', requireTenantAdmin, async (req, res) => {
 
 app.get('/api/lists/:schemaId/items', requireTenantAdmin, async (req, res) => {
   try {
-    const { fetchListItems, extractTelegramIds, fetchListSchemas } = require('./lib/leadteh');
+
     const botConfig = getBotConfigForLeadteh(req);
     if (!botConfig) return res.status(400).json({ error: 'Нет настроенных ботов' });
 
@@ -347,6 +357,11 @@ app.get('/api/lists/:schemaId/items', requireTenantAdmin, async (req, res) => {
 app.post('/api/broadcast/save', requireTenantAdmin, (req, res) => {
   try {
     const { name, parse_mode, messages, text, buttons, filters, scheduled_at, bot_id } = req.body;
+
+    // Валидация parse_mode
+    if (parse_mode && !VALID_PARSE_MODES.includes(parse_mode)) {
+      return res.status(400).json({ error: `Невалидный parse_mode. Допустимые: ${VALID_PARSE_MODES.join(', ')}` });
+    }
 
     // Проверка тарифных лимитов
     const limits = db.checkTariffLimits(req.tenantId);
@@ -636,7 +651,7 @@ app.post('/api/settings/leadteh-token', requireTenantOwner, (req, res) => {
 // ============================================
 app.get('/api/settings/bot-lists', requireTenantAdmin, async (req, res) => {
   try {
-    const { fetchListSchemas } = require('./lib/leadteh');
+
     const botConfig = getBotConfigForLeadteh(req);
     if (!botConfig) return res.json({ lists: [], mapping: {} });
 
@@ -906,8 +921,6 @@ async function processPendingBroadcasts() {
 }
 
 async function sendBroadcast(broadcast) {
-  const { fetchAllContacts, extractTags, fetchListItems, fetchListSchemas, extractTelegramIds } = require('./lib/leadteh');
-
   // Загружаем credentials тенанта и бота из БД
   const bot = broadcast.bot_id ? db.getBotById(broadcast.bot_id) : null;
   if (!bot) throw new Error('Бот не найден');
@@ -1069,6 +1082,35 @@ function buildKeyboard(buttons, botUsername) {
   return rows;
 }
 
+// Retry с exponential backoff для Telegram API (429, 5xx)
+async function telegramFetch(url, options, maxRetries = 3) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const r = await fetch(url, options);
+
+    if (r.ok || attempt === maxRetries) return r;
+
+    // 429 Too Many Requests — Telegram отдаёт retry_after
+    if (r.status === 429) {
+      const err = await r.json().catch(() => ({}));
+      const retryAfter = err.parameters?.retry_after || (2 ** attempt);
+      console.warn(`[telegram] 429 — ждём ${retryAfter}с (попытка ${attempt + 1}/${maxRetries})`);
+      await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+      continue;
+    }
+
+    // 5xx — ошибка сервера Telegram, retry с backoff
+    if (r.status >= 500) {
+      const delay = (2 ** attempt) * 1000;
+      console.warn(`[telegram] ${r.status} — retry через ${delay}мс (попытка ${attempt + 1}/${maxRetries})`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      continue;
+    }
+
+    // 4xx (кроме 429) — не ретраим
+    return r;
+  }
+}
+
 async function sendSingleMessage(botToken, chatId, text, photoUrl, inlineKeyboard, parseMode, tenantId) {
   const replyMarkup = inlineKeyboard.length > 0
     ? { inline_keyboard: inlineKeyboard }
@@ -1089,7 +1131,7 @@ async function sendSingleMessage(botToken, chatId, text, photoUrl, inlineKeyboar
     if (usedParseMode) body.parse_mode = usedParseMode;
     if (replyMarkup) body.reply_markup = replyMarkup;
 
-    let r = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+    let r = await telegramFetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -1099,7 +1141,7 @@ async function sendSingleMessage(botToken, chatId, text, photoUrl, inlineKeyboar
       const err = await r.json().catch(() => ({}));
       if (err.description && err.description.includes("can't parse entities")) {
         delete body.parse_mode;
-        r = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+        r = await telegramFetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
@@ -1118,7 +1160,7 @@ async function sendSingleMessage(botToken, chatId, text, photoUrl, inlineKeyboar
   if (usedParseMode) body.parse_mode = usedParseMode;
   if (replyMarkup) body.reply_markup = replyMarkup;
 
-  let r = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+  let r = await telegramFetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -1128,7 +1170,7 @@ async function sendSingleMessage(botToken, chatId, text, photoUrl, inlineKeyboar
     const err = await r.json().catch(() => ({}));
     if (err.description && err.description.includes("can't parse entities")) {
       delete body.parse_mode;
-      r = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      r = await telegramFetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -1169,7 +1211,7 @@ async function sendLocalPhoto(botToken, chatId, text, localPath, replyMarkup, pa
     return fd;
   }
 
-  let r = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+  let r = await telegramFetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
     method: 'POST',
     body: buildFormData(true),
   });
@@ -1177,7 +1219,7 @@ async function sendLocalPhoto(botToken, chatId, text, localPath, replyMarkup, pa
   if (!r.ok && parseMode) {
     const err = await r.json().catch(() => ({}));
     if (err.description && err.description.includes("can't parse entities")) {
-      r = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+      r = await telegramFetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
         method: 'POST',
         body: buildFormData(false),
       });

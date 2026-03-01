@@ -3,7 +3,7 @@
 ## Описание проекта
 
 Мультитенантная SaaS-платформа для Telegram рассылок. Позволяет:
-1. **Суперадмин** (telegram_id: 5444227047) управляет арендаторами и тарифами
+1. **Суперадмин** (telegram_id из .env SUPER_ADMIN_ID) управляет арендаторами и тарифами
 2. **Арендаторы** (тенанты) — независимые пользователи со своими ботами, Leadteh-аккаунтами, рассылками
 3. Полная изоляция данных между арендаторами
 4. Все заходят через один платформенный бот суперадмина
@@ -12,9 +12,9 @@
 
 - **Frontend:** HTML5, Tailwind CSS (CDN), vanilla JavaScript
 - **Backend:** Express.js (Node.js)
-- **Хранилище:** SQLite (better-sqlite3) — `data/broadcast.db`
+- **Хранилище:** SQLite (sql.js — чистый JS/WASM, debounced save) — `data/broadcast.db`
 - **Авторизация:** Telegram initData HMAC-SHA-256 + Bearer token сессии
-- **API:** Leadteh REST API, Telegram Bot API
+- **API:** Leadteh REST API, Telegram Bot API (с retry + exponential backoff)
 - **Планировщик:** встроенный node-cron (каждую минуту)
 - **Деплой:** VPS + PM2
 
@@ -26,17 +26,16 @@ telegram-broadcast/
 ├── migrate.js              — Одноразовая миграция из .env/JSON в SQLite
 ├── lib/
 │   ├── config.js           — Загрузка конфигурации (PORT, CRON_SECRET, PLATFORM_BOT_TOKEN)
-│   ├── db.js               — Инициализация SQLite, все таблицы, CRUD-хелперы
+│   ├── db.js               — Инициализация SQLite (sql.js), все таблицы, CRUD-хелперы
 │   ├── auth.js             — Валидация initData (HMAC-SHA-256), роли, сессии
 │   ├── middleware.js       — Express middleware (Bearer auth, requireSuperAdmin, requireTenantAdmin)
-│   ├── leadteh.js          — Работа с Leadteh API (контакты, теги, списки)
-│   └── storage.js          — [УСТАРЕВШИЙ] JSON-хранилище (заменён SQLite)
+│   └── leadteh.js          — Работа с Leadteh API (контакты, теги, списки)
 ├── public/
 │   └── index.html          — Mini App: мультишаговая форма + суперадмин-панель
 ├── data/
 │   ├── broadcast.db        — SQLite база данных (создаётся автоматически)
 │   └── uploads/{tenant_id}/ — Загруженные файлы по тенантам
-├── package.json            — Зависимости: express, node-cron, better-sqlite3
+├── package.json            — Зависимости: express, node-cron, sql.js
 ├── .env.example            — Шаблон переменных окружения
 └── CLAUDE.md               — Этот файл
 ```
@@ -48,6 +47,7 @@ telegram-broadcast/
 | `PORT` | Порт сервера (по умолчанию 3000) |
 | `PLATFORM_BOT_TOKEN` | Токен платформенного бота (для валидации initData) |
 | `CRON_SECRET` | Секрет для ручного вызова cron (необязательно) |
+| `SUPER_ADMIN_ID` | Telegram ID суперадмина платформы |
 
 Все остальные настройки (боты, Leadteh API, админы) хранятся в SQLite.
 
@@ -65,13 +65,14 @@ telegram-broadcast/
 
 | Роль | Описание |
 |---|---|
-| `super_admin` | telegram_id 5444227047. Управляет тенантами, тарифами, статистикой |
+| `super_admin` | SUPER_ADMIN_ID из .env. Управляет тенантами, тарифами, статистикой |
 | `owner` | Владелец тенанта. Управляет ботами, админами, Leadteh API |
 | `admin` | Админ тенанта. Создаёт рассылки, просматривает данные |
 
 ## API роуты
 
 ### Публичные
+- `GET /health` — health check (статус, uptime)
 - `POST /api/auth` — авторизация через initData
 
 ### Тенант (требует Bearer token)
@@ -80,7 +81,7 @@ telegram-broadcast/
 - `GET /api/contacts` — контакты с фильтрацией
 - `GET /api/lists` — списки Leadteh
 - `GET /api/lists/:id/items` — элементы списка
-- `POST /api/broadcast/save` — сохранить рассылку
+- `POST /api/broadcast/save` — сохранить рассылку (валидация parse_mode)
 - `GET /api/broadcast/list` — список рассылок тенанта
 - `POST /api/broadcast/delete` — удалить pending рассылку
 - `POST /api/upload` — загрузка фото
@@ -90,6 +91,7 @@ telegram-broadcast/
 - `POST /api/settings/admin/add` — добавить админа (owner)
 - `POST /api/settings/admin/remove` — удалить админа (owner)
 - `POST /api/settings/leadteh-token` — обновить Leadteh API токен (owner)
+- `POST /api/settings/validate-token` — проверить токен бота
 - `GET /api/settings/bot-lists` — привязка списков к ботам
 - `POST /api/settings/bot-lists` — сохранить привязку
 - `GET /api/tenant/info` — тариф и использование
@@ -98,6 +100,7 @@ telegram-broadcast/
 - `GET /api/super/tenants` — список тенантов
 - `POST /api/super/tenants` — создать тенанта
 - `POST /api/super/tenants/:id/update` — обновить тенанта
+- `POST /api/super/tenants/:id/delete` — удалить тенанта
 - `POST /api/super/impersonate` — войти под тенантом
 - `GET /api/super/tariffs` — тарифные планы
 - `POST /api/super/tariffs` — создать тариф
@@ -110,7 +113,7 @@ telegram-broadcast/
 ## Установка с нуля
 
 ```bash
-cp .env.example .env       # заполнить PLATFORM_BOT_TOKEN
+cp .env.example .env       # заполнить PLATFORM_BOT_TOKEN и SUPER_ADMIN_ID
 npm install
 node server.js
 ```
@@ -119,7 +122,7 @@ node server.js
 
 ```bash
 node migrate.js            # миграция .env → SQLite
-npm install                # установит better-sqlite3
+npm install
 node server.js
 ```
 
@@ -135,14 +138,25 @@ pm2 restart broadcast
 
 ## Безопасность
 
-- Валидация Telegram initData через HMAC-SHA-256
+- Валидация Telegram initData через HMAC-SHA-256 (timingSafeEqual)
 - Сессии с Bearer token (24ч, хранятся в SQLite)
 - Все API защищены middleware авторизации
 - Изоляция данных: все SQL-запросы фильтруют по tenant_id
-- CORS: разрешён только Telegram WebApp
+- CORS: разрешён только Telegram WebApp и leadtehsms.ru
 - Загрузки изолированы по тенантам (data/uploads/{tenant_id}/)
+- Path traversal protection при доступе к файлам
 - Тарифные лимиты (макс. ботов, рассылок/мес, контактов)
+- Rate limiting: авторизация 5/мин, API 60/мин, загрузки 3/мин
+- Валидация parse_mode (Markdown, MarkdownV2, HTML)
+- Retry с exponential backoff при 429/5xx от Telegram API
 - Cron обрабатывает рассылки всех тенантов, загружая credentials из БД
+- Graceful shutdown с сохранением БД на диск (SIGINT/SIGTERM)
+
+## Архитектура БД (sql.js)
+
+- sql.js держит БД в памяти, пишет на диск debounced (500мс) + каждые 5с + при shutdown
+- Транзакции: saveBroadcast, createTenant, setBotListMappings обёрнуты в BEGIN/COMMIT
+- Для продакшена с высокой нагрузкой рекомендуется миграция на better-sqlite3 (нативный)
 
 ## Язык
 
