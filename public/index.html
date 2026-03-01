@@ -1234,19 +1234,22 @@
         el.innerHTML = '<span class="text-sm" style="color:var(--text-secondary)">Подсчёт...</span>';
 
         try {
-          const params = new URLSearchParams();
-          if (selectedIncludeTags.length) params.set('include', selectedIncludeTags.join(','));
-          if (selectedExcludeTags.length) params.set('exclude', selectedExcludeTags.join(','));
-          params.set('count_only', 'true');
-
-          const r = await fetch(appendBotParam(`/api/contacts?${params}`));
-          const data = await r.json();
-
-          let text = `~${data.count} контактам`;
+          let count;
           if (selectedListId) {
-            text += ' (+ фильтр по списку на сервере)';
+            const r = await fetch(appendBotParam(`/api/lists/${selectedListId}/items`));
+            const data = await r.json();
+            count = data.count || 0;
+          } else {
+            const params = new URLSearchParams();
+            if (selectedIncludeTags.length) params.set('include', selectedIncludeTags.join(','));
+            if (selectedExcludeTags.length) params.set('exclude', selectedExcludeTags.join(','));
+            params.set('count_only', 'true');
+            const r = await fetch(appendBotParam(`/api/contacts?${params}`));
+            const data = await r.json();
+            count = data.count || 0;
           }
-          el.innerHTML = `<span class="text-sm font-medium" style="color:var(--accent)">Будет отправлено ${text}</span>`;
+
+          el.innerHTML = `<span class="text-sm font-medium" style="color:var(--accent)">Будет отправлено ~${count} контактам</span>`;
         } catch (e) {
           el.innerHTML = '<span class="text-sm" style="color:var(--danger)">Ошибка подсчёта</span>';
         }
@@ -1339,18 +1342,21 @@
       el.textContent = 'Подсчёт...';
 
       try {
-        const params = new URLSearchParams();
-        if (selectedIncludeTags.length) params.set('include', selectedIncludeTags.join(','));
-        if (selectedExcludeTags.length) params.set('exclude', selectedExcludeTags.join(','));
-        params.set('count_only', 'true');
-
-        const r = await fetch(appendBotParam(`/api/contacts?${params}`));
-        const data = await r.json();
-        let text = `~${data.count} получателей`;
+        let count;
         if (selectedListId) {
-          text += ' (+ пересечение со списком)';
+          const r = await fetch(appendBotParam(`/api/lists/${selectedListId}/items`));
+          const data = await r.json();
+          count = data.count || 0;
+        } else {
+          const params = new URLSearchParams();
+          if (selectedIncludeTags.length) params.set('include', selectedIncludeTags.join(','));
+          if (selectedExcludeTags.length) params.set('exclude', selectedExcludeTags.join(','));
+          params.set('count_only', 'true');
+          const r = await fetch(appendBotParam(`/api/contacts?${params}`));
+          const data = await r.json();
+          count = data.count || 0;
         }
-        el.textContent = text;
+        el.textContent = `~${count} получателей`;
       } catch (e) {
         el.textContent = 'Ошибка подсчёта';
       }
