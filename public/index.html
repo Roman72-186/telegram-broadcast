@@ -521,11 +521,23 @@
           <button onclick="addAdmin()" class="btn-secondary px-3 py-1.5 rounded-lg text-xs">Добавить</button>
         </div>
 
-        <!-- Кнопка сохранения -->
-        <button onclick="saveSettings()" id="saveSettingsBtn" class="btn-primary w-full py-3 rounded-lg text-sm font-medium">
-          Применить настройки
-        </button>
-        <p class="text-xs text-center mt-2" style="color: var(--text-muted)">Сервер будет перезагружен</p>
+        <!-- Списки для ботов -->
+        <h2 class="text-lg font-bold mb-1">Списки для ботов</h2>
+        <p class="text-xs mb-3" style="color: var(--text-secondary)">Выберите какие списки Leadteh доступны каждому боту. Пустой = все списки.</p>
+        <div id="settingsBotListsContainer" class="space-y-3 mb-6">
+          <div class="text-sm" style="color:var(--text-muted)">Загрузка...</div>
+        </div>
+
+        <!-- Кнопки сохранения -->
+        <div class="space-y-2">
+          <button onclick="saveBotLists()" id="saveBotListsBtn" class="btn-secondary w-full py-2.5 rounded-lg text-sm font-medium">
+            Сохранить привязку списков
+          </button>
+          <button onclick="saveSettings()" id="saveSettingsBtn" class="btn-primary w-full py-3 rounded-lg text-sm font-medium">
+            Применить настройки (перезагрузка)
+          </button>
+          <p class="text-xs text-center" style="color: var(--text-muted)">«Применить настройки» перезагружает сервер (боты, админы). Привязка списков — без перезагрузки.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -1394,11 +1406,49 @@
           const dateStr = scheduledDate.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' });
 
           let info = '';
-          if (b.status === 'sent') {
-            info = `<div class="text-xs mt-1" style="color:var(--text-secondary)">Отправлено: ${b.sent_count}, ошибок: ${b.failed_count}</div>`;
+          if (b.status === 'sent' || b.status === 'error') {
+            const total = b.total_recipients || (b.sent_count + b.failed_count) || 0;
+            const sentOk = b.sent_count || 0;
+            const failedN = b.failed_count || 0;
+            const pct = total > 0 ? Math.round((sentOk / total) * 100) : 0;
+
+            info += `<div class="mt-2 p-2 rounded-lg" style="background:var(--bg-tertiary)">`;
+            info += `<div class="flex items-center justify-between mb-1">`;
+            info += `<span class="text-xs" style="color:var(--text-secondary)">Получатели: ${total}</span>`;
+            if (b.sent_at) {
+              const sentDate = new Date(b.sent_at).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' });
+              info += `<span class="text-xs" style="color:var(--text-muted)">${sentDate}</span>`;
+            }
+            info += `</div>`;
+
+            // Прогресс-бар
+            if (total > 0) {
+              const okW = Math.round((sentOk / total) * 100);
+              const failW = Math.round((failedN / total) * 100);
+              info += `<div class="w-full rounded-full h-1.5 mb-1" style="background:var(--bg-primary)">`;
+              info += `<div class="h-1.5 rounded-full" style="width:${okW}%;background:var(--success);display:inline-block"></div>`;
+              if (failedN > 0) {
+                info += `<div class="h-1.5 rounded-full" style="width:${failW}%;background:var(--danger);display:inline-block"></div>`;
+              }
+              info += `</div>`;
+            }
+
+            info += `<div class="flex gap-3">`;
+            info += `<span class="text-xs" style="color:var(--success)">Доставлено: ${sentOk}</span>`;
+            if (failedN > 0) {
+              info += `<span class="text-xs" style="color:var(--danger)">Ошибок: ${failedN}</span>`;
+            }
+            if (total > 0) {
+              info += `<span class="text-xs" style="color:var(--text-muted)">${pct}%</span>`;
+            }
+            info += `</div>`;
+            info += `</div>`;
+          }
+          if (b.status === 'sending') {
+            info = `<div class="text-xs mt-1" style="color:var(--warning)">Идёт отправка...</div>`;
           }
           if (b.status === 'error' && b.error) {
-            info = `<div class="text-xs mt-1" style="color:var(--danger)">${escapeHtml(b.error)}</div>`;
+            info += `<div class="text-xs mt-1" style="color:var(--danger)">${escapeHtml(b.error)}</div>`;
           }
 
           const deleteBtn = b.status === 'pending'
@@ -1484,6 +1534,8 @@
     let settingsBots = [];
     let settingsAdminIds = [];
     let newBotValidated = false;
+    let allLeadtehLists = [];
+    let botListsMapping = {};
 
     async function loadSettings() {
       const loading = document.getElementById('settingsLoading');
@@ -1512,10 +1564,101 @@
         renderSettingsAdmins();
         loading.classList.add('hidden');
         content.classList.remove('hidden');
+
+        // Загружаем привязку списков к ботам
+        loadBotListsMapping();
       } catch (e) {
         console.error('Ошибка загрузки настроек:', e);
         showAlert('Ошибка загрузки настроек');
       }
+    }
+
+    async function loadBotListsMapping() {
+      const container = document.getElementById('settingsBotListsContainer');
+      try {
+        const r = await fetch(`/api/settings/bot-lists?admin_id=${adminTelegramId}`);
+        const data = await r.json();
+        allLeadtehLists = data.lists || [];
+        botListsMapping = data.mapping || {};
+        renderBotListsMapping();
+      } catch (e) {
+        container.innerHTML = '<div class="text-xs" style="color:var(--danger)">Ошибка загрузки</div>';
+      }
+    }
+
+    function renderBotListsMapping() {
+      const container = document.getElementById('settingsBotListsContainer');
+      if (settingsBots.length === 0 || allLeadtehLists.length === 0) {
+        container.innerHTML = '<div class="text-xs" style="color:var(--text-muted)">Нет списков или ботов</div>';
+        return;
+      }
+
+      container.innerHTML = settingsBots.map((bot, i) => {
+        const botId = bot.is_existing ? String(bot.original_index + 1) : `new_${i}`;
+        const assigned = botListsMapping[botId] || [];
+
+        const listCheckboxes = allLeadtehLists.map(l => {
+          const checked = assigned.includes(l.id) ? 'checked' : '';
+          return `<label class="flex items-center gap-2 text-xs py-0.5 cursor-pointer">
+            <input type="checkbox" ${checked} onchange="toggleBotList('${botId}','${l.id}')" class="rounded" style="accent-color:var(--accent)" />
+            <span style="color:var(--text-secondary)">${escapeHtml(l.name)}</span>
+          </label>`;
+        }).join('');
+
+        const assignedCount = assigned.length;
+        const label = assignedCount > 0 ? `${assignedCount} из ${allLeadtehLists.length}` : 'все списки';
+
+        return `<div class="p-3 rounded-lg" style="background:var(--bg-secondary);border:1px solid var(--border)">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-medium">${escapeHtml(bot.name)}</span>
+            <span class="text-xs" style="color:var(--text-muted)">${label}</span>
+          </div>
+          <details>
+            <summary class="text-xs cursor-pointer" style="color:var(--accent)">Выбрать списки</summary>
+            <div class="mt-2 max-h-40 overflow-y-auto space-y-0.5">${listCheckboxes}</div>
+          </details>
+        </div>`;
+      }).join('');
+    }
+
+    function toggleBotList(botId, listId) {
+      if (!botListsMapping[botId]) botListsMapping[botId] = [];
+      const arr = botListsMapping[botId];
+      const idx = arr.indexOf(listId);
+      if (idx >= 0) {
+        arr.splice(idx, 1);
+      } else {
+        arr.push(listId);
+      }
+      // Обновить label без полной перерисовки
+      renderBotListsMapping();
+    }
+
+    async function saveBotLists() {
+      const btn = document.getElementById('saveBotListsBtn');
+      btn.disabled = true;
+      btn.textContent = 'Сохранение...';
+
+      try {
+        const r = await fetch('/api/settings/bot-lists', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ admin_id: adminTelegramId, mapping: botListsMapping }),
+        });
+        const data = await r.json();
+        if (data.ok) {
+          showAlert('Привязка списков сохранена');
+          // Сбросить кэш списков чтобы при создании рассылки загрузились заново
+          allLists = [];
+          listsLoaded = false;
+        } else {
+          showAlert(data.error || 'Ошибка сохранения');
+        }
+      } catch (e) {
+        showAlert('Ошибка сохранения');
+      }
+      btn.disabled = false;
+      btn.textContent = 'Сохранить привязку списков';
     }
 
     function renderSettingsBots() {

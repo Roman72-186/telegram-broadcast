@@ -39,6 +39,28 @@ function getBotConfig(req) {
 }
 
 // ============================================
+// Привязка списков к ботам
+// ============================================
+const botListsPath = path.join(__dirname, 'data', 'bot-lists.json');
+
+function loadBotLists() {
+  try {
+    if (fs.existsSync(botListsPath)) {
+      return JSON.parse(fs.readFileSync(botListsPath, 'utf-8'));
+    }
+  } catch (e) {
+    console.error('Ошибка чтения bot-lists.json:', e.message);
+  }
+  return {};
+}
+
+function saveBotLists(mapping) {
+  const dir = path.dirname(botListsPath);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(botListsPath, JSON.stringify(mapping, null, 2), 'utf-8');
+}
+
+// ============================================
 // Хелперы настроек
 // ============================================
 function requireAdmin(req, res) {
@@ -199,6 +221,44 @@ app.post('/api/settings/validate-token', async (req, res) => {
 });
 
 // ============================================
+// API: Привязка списков к ботам
+// ============================================
+app.get('/api/settings/bot-lists', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+
+  try {
+    const { fetchListSchemas } = require('./lib/leadteh');
+    // Загружаем все списки (через первого бота — они одинаковые на уровне аккаунта)
+    const botConfig = getBotConfig(req) || config;
+    const schemas = await fetchListSchemas(botConfig);
+
+    const allLists = (Array.isArray(schemas) ? schemas : []).map((s) => ({
+      id: s.id,
+      name: s.name || s.title || `Список ${s.id}`,
+    }));
+
+    const mapping = loadBotLists();
+
+    res.json({ lists: allLists, mapping });
+  } catch (e) {
+    console.error('GET /api/settings/bot-lists error:', e.message);
+    res.status(500).json({ error: 'Ошибка загрузки списков' });
+  }
+});
+
+app.post('/api/settings/bot-lists', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+
+  const { mapping } = req.body;
+  if (!mapping || typeof mapping !== 'object') {
+    return res.status(400).json({ error: 'Невалидные данные' });
+  }
+
+  saveBotLists(mapping);
+  res.json({ ok: true });
+});
+
+// ============================================
 // API: Список ботов
 // ============================================
 app.get('/api/bots', (req, res) => {
@@ -294,11 +354,21 @@ app.get('/api/lists', async (req, res) => {
     const botConfig = getBotConfig(req) || config;
     const schemas = await fetchListSchemas(botConfig);
 
-    const lists = (Array.isArray(schemas) ? schemas : []).map((s) => ({
+    let lists = (Array.isArray(schemas) ? schemas : []).map((s) => ({
       id: s.id,
       name: s.name || s.title || `Список ${s.id}`,
       fields: s.fields || [],
     }));
+
+    // Фильтрация по привязке списков к боту
+    const botId = req.query.bot_id;
+    if (botId) {
+      const mapping = loadBotLists();
+      const assigned = mapping[botId];
+      if (Array.isArray(assigned) && assigned.length > 0) {
+        lists = lists.filter((l) => assigned.includes(l.id));
+      }
+    }
 
     res.json({ lists });
   } catch (e) {
@@ -622,6 +692,10 @@ async function sendBroadcast(broadcast) {
     keyboard: buildKeyboard(msg.buttons || [], botUsername),
   }));
 
+  // Сохраняем общее количество получателей
+  broadcast.total_recipients = recipients.length;
+  storage.update(broadcast);
+
   let sent = 0;
   let failed = 0;
 
@@ -710,7 +784,6 @@ async function sendSingleMessage(botToken, chatId, text, photoUrl, inlineKeyboar
     : undefined;
 
   if (photoUrl) {
-    // sendPhoto — caption макс 1024 символов
     const body = {
       chat_id: String(chatId),
       photo: photoUrl,
@@ -719,11 +792,27 @@ async function sendSingleMessage(botToken, chatId, text, photoUrl, inlineKeyboar
     };
     if (replyMarkup) body.reply_markup = replyMarkup;
 
-    const r = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+    let r = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
+
+    // При ошибке парсинга Markdown — повторить без parse_mode
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      if (err.description && err.description.includes("can't parse entities")) {
+        delete body.parse_mode;
+        r = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+      } else {
+        // Вернуть фейковый Response с уже распарсенной ошибкой
+        return { ok: false, json: async () => err };
+      }
+    }
     return r;
   }
 
@@ -735,11 +824,26 @@ async function sendSingleMessage(botToken, chatId, text, photoUrl, inlineKeyboar
   };
   if (replyMarkup) body.reply_markup = replyMarkup;
 
-  const r = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+  let r = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
+
+  // При ошибке парсинга Markdown — повторить без parse_mode
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}));
+    if (err.description && err.description.includes("can't parse entities")) {
+      delete body.parse_mode;
+      r = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    } else {
+      return { ok: false, json: async () => err };
+    }
+  }
   return r;
 }
 
