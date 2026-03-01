@@ -18,7 +18,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use((req, res, next) => {
   const origin = req.headers.origin || '';
   // Telegram WebApp загружается через web.telegram.org или t.me
-  if (origin && !origin.includes('telegram.org') && !origin.includes('t.me') && !origin.includes('localhost')) {
+  if (origin && !origin.includes('telegram.org') && !origin.includes('t.me') && !origin.includes('localhost') && !origin.includes('leadtehsms.ru')) {
     return res.status(403).json({ error: 'CORS: Origin не разрешён' });
   }
   res.setHeader('Access-Control-Allow-Origin', origin || '*');
