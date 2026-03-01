@@ -45,7 +45,13 @@ setInterval(() => {
 }, 300000);
 
 app.use(express.json({ limit: '15mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    }
+  }
+}));
 
 // CORS: разрешить только Telegram WebApp и доверенные домены
 app.use((req, res, next) => {
@@ -318,6 +324,7 @@ app.get('/api/lists', requireTenantAdmin, async (req, res) => {
 
     if (filterBot) {
       const assigned = db.getBotListMappings(filterBot.id);
+      console.log(`[lists] tenant=${req.tenantId} bot=${filterBot.id} total=${lists.length} mappings=${assigned.length}`);
       if (assigned.length > 0) {
         lists = lists.filter(l => assigned.includes(String(l.id)));
       } else {
