@@ -409,7 +409,7 @@ app.get('/api/lists/:schemaId/items', async (req, res) => {
 // ============================================
 app.post('/api/broadcast/save', (req, res) => {
   try {
-    const { messages, text, buttons, filters, scheduled_at, created_by, bot_id } = req.body;
+    const { name, messages, text, buttons, filters, scheduled_at, created_by, bot_id } = req.body;
 
     if (!created_by) {
       return res.status(400).json({ error: 'created_by обязателен' });
@@ -469,6 +469,7 @@ app.post('/api/broadcast/save', (req, res) => {
 
     const broadcast = {
       id,
+      name: name || '',
       messages: normalizedMessages,
       filters: {
         include_tags: filters?.include_tags || [],

@@ -412,10 +412,16 @@
         </div>
       </div>
 
-      <!-- Шаг 4: Дата и время -->
+      <!-- Шаг 4: Название + Дата и время -->
       <div id="step4" class="step-content hidden fade-in">
-        <h2 class="text-lg font-bold mb-1">Дата и время</h2>
-        <p class="text-xs mb-3" style="color: var(--text-secondary)">Когда отправить рассылку</p>
+        <h2 class="text-lg font-bold mb-1">Название и время</h2>
+        <p class="text-xs mb-3" style="color: var(--text-secondary)">Дайте рассылке название и выберите время</p>
+
+        <div class="mb-4">
+          <label class="text-sm font-medium mb-1 block">Название рассылки</label>
+          <input type="text" id="broadcastName" placeholder="Например: Акция на розы"
+            class="input-field w-full rounded-lg px-3 py-2 text-sm" />
+        </div>
 
         <label class="flex items-center gap-2 mb-4 cursor-pointer">
           <input type="checkbox" id="sendNow" onchange="toggleSchedule()" checked
@@ -777,6 +783,11 @@
       }
 
       if (currentStep === 4) {
+        const bName = document.getElementById('broadcastName').value.trim();
+        if (!bName) {
+          showAlert('Введите название рассылки');
+          return;
+        }
         if (!document.getElementById('sendNow').checked) {
           const date = document.getElementById('scheduleDate').value;
           const time = document.getElementById('scheduleTime').value;
@@ -1301,6 +1312,7 @@
         }
 
         const body = {
+          name: document.getElementById('broadcastName').value.trim(),
           messages: messages.map((msg) => ({
             photo_url: msg.photo_url || '',
             text: msg.text.trim(),
@@ -1352,6 +1364,7 @@
       selectedExcludeTags = [];
       selectedListId = '';
       selectedListName = '';
+      document.getElementById('broadcastName').value = '';
       document.getElementById('sendNow').checked = true;
       document.getElementById('scheduleFields').classList.add('hidden');
       const listSelect = document.getElementById('listSelect');
@@ -1393,6 +1406,7 @@
         for (const b of list) {
           const card = document.createElement('div');
           card.className = 'broadcast-card fade-in';
+          card.style.cursor = 'pointer';
 
           const statusClass = `status-${b.status}`;
           const statusText = {
@@ -1403,100 +1417,128 @@
           }[b.status] || b.status;
 
           const scheduledDate = new Date(b.scheduled_at);
-          const dateStr = scheduledDate.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' });
+          const dateStr = scheduledDate.toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow', day: 'numeric', month: 'short' });
+          const timeStr = scheduledDate.toLocaleTimeString('ru-RU', { timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit' });
 
-          let info = '';
+          const title = b.name || (b.messages?.[0]?.text?.slice(0, 40) || b.text?.slice(0, 40) || 'Без названия');
+          const botLabel = (allBots.length > 1 && b.bot_name) ? `<span class="text-xs" style="color:var(--text-muted)">  ${escapeHtml(b.bot_name)}</span>` : '';
+
+          // --- Детали (скрыты) ---
+          let details = '';
+
+          // Текст сообщений
+          let msgCount = 0;
+          let totalButtons = 0;
+          let hasPhoto = false;
+          if (Array.isArray(b.messages) && b.messages.length > 0) {
+            msgCount = b.messages.length;
+            hasPhoto = b.messages.some((m) => m.photo_url);
+            totalButtons = b.messages.reduce((sum, m) => sum + (m.buttons?.length || 0), 0);
+          } else {
+            msgCount = 1;
+            totalButtons = b.buttons?.length || 0;
+          }
+
+          // Фильтры
+          const tagsInfo = [];
+          if (b.filters?.include_tags?.length) tagsInfo.push('+ ' + b.filters.include_tags.join(', '));
+          if (b.filters?.exclude_tags?.length) tagsInfo.push('- ' + b.filters.exclude_tags.join(', '));
+          if (b.filters?.list_name) tagsInfo.push('Список: ' + b.filters.list_name);
+
+          details += `<div class="mt-3 pt-3" style="border-top:1px solid var(--border)">`;
+
+          // Инфо о содержимом
+          const contentParts = [];
+          if (msgCount > 1) contentParts.push(`${msgCount} сообщ.`);
+          if (hasPhoto) contentParts.push('с фото');
+          if (totalButtons) contentParts.push(`${totalButtons} кнопок`);
+          if (contentParts.length) {
+            details += `<div class="text-xs mb-1" style="color:var(--text-secondary)">Содержимое: ${contentParts.join(', ')}</div>`;
+          }
+
+          // Превью текста
+          const previewText = b.messages?.[0]?.text || b.text || '';
+          if (previewText) {
+            const preview = previewText.length > 120 ? previewText.slice(0, 120) + '...' : previewText;
+            details += `<div class="text-xs mb-2 p-2 rounded" style="background:var(--bg-primary);color:var(--text-secondary);white-space:pre-wrap">${escapeHtml(preview)}</div>`;
+          }
+
+          if (tagsInfo.length) {
+            details += `<div class="text-xs mb-1" style="color:var(--text-secondary)">Фильтры: ${escapeHtml(tagsInfo.join(' | '))}</div>`;
+          }
+
+          // Полное время
+          const fullDateStr = scheduledDate.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' });
+          details += `<div class="text-xs mb-2" style="color:var(--text-muted)">Запланировано: ${fullDateStr} (МСК)</div>`;
+
+          // Статистика
           if (b.status === 'sent' || b.status === 'error') {
             const total = b.total_recipients || (b.sent_count + b.failed_count) || 0;
             const sentOk = b.sent_count || 0;
             const failedN = b.failed_count || 0;
             const pct = total > 0 ? Math.round((sentOk / total) * 100) : 0;
 
-            info += `<div class="mt-2 p-2 rounded-lg" style="background:var(--bg-tertiary)">`;
-            info += `<div class="flex items-center justify-between mb-1">`;
-            info += `<span class="text-xs" style="color:var(--text-secondary)">Получатели: ${total}</span>`;
+            details += `<div class="p-2 rounded-lg" style="background:var(--bg-tertiary)">`;
+            details += `<div class="flex items-center justify-between mb-1">`;
+            details += `<span class="text-xs font-medium" style="color:var(--text-primary)">Статистика</span>`;
             if (b.sent_at) {
               const sentDate = new Date(b.sent_at).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' });
-              info += `<span class="text-xs" style="color:var(--text-muted)">${sentDate}</span>`;
+              details += `<span class="text-xs" style="color:var(--text-muted)">Отправлено: ${sentDate}</span>`;
             }
-            info += `</div>`;
+            details += `</div>`;
 
-            // Прогресс-бар
             if (total > 0) {
               const okW = Math.round((sentOk / total) * 100);
-              const failW = Math.round((failedN / total) * 100);
-              info += `<div class="w-full rounded-full h-1.5 mb-1" style="background:var(--bg-primary)">`;
-              info += `<div class="h-1.5 rounded-full" style="width:${okW}%;background:var(--success);display:inline-block"></div>`;
-              if (failedN > 0) {
-                info += `<div class="h-1.5 rounded-full" style="width:${failW}%;background:var(--danger);display:inline-block"></div>`;
-              }
-              info += `</div>`;
+              details += `<div class="w-full rounded-full h-2 mb-2 mt-1" style="background:var(--bg-primary)">`;
+              details += `<div class="h-2 rounded-full" style="width:${okW}%;background:${failedN > 0 ? 'linear-gradient(90deg, var(--success) ' + okW + '%, var(--danger) ' + okW + '%)' : 'var(--success)'}"></div>`;
+              details += `</div>`;
             }
 
-            info += `<div class="flex gap-3">`;
-            info += `<span class="text-xs" style="color:var(--success)">Доставлено: ${sentOk}</span>`;
+            details += `<div class="flex gap-4">`;
+            details += `<div class="text-center"><div class="text-lg font-bold" style="color:var(--text-primary)">${total}</div><div class="text-xs" style="color:var(--text-muted)">Всего</div></div>`;
+            details += `<div class="text-center"><div class="text-lg font-bold" style="color:var(--success)">${sentOk}</div><div class="text-xs" style="color:var(--text-muted)">Доставлено</div></div>`;
             if (failedN > 0) {
-              info += `<span class="text-xs" style="color:var(--danger)">Ошибок: ${failedN}</span>`;
+              details += `<div class="text-center"><div class="text-lg font-bold" style="color:var(--danger)">${failedN}</div><div class="text-xs" style="color:var(--text-muted)">Ошибок</div></div>`;
             }
             if (total > 0) {
-              info += `<span class="text-xs" style="color:var(--text-muted)">${pct}%</span>`;
+              details += `<div class="text-center"><div class="text-lg font-bold" style="color:var(--text-primary)">${pct}%</div><div class="text-xs" style="color:var(--text-muted)">Успех</div></div>`;
             }
-            info += `</div>`;
-            info += `</div>`;
+            details += `</div>`;
+            details += `</div>`;
           }
+
           if (b.status === 'sending') {
-            info = `<div class="text-xs mt-1" style="color:var(--warning)">Идёт отправка...</div>`;
+            details += `<div class="text-xs" style="color:var(--warning)">Идёт отправка...</div>`;
           }
           if (b.status === 'error' && b.error) {
-            info += `<div class="text-xs mt-1" style="color:var(--danger)">${escapeHtml(b.error)}</div>`;
+            details += `<div class="text-xs mt-1" style="color:var(--danger)">${escapeHtml(b.error)}</div>`;
           }
 
-          const deleteBtn = b.status === 'pending'
-            ? `<button onclick="deleteBroadcast('${b.id}')" class="text-xs mt-2" style="color:var(--danger)">Отменить</button>`
-            : '';
-
-          let textPreview = '';
-          let msgCount = 0;
-          let totalButtons = 0;
-          let hasPhoto = false;
-
-          if (Array.isArray(b.messages) && b.messages.length > 0) {
-            msgCount = b.messages.length;
-            textPreview = b.messages[0].text || '';
-            hasPhoto = b.messages.some((m) => m.photo_url);
-            totalButtons = b.messages.reduce((sum, m) => sum + (m.buttons?.length || 0), 0);
-          } else {
-            msgCount = 1;
-            textPreview = b.text || '';
-            totalButtons = b.buttons?.length || 0;
+          if (b.status === 'pending') {
+            details += `<button onclick="event.stopPropagation();deleteBroadcast('${b.id}')" class="text-xs mt-2" style="color:var(--danger)">Отменить рассылку</button>`;
           }
 
-          if (textPreview.length > 80) textPreview = textPreview.slice(0, 80) + '...';
-
-          const tagsInfo = [];
-          if (b.filters?.include_tags?.length) tagsInfo.push('+ ' + b.filters.include_tags.join(', '));
-          if (b.filters?.exclude_tags?.length) tagsInfo.push('- ' + b.filters.exclude_tags.join(', '));
-          if (b.filters?.list_name) tagsInfo.push('Список: ' + b.filters.list_name);
-
-          const photoLabel = hasPhoto ? '<span class="text-xs mr-1" style="color:var(--text-muted)">📷</span>' : '';
-          const msgLabel = msgCount > 1 ? `<span class="text-xs" style="color:var(--text-muted)">${msgCount} сообщ.</span>` : '';
-          const botLabel = (allBots.length > 1 && b.bot_name) ? `<span class="text-xs" style="color:var(--text-muted)">🤖 ${escapeHtml(b.bot_name)}</span>` : '';
+          details += `</div>`;
 
           card.innerHTML = `
-            <div class="flex items-start justify-between mb-1">
-              <div class="text-sm font-medium flex-1 mr-2 preview-text">${photoLabel}${escapeHtml(textPreview)}</div>
-              <span class="status-badge ${statusClass}">${statusText}</span>
+            <div class="flex items-center justify-between">
+              <div class="flex-1 min-w-0 mr-2">
+                <div class="text-sm font-medium truncate">${escapeHtml(title)}</div>
+                <div class="flex items-center gap-2 mt-0.5">
+                  <span class="text-xs" style="color:var(--text-muted)">${dateStr}, ${timeStr}</span>
+                  ${botLabel}
+                </div>
+              </div>
+              <span class="status-badge ${statusClass} flex-shrink-0">${statusText}</span>
             </div>
-            ${tagsInfo.length ? `<div class="text-xs" style="color:var(--text-secondary)">${escapeHtml(tagsInfo.join(' | '))}</div>` : ''}
-            <div class="flex items-center gap-2 mt-1">
-              <span class="text-xs" style="color:var(--text-muted)">${dateStr} (МСК)</span>
-              ${msgLabel}
-              ${botLabel}
-            </div>
-            ${totalButtons ? `<div class="text-xs" style="color:var(--text-muted)">Кнопок: ${totalButtons}</div>` : ''}
-            ${info}
-            ${deleteBtn}
+            <div class="broadcast-details hidden">${details}</div>
           `;
+
+          card.onclick = () => {
+            const det = card.querySelector('.broadcast-details');
+            det.classList.toggle('hidden');
+          };
+
           content.appendChild(card);
         }
       } catch (e) {
