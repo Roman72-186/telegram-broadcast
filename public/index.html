@@ -273,13 +273,6 @@
 
   <!-- Основной контент -->
   <div id="app" class="hidden max-w-lg mx-auto p-4">
-    <!-- Селектор бота (скрыт при одном боте) -->
-    <div id="botSelector" class="hidden mb-3">
-      <select id="botSelect" onchange="onBotChange()"
-        class="input-field w-full rounded-lg px-3 py-2 text-sm font-medium">
-      </select>
-    </div>
-
     <!-- Переключатель: создать / список / настройки -->
     <div class="flex gap-2 mb-4">
       <button id="tabCreate" onclick="showTab('create')"
@@ -311,6 +304,14 @@
         <h2 class="text-lg font-bold mb-1">Сообщения</h2>
         <p class="text-xs mb-3" style="color: var(--text-secondary)">От 1 до 5 сообщений, идут подряд получателю</p>
 
+        <!-- Выбор бота (если несколько) -->
+        <div id="step1BotSelector" class="hidden mb-3">
+          <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Бот для рассылки</label>
+          <select id="step1BotSelect" onchange="onBotChange()"
+            class="input-field w-full rounded-lg px-3 py-2 text-sm font-medium">
+          </select>
+        </div>
+
         <!-- Выбор разметки -->
         <div class="mb-3">
           <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Разметка текста</label>
@@ -336,12 +337,20 @@
           <button onclick="finishEditMessage()" class="text-sm btn-primary rounded-lg px-4 py-1.5">Готово</button>
         </div>
 
-        <!-- Фото URL -->
+        <!-- Фото -->
         <div class="mb-3">
           <label class="text-sm font-medium mb-1 block">Фото (необязательно)</label>
-          <input type="text" id="editorPhotoUrl" placeholder="https://example.com/photo.jpg"
-            class="input-field w-full rounded-lg px-3 py-2 text-sm"
-            oninput="onEditorPhotoInput()" />
+          <div class="flex gap-2">
+            <input type="text" id="editorPhotoUrl" placeholder="Ссылка или загрузите файл"
+              class="input-field flex-1 rounded-lg px-3 py-2 text-sm"
+              oninput="onEditorPhotoInput()" />
+            <label class="btn-secondary rounded-lg px-3 py-2 text-sm cursor-pointer flex items-center gap-1 shrink-0">
+              <input type="file" id="editorPhotoFile" accept="image/*" class="hidden" onchange="onPhotoFileSelect(this)" />
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Файл
+            </label>
+          </div>
+          <div id="editorPhotoUploading" class="hidden text-xs mt-1" style="color: var(--text-secondary)">Загрузка файла...</div>
           <div id="editorPhotoPreview" class="mt-2 hidden">
             <img id="editorPhotoImg" class="photo-preview" alt="Превью фото"
               onerror="this.parentElement.classList.add('hidden')" />
@@ -640,7 +649,7 @@
       }
 
       if (allBots.length > 1) {
-        const select = document.getElementById('botSelect');
+        const select = document.getElementById('step1BotSelect');
         select.innerHTML = '';
         for (const bot of allBots) {
           const opt = document.createElement('option');
@@ -649,14 +658,14 @@
           select.appendChild(opt);
         }
         selectedBotId = allBots[0].id;
-        document.getElementById('botSelector').classList.remove('hidden');
+        document.getElementById('step1BotSelector').classList.remove('hidden');
       } else if (allBots.length === 1) {
         selectedBotId = allBots[0].id;
       }
     }
 
     function onBotChange() {
-      const select = document.getElementById('botSelect');
+      const select = document.getElementById('step1BotSelect');
       selectedBotId = select.value;
 
       // Сбрасываем кешированные данные
@@ -932,6 +941,50 @@
 
       messages[currentMessageIndex].photo_url = url;
       onEditorTextInput();
+    }
+
+    async function onPhotoFileSelect(input) {
+      const file = input.files[0];
+      if (!file) return;
+
+      if (file.size > 10 * 1024 * 1024) {
+        showAlert('Файл слишком большой (макс. 10 МБ)');
+        input.value = '';
+        return;
+      }
+
+      const uploading = document.getElementById('editorPhotoUploading');
+      uploading.classList.remove('hidden');
+
+      try {
+        const base64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        const r = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data: base64, filename: file.name }),
+        });
+
+        const data = await r.json();
+
+        if (data.ok && data.url) {
+          document.getElementById('editorPhotoUrl').value = data.url;
+          onEditorPhotoInput();
+        } else {
+          showAlert(data.error || 'Ошибка загрузки');
+        }
+      } catch (e) {
+        console.error('Upload error:', e);
+        showAlert('Ошибка загрузки файла');
+      }
+
+      uploading.classList.add('hidden');
+      input.value = '';
     }
 
     function onEditorTextInput() {
@@ -1401,12 +1454,7 @@
       try {
         const r = await fetch('/api/broadcast/list');
         const data = await r.json();
-        let list = data.broadcasts || [];
-
-        // Фильтр по выбранному боту
-        if (selectedBotId && allBots.length > 1) {
-          list = list.filter(b => String(b.bot_id) === String(selectedBotId));
-        }
+        const list = data.broadcasts || [];
 
         loading.classList.add('hidden');
 

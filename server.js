@@ -9,8 +9,40 @@ const storage = require('./lib/storage');
 const app = express();
 const config = loadConfig();
 
-app.use(express.json());
+app.use(express.json({ limit: '15mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+// ============================================
+// API: Загрузка фото
+// ============================================
+app.post('/api/upload', (req, res) => {
+  try {
+    const { data, filename } = req.body;
+    if (!data) return res.status(400).json({ error: 'Нет данных' });
+
+    const base64Data = data.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64Data, 'base64');
+
+    if (buffer.length > 10 * 1024 * 1024) {
+      return res.status(400).json({ error: 'Файл слишком большой (макс. 10 МБ)' });
+    }
+
+    const ext = (filename || 'image.jpg').split('.').pop().toLowerCase();
+    const allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+    const safeExt = allowed.includes(ext) ? ext : 'jpg';
+
+    const uploadsDir = path.join(__dirname, 'public', 'uploads');
+    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+    const name = generateId() + '.' + safeExt;
+    fs.writeFileSync(path.join(uploadsDir, name), buffer);
+
+    res.json({ ok: true, url: `/uploads/${name}` });
+  } catch (e) {
+    console.error('POST /api/upload error:', e.message);
+    res.status(500).json({ error: 'Ошибка загрузки файла' });
+  }
+});
 
 // ============================================
 // API: Проверка админа
@@ -432,10 +464,13 @@ app.post('/api/broadcast/save', (req, res) => {
           return res.status(400).json({ error: `Текст сообщения ${i + 1} обязателен` });
         }
         if (msg.photo_url && msg.photo_url.trim()) {
-          try {
-            new URL(msg.photo_url);
-          } catch {
-            return res.status(400).json({ error: `Невалидный URL фото в сообщении ${i + 1}` });
+          // Разрешаем локальные загрузки (/uploads/...) и внешние URL
+          if (!msg.photo_url.startsWith('/uploads/')) {
+            try {
+              new URL(msg.photo_url);
+            } catch {
+              return res.status(400).json({ error: `Невалидный URL фото в сообщении ${i + 1}` });
+            }
           }
         }
         if (Array.isArray(msg.buttons) && msg.buttons.length > 6) {
@@ -790,6 +825,11 @@ async function sendSingleMessage(botToken, chatId, text, photoUrl, inlineKeyboar
   const usedParseMode = parseMode || undefined;
 
   if (photoUrl) {
+    // Локальный файл — отправляем через multipart
+    if (photoUrl.startsWith('/uploads/')) {
+      return await sendLocalPhoto(botToken, chatId, text, photoUrl, replyMarkup, usedParseMode);
+    }
+
     const body = {
       chat_id: String(chatId),
       photo: photoUrl,
@@ -849,6 +889,46 @@ async function sendSingleMessage(botToken, chatId, text, photoUrl, inlineKeyboar
       return { ok: false, json: async () => err };
     }
   }
+  return r;
+}
+
+async function sendLocalPhoto(botToken, chatId, text, localPath, replyMarkup, parseMode) {
+  const filePath = path.join(__dirname, 'public', localPath);
+  if (!fs.existsSync(filePath)) {
+    return { ok: false, json: async () => ({ description: 'Файл не найден: ' + localPath }) };
+  }
+
+  const fileBuffer = fs.readFileSync(filePath);
+  const ext = path.extname(filePath).toLowerCase();
+  const mimeType = ext === '.png' ? 'image/png' : ext === '.gif' ? 'image/gif' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+
+  function buildFormData(withParseMode) {
+    const fd = new FormData();
+    fd.append('chat_id', String(chatId));
+    fd.append('photo', new Blob([fileBuffer], { type: mimeType }), 'photo' + ext);
+    if (text) fd.append('caption', text.slice(0, 1024));
+    if (withParseMode && parseMode) fd.append('parse_mode', parseMode);
+    if (replyMarkup) fd.append('reply_markup', JSON.stringify(replyMarkup));
+    return fd;
+  }
+
+  let r = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+    method: 'POST',
+    body: buildFormData(true),
+  });
+
+  if (!r.ok && parseMode) {
+    const err = await r.json().catch(() => ({}));
+    if (err.description && err.description.includes("can't parse entities")) {
+      r = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+        method: 'POST',
+        body: buildFormData(false),
+      });
+    } else {
+      return { ok: false, json: async () => err };
+    }
+  }
+
   return r;
 }
 
