@@ -486,6 +486,9 @@
               <option value="">Не выбран (все контакты)</option>
             </select>
             <div id="listInfo" class="list-info hidden"></div>
+            <div id="listNoMappings" class="hidden text-xs mt-1 p-2 rounded-lg" style="background:var(--bg-secondary);border:1px solid var(--warning, #f59e0b);color:var(--text-secondary)">
+              Для этого бота не привязаны списки. <a href="#" onclick="showTab('settings');return false;" style="color:var(--accent);text-decoration:underline">Настроить в разделе Настройки</a>
+            </div>
           </div>
 
           <div id="contactsCount" class="text-center py-3">
@@ -630,7 +633,7 @@
 
         <!-- Списки для ботов -->
         <h2 class="text-lg font-bold mb-1">Списки для ботов</h2>
-        <p class="text-xs mb-3" style="color: var(--text-secondary)">Выберите какие списки Leadteh доступны каждому боту. Пустой = все списки.</p>
+        <p class="text-xs mb-3" style="color: var(--text-secondary)">Отметьте списки, доступные каждому боту. Без привязки бот не сможет использовать списки.</p>
         <div id="settingsBotListsContainer" class="space-y-3 mb-6">
           <div class="text-sm" style="color:var(--text-muted)">Загрузка...</div>
         </div>
@@ -938,6 +941,10 @@
       selectedExcludeTags = [];
       selectedListId = '';
       selectedListName = '';
+      const noMappingsEl = document.getElementById('listNoMappings');
+      if (noMappingsEl) noMappingsEl.classList.add('hidden');
+      const listSelect = document.getElementById('listSelect');
+      if (listSelect) { listSelect.disabled = false; listSelect.innerHTML = '<option value="">Не выбран (все контакты)</option>'; }
       if (currentStep === 3) {
         loadTags();
         loadLists();
@@ -1306,18 +1313,27 @@
     async function loadLists() {
       const loading = document.getElementById('listsLoading');
       const select = document.getElementById('listSelect');
+      const noMappingsEl = document.getElementById('listNoMappings');
       loading.classList.remove('hidden');
+      noMappingsEl.classList.add('hidden');
       try {
         const r = await apiFetch(appendBotParam('/api/lists'));
         const data = await r.json();
         allLists = data.lists || [];
-        select.innerHTML = '<option value="">Не выбран (все контакты)</option>';
-        for (const list of allLists) {
-          const opt = document.createElement('option');
-          opt.value = list.id;
-          opt.textContent = list.name;
-          if (list.id === selectedListId) opt.selected = true;
-          select.appendChild(opt);
+        if (data.no_mappings) {
+          select.innerHTML = '<option value="">Нет привязанных списков</option>';
+          select.disabled = true;
+          noMappingsEl.classList.remove('hidden');
+        } else {
+          select.disabled = false;
+          select.innerHTML = '<option value="">Не выбран (все контакты)</option>';
+          for (const list of allLists) {
+            const opt = document.createElement('option');
+            opt.value = list.id;
+            opt.textContent = list.name;
+            if (list.id === selectedListId) opt.selected = true;
+            select.appendChild(opt);
+          }
         }
       } catch (e) {
         console.error('Ошибка загрузки списков:', e);
@@ -1831,7 +1847,7 @@
             <span style="color:var(--text-secondary)">${escapeHtml(l.name)}</span>
           </label>`;
         }).join('');
-        const label = assigned.length > 0 ? `${assigned.length} из ${allLeadtehLists.length}` : 'все списки';
+        const label = assigned.length > 0 ? `${assigned.length} из ${allLeadtehLists.length}` : 'списки не привязаны';
         return `<div class="p-3 rounded-lg" style="background:var(--bg-secondary);border:1px solid var(--border)">
           <div class="flex items-center justify-between mb-2">
             <span class="text-sm font-medium">${escapeHtml(bot.name)}</span>

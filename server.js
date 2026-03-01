@@ -315,6 +315,8 @@ app.get('/api/lists', requireTenantAdmin, async (req, res) => {
       const assigned = db.getBotListMappings(Number(botId));
       if (assigned.length > 0) {
         lists = lists.filter(l => assigned.includes(String(l.id)));
+      } else {
+        return res.json({ lists: [], no_mappings: true });
       }
     }
 
@@ -651,18 +653,28 @@ app.post('/api/settings/leadteh-token', requireTenantOwner, (req, res) => {
 // ============================================
 app.get('/api/settings/bot-lists', requireTenantAdmin, async (req, res) => {
   try {
+    const tenant = db.getTenantById(req.tenantId);
+    const bots = db.getBotsByTenant(req.tenantId);
+    if (!tenant || bots.length === 0) return res.json({ lists: [], mapping: {} });
 
-    const botConfig = getBotConfigForLeadteh(req);
-    if (!botConfig) return res.json({ lists: [], mapping: {} });
-
-    const schemas = await fetchListSchemas(botConfig);
-    const allLists = (Array.isArray(schemas) ? schemas : []).map(s => ({
-      id: s.id,
-      name: s.name || s.title || `Список ${s.id}`,
-    }));
+    // Загружаем списки для всех уникальных leadteh_bot_id
+    const uniqueBotIds = [...new Set(bots.map(b => b.leadteh_bot_id).filter(Boolean))];
+    const listsMap = new Map();
+    for (const leadtehBotId of uniqueBotIds) {
+      try {
+        const schemas = await fetchListSchemas({ leadtehApiToken: tenant.leadteh_api_token, leadtehBotId });
+        for (const s of (Array.isArray(schemas) ? schemas : [])) {
+          if (!listsMap.has(s.id)) {
+            listsMap.set(s.id, { id: s.id, name: s.name || s.title || `Список ${s.id}` });
+          }
+        }
+      } catch (e) {
+        console.error(`Ошибка загрузки списков для leadteh_bot_id=${leadtehBotId}:`, e.message);
+      }
+    }
+    const allLists = [...listsMap.values()];
 
     // Собираем маппинг для ботов тенанта
-    const bots = db.getBotsByTenant(req.tenantId);
     const mapping = {};
     for (const bot of bots) {
       mapping[bot.id] = db.getBotListMappings(bot.id);
