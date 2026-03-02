@@ -15,6 +15,12 @@ const config = loadConfig();
 const VALID_PARSE_MODES = ['Markdown', 'MarkdownV2', 'HTML'];
 
 // ============================================
+// Кэш превью получателей (in-memory, TTL 10 мин)
+// ============================================
+const recipientPreviewCache = new Map();
+const PREVIEW_CACHE_TTL_MS = 10 * 60 * 1000;
+
+// ============================================
 // Rate Limiter (in-memory)
 // ============================================
 const rateLimitStore = new Map();
@@ -41,6 +47,9 @@ setInterval(() => {
   const now = Date.now();
   for (const [key, entry] of rateLimitStore) {
     if (now - entry.start > 120000) rateLimitStore.delete(key);
+  }
+  for (const [key, entry] of recipientPreviewCache) {
+    if (now - entry.createdAt > PREVIEW_CACHE_TTL_MS) recipientPreviewCache.delete(key);
   }
 }, 300000);
 
@@ -378,6 +387,128 @@ app.get('/api/lists/:schemaId/items', requireTenantAdmin, async (req, res) => {
   } catch (e) {
     console.error('GET /api/lists/:id/items error:', e.message);
     res.status(500).json({ error: 'Ошибка загрузки элементов списка' });
+  }
+});
+
+// ============================================
+// API: Превью получателей (список контактов с пагинацией)
+// ============================================
+app.post('/api/recipients/preview', requireTenantAdmin, async (req, res) => {
+  try {
+    const botConfig = getBotConfigForLeadteh(req);
+    if (!botConfig) return res.status(400).json({ error: 'Нет настроенных ботов' });
+
+    const { include_tags, exclude_tags, list_schema_id } = req.body;
+    const perPage = 50;
+    let contacts = [];
+
+    if (list_schema_id) {
+      // Режим списка: получить telegram_id из списка, затем обогатить данными контактов
+      const schemas = await fetchListSchemas(botConfig);
+      const schema = (Array.isArray(schemas) ? schemas : []).find(
+        s => String(s.id) === String(list_schema_id)
+      );
+      const fields = schema?.fields || [];
+      const items = await fetchListItems(botConfig, list_schema_id);
+      const telegramIds = extractTelegramIds(Array.isArray(items) ? items : [], fields);
+
+      if (telegramIds.length > 0) {
+        const allContacts = await fetchAllContacts(botConfig);
+        const contactMap = new Map();
+        for (const c of allContacts) {
+          if (c.telegram_id) contactMap.set(String(c.telegram_id), c);
+        }
+        contacts = telegramIds.map(tid => {
+          const c = contactMap.get(tid);
+          return {
+            telegram_id: tid,
+            name: c?.name || '',
+            tags: c ? extractTags(c) : [],
+          };
+        });
+      }
+    } else {
+      // Режим тегов: фильтрация контактов
+      const includeTags = Array.isArray(include_tags) ? include_tags : [];
+      const excludeTags = Array.isArray(exclude_tags) ? exclude_tags : [];
+
+      const allContacts = await fetchAllContacts(botConfig);
+      const filtered = allContacts.filter(contact => {
+        if (!contact.telegram_id) return false;
+        const contactTags = extractTags(contact);
+
+        if (includeTags.length > 0) {
+          const hasAny = includeTags.some(t =>
+            contactTags.some(ct => ct.toLowerCase() === t.toLowerCase())
+          );
+          if (!hasAny) return false;
+        }
+        if (excludeTags.length > 0) {
+          const hasExcluded = excludeTags.some(t =>
+            contactTags.some(ct => ct.toLowerCase() === t.toLowerCase())
+          );
+          if (hasExcluded) return false;
+        }
+        return true;
+      });
+
+      contacts = filtered.map(c => ({
+        telegram_id: String(c.telegram_id),
+        name: c.name || '',
+        tags: extractTags(c),
+      }));
+    }
+
+    // Кэшируем результат
+    const cacheId = `${req.tenantId}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    recipientPreviewCache.set(cacheId, {
+      tenantId: req.tenantId,
+      contacts,
+      createdAt: Date.now(),
+    });
+
+    res.json({
+      cache_id: cacheId,
+      total: contacts.length,
+      page: 1,
+      per_page: perPage,
+      contacts: contacts.slice(0, perPage),
+    });
+  } catch (e) {
+    console.error('POST /api/recipients/preview error:', e.message);
+    res.status(500).json({ error: 'Ошибка загрузки получателей' });
+  }
+});
+
+app.get('/api/recipients/preview/:cacheId', requireTenantAdmin, (req, res) => {
+  try {
+    const { cacheId } = req.params;
+    const entry = recipientPreviewCache.get(cacheId);
+
+    if (!entry || entry.tenantId !== req.tenantId) {
+      return res.status(404).json({ error: 'Кэш не найден или истёк', expired: true });
+    }
+
+    if (Date.now() - entry.createdAt > PREVIEW_CACHE_TTL_MS) {
+      recipientPreviewCache.delete(cacheId);
+      return res.status(404).json({ error: 'Кэш истёк', expired: true });
+    }
+
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const perPage = 50;
+    const start = (page - 1) * perPage;
+    const pageContacts = entry.contacts.slice(start, start + perPage);
+
+    res.json({
+      cache_id: cacheId,
+      total: entry.contacts.length,
+      page,
+      per_page: perPage,
+      contacts: pageContacts,
+    });
+  } catch (e) {
+    console.error('GET /api/recipients/preview/:cacheId error:', e.message);
+    res.status(500).json({ error: 'Ошибка чтения кэша' });
   }
 });
 

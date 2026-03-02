@@ -277,6 +277,50 @@
       border-top-color: var(--bg-tertiary);
     }
     .tooltip-trigger.active .tooltip-text { display: block; }
+
+    /* Модал превью получателей */
+    .recipients-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,0.6);
+      display: flex; flex-direction: column;
+    }
+    .recipients-modal {
+      display: flex; flex-direction: column;
+      height: 100%; background: var(--bg-primary);
+    }
+    .recipients-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px; border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .recipients-header h3 { margin: 0; font-size: 16px; font-weight: 600; }
+    .recipients-body {
+      flex: 1; overflow-y: auto; padding: 8px 16px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .recipient-row {
+      display: flex; align-items: flex-start; gap: 8px;
+      padding: 8px 0; border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .recipient-row .r-num { color: var(--text-muted); min-width: 28px; text-align: right; flex-shrink: 0; }
+    .recipient-row .r-info { flex: 1; min-width: 0; }
+    .recipient-row .r-name { font-weight: 500; color: var(--text-primary); }
+    .recipient-row .r-tid { color: var(--text-secondary); font-size: 12px; }
+    .recipient-row .r-tags { color: var(--text-muted); font-size: 11px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .recipients-footer {
+      display: flex; align-items: center; justify-content: center; gap: 16px;
+      padding: 10px 16px; border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .recipients-footer button {
+      padding: 6px 16px; border-radius: 8px; font-size: 13px;
+      border: 1px solid var(--border); background: var(--bg-secondary);
+      color: var(--text-primary); cursor: pointer;
+    }
+    .recipients-footer button:disabled { opacity: 0.4; cursor: default; }
+    .recipients-footer .page-info { font-size: 13px; color: var(--text-secondary); min-width: 50px; text-align: center; }
+    .show-recipients-link { color: var(--accent); cursor: pointer; text-decoration: underline; font-size: 13px; margin-left: 6px; }
   </style>
 </head>
 <body class="pb-24">
@@ -714,6 +758,10 @@
 
     let allBots = [];
     let selectedBotId = '';
+
+    let previewCacheId = null;
+    let previewCurrentPage = 1;
+    let previewTotalPages = 1;
 
     if (tg) {
       tg.ready();
@@ -1524,7 +1572,7 @@
           try {
             const r = await apiFetch(appendBotParam('/api/contacts?count_only=true'));
             const data = await r.json();
-            el.innerHTML = `<span class="text-sm font-medium" style="color:var(--accent)">Получателей: ~${data.count}</span>`;
+            el.innerHTML = `<span class="text-sm font-medium" style="color:var(--accent)">Получателей: ~${data.count}</span> <span class="show-recipients-link" onclick="openRecipientsModal()">Показать</span>`;
           } catch (e) { /* ignore */ }
           return;
         }
@@ -1544,7 +1592,7 @@
             const data = await r.json();
             count = data.count || 0;
           }
-          el.innerHTML = `<span class="text-sm font-medium" style="color:var(--accent)">Будет отправлено ~${count} контактам</span>`;
+          el.innerHTML = `<span class="text-sm font-medium" style="color:var(--accent)">Будет отправлено ~${count} контактам</span> <span class="show-recipients-link" onclick="openRecipientsModal()">Показать</span>`;
         } catch (e) {
           el.innerHTML = '<span class="text-sm" style="color:var(--danger)">Ошибка подсчёта</span>';
         }
@@ -1628,10 +1676,111 @@
           const data = await r.json();
           count = data.count || 0;
         }
-        el.textContent = `~${count} получателей`;
+        el.innerHTML = `~${count} получателей <span class="show-recipients-link" onclick="openRecipientsModal()">Показать</span>`;
       } catch (e) {
         el.textContent = 'Ошибка подсчёта';
       }
+    }
+
+    // ============================================
+    // Превью получателей (модал)
+    // ============================================
+    async function openRecipientsModal() {
+      const modal = document.getElementById('recipientsModal');
+      const list = document.getElementById('recipientsList');
+      list.innerHTML = '<div class="text-center text-sm py-8" style="color:var(--text-secondary)">Загрузка...</div>';
+      document.getElementById('recipientsTitle').textContent = 'Получатели';
+      modal.classList.remove('hidden');
+
+      try {
+        const body = {};
+        if (selectedListId) {
+          body.list_schema_id = selectedListId;
+        } else {
+          if (selectedIncludeTags.length) body.include_tags = selectedIncludeTags;
+          if (selectedExcludeTags.length) body.exclude_tags = selectedExcludeTags;
+        }
+
+        const r = await apiFetch(appendBotParam('/api/recipients/preview'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || 'Ошибка');
+
+        previewCacheId = data.cache_id;
+        previewCurrentPage = 1;
+        previewTotalPages = Math.max(1, Math.ceil(data.total / data.per_page));
+
+        document.getElementById('recipientsTitle').textContent = `Получатели (${data.total})`;
+        renderRecipients(data.contacts, 0);
+        updatePaginationButtons();
+      } catch (e) {
+        list.innerHTML = `<div class="text-center text-sm py-8" style="color:var(--danger)">${escapeHtml(e.message)}</div>`;
+      }
+    }
+
+    function renderRecipients(contacts, startIndex) {
+      const list = document.getElementById('recipientsList');
+      if (!contacts || contacts.length === 0) {
+        list.innerHTML = '<div class="text-center text-sm py-8" style="color:var(--text-secondary)">Получатели не найдены</div>';
+        return;
+      }
+      list.innerHTML = '';
+      contacts.forEach((c, i) => {
+        const row = document.createElement('div');
+        row.className = 'recipient-row';
+        const tagsStr = (c.tags || []).slice(0, 5).map(t => escapeHtml(t)).join(', ');
+        row.innerHTML = `
+          <span class="r-num">${startIndex + i + 1}</span>
+          <div class="r-info">
+            <div class="r-name">${escapeHtml(c.name || '—')}</div>
+            <div class="r-tid">${escapeHtml(c.telegram_id)}</div>
+            ${tagsStr ? `<div class="r-tags">${tagsStr}</div>` : ''}
+          </div>`;
+        list.appendChild(row);
+      });
+      list.scrollTop = 0;
+    }
+
+    async function loadRecipientsPage(direction) {
+      const newPage = previewCurrentPage + direction;
+      if (newPage < 1 || newPage > previewTotalPages) return;
+
+      const list = document.getElementById('recipientsList');
+      list.innerHTML = '<div class="text-center text-sm py-8" style="color:var(--text-secondary)">Загрузка...</div>';
+
+      try {
+        const r = await apiFetch(appendBotParam(`/api/recipients/preview/${previewCacheId}?page=${newPage}`));
+        const data = await r.json();
+
+        if (!r.ok) {
+          if (data.expired) {
+            // Кэш истёк — перезагружаем
+            await openRecipientsModal();
+            return;
+          }
+          throw new Error(data.error || 'Ошибка');
+        }
+
+        previewCurrentPage = data.page;
+        previewTotalPages = Math.max(1, Math.ceil(data.total / data.per_page));
+        renderRecipients(data.contacts, (data.page - 1) * data.per_page);
+        updatePaginationButtons();
+      } catch (e) {
+        list.innerHTML = `<div class="text-center text-sm py-8" style="color:var(--danger)">${escapeHtml(e.message)}</div>`;
+      }
+    }
+
+    function updatePaginationButtons() {
+      document.getElementById('recipientsPrev').disabled = previewCurrentPage <= 1;
+      document.getElementById('recipientsNext').disabled = previewCurrentPage >= previewTotalPages;
+      document.getElementById('recipientsPageInfo').textContent = `${previewCurrentPage} / ${previewTotalPages}`;
+    }
+
+    function closeRecipientsModal() {
+      document.getElementById('recipientsModal').classList.add('hidden');
     }
 
     // ============================================
@@ -2341,5 +2490,21 @@
       setTimeout(() => toast.remove(), 2800);
     }
   </script>
+
+  <!-- Модал превью получателей -->
+  <div id="recipientsModal" class="recipients-overlay hidden">
+    <div class="recipients-modal">
+      <div class="recipients-header">
+        <h3 id="recipientsTitle">Получатели</h3>
+        <span style="cursor:pointer;font-size:20px;color:var(--text-secondary);padding:4px 8px" onclick="closeRecipientsModal()">✕</span>
+      </div>
+      <div class="recipients-body" id="recipientsList"></div>
+      <div class="recipients-footer">
+        <button onclick="loadRecipientsPage(-1)" id="recipientsPrev">Назад</button>
+        <span class="page-info" id="recipientsPageInfo">1 / 1</span>
+        <button onclick="loadRecipientsPage(1)" id="recipientsNext">Далее</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
