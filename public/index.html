@@ -2370,7 +2370,10 @@
             if (failedN > 0) details += `<div class="text-center"><div class="text-lg font-bold" style="color:var(--danger)">${failedN}</div><div class="text-xs" style="color:var(--text-muted)">Ошибок</div></div>`;
             if (total > 0) details += `<div class="text-center"><div class="text-lg font-bold">${pct}%</div><div class="text-xs" style="color:var(--text-muted)">Успех</div></div>`;
             details += `</div></div>`;
-            details += `<button onclick="event.stopPropagation();downloadBroadcastExcel('${b.id}')" class="w-full mt-2 py-1.5 px-3 rounded-lg text-xs font-medium" style="background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border)">Скачать отчёт в Excel</button>`;
+            details += `<div class="flex gap-2 mt-2">`;
+            details += `<button onclick="event.stopPropagation();repeatBroadcast('${b.id}')" class="flex-1 py-1.5 px-3 rounded-lg text-xs font-medium btn-primary">Повторить</button>`;
+            details += `<button onclick="event.stopPropagation();downloadBroadcastExcel('${b.id}')" class="flex-1 py-1.5 px-3 rounded-lg text-xs font-medium" style="background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border)">Excel отчёт</button>`;
+            details += `</div>`;
           }
 
           if (b.status === 'error' && b.error) details += `<div class="text-xs mt-1" style="color:var(--danger)">${escapeHtml(b.error)}</div>`;
@@ -2420,6 +2423,22 @@
       } catch (e) {
         console.error('Ошибка скачивания отчёта:', e);
         showAlert('Ошибка скачивания отчёта');
+      }
+    }
+
+    async function repeatBroadcast(id) {
+      if (!confirm('Повторить эту рассылку? Будет создана копия и отправлена сейчас.')) return;
+      try {
+        const r = await apiFetch('/api/broadcast/repeat', { method: 'POST', body: { id } });
+        const data = await r.json();
+        if (data.ok) {
+          showAlert('Рассылка создана и запланирована!');
+          loadBroadcasts();
+        } else {
+          showAlert(data.error || 'Ошибка повтора');
+        }
+      } catch (e) {
+        showAlert('Ошибка повтора рассылки');
       }
     }
 

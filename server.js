@@ -739,6 +739,51 @@ app.post('/api/broadcast/delete', requireTenantAdmin, (req, res) => {
 });
 
 // ============================================
+// API: Повторить рассылку
+// ============================================
+app.post('/api/broadcast/repeat', requireTenantAdmin, (req, res) => {
+  try {
+    const { id } = req.body;
+    if (!id) return res.status(400).json({ error: 'id обязателен' });
+
+    const original = db.getBroadcast(id, req.tenantId);
+    if (!original) return res.status(404).json({ error: 'Рассылка не найдена' });
+
+    // Проверка тарифных лимитов
+    const limits = db.checkTariffLimits(req.tenantId);
+    if (!limits.allowed) {
+      return res.status(403).json({ error: limits.reason });
+    }
+
+    const newId = generateId();
+    const newBroadcast = {
+      id: newId,
+      name: (original.name || '') + ' (повтор)',
+      parse_mode: original.parse_mode || null,
+      messages: (original.messages || []).map(m => ({
+        photo_url: m.photo_url || '',
+        text: m.text || '',
+        buttons: m.buttons || [],
+        parse_mode: m.parse_mode || null,
+      })),
+      filters: original.filters || {},
+      bot_id: original.bot_id || null,
+      scheduled_at: new Date().toISOString(),
+      created_by: req.telegramId,
+      message_delay: original.message_delay || 0,
+    };
+
+    db.saveBroadcast(req.tenantId, newBroadcast);
+    db.incrementUsage(req.tenantId);
+
+    res.json({ ok: true, id: newId });
+  } catch (e) {
+    console.error('POST /api/broadcast/repeat error:', e.message);
+    res.status(500).json({ error: 'Ошибка повтора рассылки' });
+  }
+});
+
+// ============================================
 // API: Экспорт отчёта рассылки в Excel
 // ============================================
 app.get('/api/broadcast/:id/export', requireTenantAdmin, async (req, res) => {
