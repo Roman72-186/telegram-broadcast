@@ -251,6 +251,33 @@ function getBotConfigForLeadteh(req) {
 }
 
 // ============================================
+// Вычисление фильтров по условиям (конструктор И/ИЛИ)
+// Приоритет: AND > OR. Группируем AND-условия, между группами — OR.
+// ============================================
+function evaluateFilterConditions(contactTags, conditions, operators) {
+  if (!conditions || conditions.length === 0) return true;
+
+  // Разбиваем на AND-группы по OR-операторам
+  const groups = [[]];
+  for (let i = 0; i < conditions.length; i++) {
+    groups[groups.length - 1].push(conditions[i]);
+    if (i < operators.length && operators[i] === 'OR') {
+      groups.push([]);
+    }
+  }
+
+  // Между группами — OR (ANY), внутри группы — AND (ALL)
+  const lowerTags = contactTags.map(t => t.toLowerCase());
+  return groups.some(group =>
+    group.every(cond => {
+      const tagLower = cond.tag.toLowerCase();
+      const hasTag = lowerTags.includes(tagLower);
+      return cond.type === 'has' ? hasTag : !hasTag;
+    })
+  );
+}
+
+// ============================================
 // API: Теги
 // ============================================
 app.get('/api/tags', requireTenantAdmin, async (req, res) => {
@@ -282,19 +309,37 @@ app.get('/api/contacts', requireTenantAdmin, async (req, res) => {
     const botConfig = getBotConfigForLeadteh(req);
     if (!botConfig) return res.status(400).json({ error: 'Нет настроенных ботов' });
 
+    const countOnly = req.query.count_only === 'true';
+
+    // Новый формат: conditions + operators (конструктор И/ИЛИ)
+    let conditions = null;
+    let operators = null;
+    if (req.query.conditions) {
+      try {
+        conditions = JSON.parse(req.query.conditions);
+        operators = req.query.operators ? JSON.parse(req.query.operators) : [];
+      } catch (e) { /* fallback to legacy */ }
+    }
+
+    // Legacy формат: include/exclude
     const includeTags = req.query.include
       ? req.query.include.split(',').map(t => t.trim()).filter(Boolean)
       : [];
     const excludeTags = req.query.exclude
       ? req.query.exclude.split(',').map(t => t.trim()).filter(Boolean)
       : [];
-    const countOnly = req.query.count_only === 'true';
 
     const allContacts = await fetchAllContacts(botConfig);
     const filtered = allContacts.filter(contact => {
       if (!contact.telegram_id) return false;
       const contactTags = extractTags(contact);
 
+      // Новый формат условий
+      if (conditions && conditions.length > 0) {
+        return evaluateFilterConditions(contactTags, conditions, operators || []);
+      }
+
+      // Legacy формат
       if (includeTags.length > 0) {
         const hasAny = includeTags.some(t =>
           contactTags.some(ct => ct.toLowerCase() === t.toLowerCase())
@@ -398,7 +443,7 @@ app.post('/api/recipients/preview', requireTenantAdmin, async (req, res) => {
     const botConfig = getBotConfigForLeadteh(req);
     if (!botConfig) return res.status(400).json({ error: 'Нет настроенных ботов' });
 
-    const { include_tags, exclude_tags, list_schema_id } = req.body;
+    const { include_tags, exclude_tags, conditions, operators, list_schema_id } = req.body;
     const perPage = 50;
     let contacts = [];
 
@@ -427,8 +472,22 @@ app.post('/api/recipients/preview', requireTenantAdmin, async (req, res) => {
           };
         });
       }
+    } else if (Array.isArray(conditions) && conditions.length > 0) {
+      // Новый формат: конструктор условий И/ИЛИ
+      const ops = Array.isArray(operators) ? operators : [];
+      const allContacts = await fetchAllContacts(botConfig);
+      const filtered = allContacts.filter(contact => {
+        if (!contact.telegram_id) return false;
+        const contactTags = extractTags(contact);
+        return evaluateFilterConditions(contactTags, conditions, ops);
+      });
+      contacts = filtered.map(c => ({
+        telegram_id: String(c.telegram_id),
+        name: c.name || '',
+        tags: extractTags(c),
+      }));
     } else {
-      // Режим тегов: фильтрация контактов
+      // Legacy: фильтрация по include/exclude тегам
       const includeTags = Array.isArray(include_tags) ? include_tags : [];
       const excludeTags = Array.isArray(exclude_tags) ? exclude_tags : [];
 
@@ -591,17 +650,24 @@ app.post('/api/broadcast/save', requireTenantAdmin, (req, res) => {
       broadcastBot = bots[0];
     }
 
+    // Новый формат фильтров: conditions/operators (с обратной совместимостью)
+    const broadcastFilters = {};
+    if (Array.isArray(filters?.conditions) && filters.conditions.length > 0) {
+      broadcastFilters.conditions = filters.conditions;
+      broadcastFilters.operators = Array.isArray(filters.operators) ? filters.operators : [];
+    } else {
+      broadcastFilters.include_tags = filters?.include_tags || [];
+      broadcastFilters.exclude_tags = filters?.exclude_tags || [];
+    }
+    broadcastFilters.list_schema_id = filters?.list_schema_id || null;
+    broadcastFilters.list_name = filters?.list_name || null;
+
     const broadcast = {
       id,
       name: name || '',
       parse_mode: parse_mode || null,
       messages: normalizedMessages,
-      filters: {
-        include_tags: filters?.include_tags || [],
-        exclude_tags: filters?.exclude_tags || [],
-        list_schema_id: filters?.list_schema_id || null,
-        list_name: filters?.list_name || null,
-      },
+      filters: broadcastFilters,
       bot_id: broadcastBot ? broadcastBot.id : null,
       scheduled_at: scheduled_at || new Date().toISOString(),
       created_by: req.telegramId,
@@ -1117,9 +1183,8 @@ async function sendBroadcast(broadcast) {
   };
 
   const allContacts = await fetchAllContacts(botConfig);
-  const includeTags = broadcast.filters?.include_tags || [];
-  const excludeTags = broadcast.filters?.exclude_tags || [];
-  const listSchemaId = broadcast.filters?.list_schema_id || null;
+  const filters = broadcast.filters || {};
+  const listSchemaId = filters.list_schema_id || null;
 
   // Загрузить telegram_id из списка
   let listTelegramIds = null;
@@ -1138,6 +1203,13 @@ async function sendBroadcast(broadcast) {
     }
   }
 
+  // Новый формат: conditions + operators
+  const filterConditions = Array.isArray(filters.conditions) ? filters.conditions : null;
+  const filterOperators = Array.isArray(filters.operators) ? filters.operators : [];
+  // Legacy формат
+  const includeTags = filters.include_tags || [];
+  const excludeTags = filters.exclude_tags || [];
+
   const recipients = allContacts.filter(contact => {
     if (!contact.telegram_id) return false;
 
@@ -1147,6 +1219,12 @@ async function sendBroadcast(broadcast) {
 
     const contactTags = extractTags(contact);
 
+    // Новый формат условий
+    if (filterConditions && filterConditions.length > 0) {
+      return evaluateFilterConditions(contactTags, filterConditions, filterOperators);
+    }
+
+    // Legacy формат
     if (includeTags.length > 0) {
       const hasAny = includeTags.some(t =>
         contactTags.some(ct => ct.toLowerCase() === t.toLowerCase())

@@ -222,6 +222,82 @@
       margin-top: 6px;
     }
 
+    .condition-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 10px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+    .condition-row select {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 4px 8px;
+      font-size: 13px;
+      appearance: none;
+    }
+    .condition-row select:focus {
+      border-color: var(--accent);
+      outline: none;
+    }
+    .condition-type-select {
+      width: 68px;
+      flex-shrink: 0;
+      text-align: center;
+    }
+    .condition-tag-select {
+      flex: 1;
+      min-width: 0;
+    }
+    .condition-remove {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background: rgba(231, 76, 60, 0.12);
+      color: var(--danger);
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    .condition-remove:hover {
+      background: rgba(231, 76, 60, 0.25);
+    }
+    .operator-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 4px 0 4px 30px;
+      cursor: pointer;
+      user-select: none;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      padding: 2px 14px;
+      border-radius: 10px;
+      transition: all 0.15s;
+      width: fit-content;
+    }
+    .operator-toggle.and {
+      background: rgba(52, 152, 219, 0.15);
+      color: #3498db;
+      border: 1px solid rgba(52, 152, 219, 0.3);
+    }
+    .operator-toggle.or {
+      background: rgba(243, 156, 18, 0.15);
+      color: var(--warning);
+      border: 1px solid rgba(243, 156, 18, 0.3);
+    }
+    .operator-toggle:hover { opacity: 0.8; }
+
     .stat-card {
       background: var(--bg-secondary);
       border: 1px solid var(--border);
@@ -494,34 +570,18 @@
 
         <div id="tagsContent" class="hidden">
           <div class="mb-4">
-            <div class="section-label flex items-center">Содержит тег (хотя бы один)<span class="tooltip-trigger">?<span class="tooltip-text">Отправить контактам с хотя бы одним из выбранных тегов</span></span></div>
-            <div id="includeSelectedChips" class="flex flex-wrap gap-1 mb-2"></div>
-            <details id="includeTagsDetails">
-              <summary class="btn-secondary rounded-lg px-3 py-1.5 text-sm cursor-pointer inline-block">Выбрать теги</summary>
-              <div id="includeTagsContainer" class="mt-2 max-h-48 overflow-y-auto rounded-lg" style="border:1px solid var(--border);background:var(--bg-secondary)"></div>
-            </details>
+            <div class="section-label flex items-center">Условия фильтрации<span class="tooltip-trigger">?<span class="tooltip-text">Добавьте условия: ЕСТЬ тег / НЕТ тега. Между условиями — оператор И или ИЛИ (кликните для переключения)</span></span></div>
+            <div id="conditionsList"></div>
+            <button onclick="addCondition()" class="btn-secondary rounded-lg px-3 py-1.5 text-sm mt-2">+ Условие</button>
             <div class="flex gap-2 mt-2">
-              <input id="customIncludeTag" type="text" placeholder="Свой тег..."
+              <input id="customFilterTag" type="text" placeholder="Свой тег..."
                 class="input-field flex-1 rounded-lg px-3 py-1.5 text-sm" />
-              <button onclick="addCustomTag('include')"
-                class="btn-secondary rounded-lg px-3 py-1.5 text-sm">+</button>
+              <button onclick="addCustomFilterTag()"
+                class="btn-secondary rounded-lg px-3 py-1.5 text-sm">+ Добавить</button>
             </div>
           </div>
 
-          <div class="mb-4">
-            <div class="section-label flex items-center">Не содержит тег (исключить)<span class="tooltip-trigger">?<span class="tooltip-text">Исключить контактов с этими тегами</span></span></div>
-            <div id="excludeSelectedChips" class="flex flex-wrap gap-1 mb-2"></div>
-            <details id="excludeTagsDetails">
-              <summary class="btn-secondary rounded-lg px-3 py-1.5 text-sm cursor-pointer inline-block">Выбрать теги</summary>
-              <div id="excludeTagsContainer" class="mt-2 max-h-48 overflow-y-auto rounded-lg" style="border:1px solid var(--border);background:var(--bg-secondary)"></div>
-            </details>
-            <div class="flex gap-2 mt-2">
-              <input id="customExcludeTag" type="text" placeholder="Свой тег..."
-                class="input-field flex-1 rounded-lg px-3 py-1.5 text-sm" />
-              <button onclick="addCustomTag('exclude')"
-                class="btn-secondary rounded-lg px-3 py-1.5 text-sm">+</button>
-            </div>
-          </div>
+          <hr style="border-color:var(--border);margin:12px 0" />
 
           <div class="mb-4">
             <div class="section-label flex items-center">Содержится в списке<span class="tooltip-trigger">?<span class="tooltip-text">Отправить только контактам из выбранного списка Leadteh</span></span></div>
@@ -745,8 +805,8 @@
     let currentStep = 1;
     const mainSteps = [1, 3, 4, 5];
     let allTags = [];
-    let selectedIncludeTags = [];
-    let selectedExcludeTags = [];
+    let filterConditions = [];
+    let filterOperators = [];
 
     let messages = [{ photo_url: '', text: '', buttons: [] }];
     let currentMessageIndex = 0;
@@ -975,8 +1035,8 @@
       allTags = [];
       allLists = [];
       listsLoaded = false;
-      selectedIncludeTags = [];
-      selectedExcludeTags = [];
+      filterConditions = [];
+      filterOperators = [];
       selectedListId = '';
       selectedListName = '';
       const noMappingsEl = document.getElementById('listNoMappings');
@@ -1374,7 +1434,7 @@
       }
       document.getElementById('tagsLoading').classList.add('hidden');
       document.getElementById('tagsContent').classList.remove('hidden');
-      renderTags();
+      renderFilterConstructor();
       updateFilterMode();
     }
 
@@ -1422,10 +1482,10 @@
         updateContactsCount();
         return;
       }
-      // Список выбран — очищаем теги
-      selectedIncludeTags = [];
-      selectedExcludeTags = [];
-      renderTags();
+      // Список выбран — очищаем условия
+      filterConditions = [];
+      filterOperators = [];
+      renderFilterConstructor();
 
       selectedListName = select.options[select.selectedIndex].textContent;
       infoEl.classList.remove('hidden');
@@ -1441,83 +1501,170 @@
       updateContactsCount();
     }
 
-    function renderTags() {
-      renderTagList('includeTagsContainer', allTags, selectedIncludeTags, 'include');
-      renderTagList('excludeTagsContainer', allTags, selectedExcludeTags, 'exclude');
-      renderSelectedChips('includeSelectedChips', selectedIncludeTags, 'include');
-      renderSelectedChips('excludeSelectedChips', selectedExcludeTags, 'exclude');
+    // ============================================
+    // Конструктор фильтров (условия И/ИЛИ)
+    // ============================================
+    function getActiveFilters() {
+      const conditions = filterConditions.filter(c => c.tag);
+      // Пересобираем операторы для активных условий
+      const ops = [];
+      let opIdx = 0;
+      for (let i = 0; i < filterConditions.length; i++) {
+        if (!filterConditions[i].tag) { if (i < filterOperators.length) opIdx++; continue; }
+        if (ops.length > 0 || conditions.length > ops.length + 1) {
+          // нужен оператор перед этим условием (кроме первого)
+        }
+      }
+      // Простой подход: собираем операторы между непустыми условиями
+      const activeOps = [];
+      const activeIndices = [];
+      for (let i = 0; i < filterConditions.length; i++) {
+        if (filterConditions[i].tag) activeIndices.push(i);
+      }
+      for (let j = 1; j < activeIndices.length; j++) {
+        // Берём оператор между activeIndices[j-1] и activeIndices[j]
+        // Используем оператор по индексу первого из пары
+        const prevIdx = activeIndices[j - 1];
+        activeOps.push(filterOperators[prevIdx] || 'AND');
+      }
+      return { conditions, operators: activeOps };
     }
 
-    function renderTagList(containerId, tags, selected, type) {
-      const container = document.getElementById(containerId);
+    function renderFilterConstructor() {
+      const container = document.getElementById('conditionsList');
       container.innerHTML = '';
-      const allDisplayTags = [...new Set([...tags, ...selected])];
-      for (const tag of allDisplayTags) {
+      const hasListSelected = !!selectedListId;
+
+      for (let i = 0; i < filterConditions.length; i++) {
+        // Оператор между условиями (перед вторым и далее)
+        if (i > 0) {
+          const opDiv = document.createElement('div');
+          const op = filterOperators[i - 1] || 'AND';
+          opDiv.className = `operator-toggle ${op.toLowerCase()}`;
+          opDiv.textContent = op === 'AND' ? 'И' : 'ИЛИ';
+          opDiv.title = 'Нажмите для переключения И/ИЛИ';
+          if (!hasListSelected) {
+            opDiv.onclick = () => toggleOperator(i - 1);
+          } else {
+            opDiv.style.opacity = '0.4';
+            opDiv.style.pointerEvents = 'none';
+          }
+          container.appendChild(opDiv);
+        }
+
         const row = document.createElement('div');
-        row.className = 'px-3 py-2 text-sm cursor-pointer flex items-center gap-2';
-        row.style.cssText = selected.includes(tag)
-          ? 'background:var(--accent-bg, rgba(59,130,246,0.15));color:var(--text-primary)'
-          : 'color:var(--text-secondary)';
-        row.onmouseenter = () => { if (!selected.includes(tag)) row.style.background = 'var(--bg-tertiary)'; };
-        row.onmouseleave = () => { if (!selected.includes(tag)) row.style.background = ''; };
-        const check = document.createElement('span');
-        check.textContent = selected.includes(tag) ? '✓' : '';
-        check.style.cssText = 'width:16px;text-align:center;flex-shrink:0;font-size:12px';
-        const text = document.createElement('span');
-        text.textContent = tag;
-        text.style.cssText = 'overflow:hidden;text-overflow:ellipsis';
-        row.appendChild(check);
-        row.appendChild(text);
-        row.onclick = () => toggleTag(tag, type);
+        row.className = 'condition-row';
+        if (hasListSelected) {
+          row.style.opacity = '0.4';
+          row.style.pointerEvents = 'none';
+        }
+
+        // Тип: ЕСТЬ / НЕТ
+        const typeSelect = document.createElement('select');
+        typeSelect.className = 'condition-type-select';
+        typeSelect.innerHTML = '<option value="has">ЕСТЬ</option><option value="not">НЕТ</option>';
+        typeSelect.value = filterConditions[i].type;
+        const ci = i;
+        typeSelect.onchange = () => {
+          filterConditions[ci].type = typeSelect.value;
+          updateContactsCount();
+        };
+
+        // Тег: выпадающий список
+        const tagSelect = document.createElement('select');
+        tagSelect.className = 'condition-tag-select';
+        tagSelect.innerHTML = '<option value="">Выберите тег</option>';
+        const usedTags = new Set(filterConditions.map(c => c.tag).filter(Boolean));
+        const displayTags = [...new Set([...allTags, ...usedTags])].sort();
+        for (const tag of displayTags) {
+          const opt = document.createElement('option');
+          opt.value = tag;
+          opt.textContent = tag;
+          if (tag === filterConditions[i].tag) opt.selected = true;
+          tagSelect.appendChild(opt);
+        }
+        tagSelect.onchange = () => {
+          filterConditions[ci].tag = tagSelect.value;
+          updateFilterMode();
+          updateContactsCount();
+        };
+
+        // Кнопка удаления
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'condition-remove';
+        removeBtn.innerHTML = '&#10005;';
+        removeBtn.title = 'Удалить условие';
+        removeBtn.onclick = () => removeCondition(ci);
+
+        row.appendChild(typeSelect);
+        row.appendChild(tagSelect);
+        row.appendChild(removeBtn);
         container.appendChild(row);
       }
     }
 
-    function renderSelectedChips(containerId, selected, type) {
-      const container = document.getElementById(containerId);
-      container.innerHTML = '';
-      for (const tag of selected) {
-        const chip = document.createElement('span');
-        chip.className = 'tag-chip selected';
-        chip.style.cssText = 'display:inline-flex;align-items:center;gap:4px';
-        chip.innerHTML = `<span>${tag}</span><span style="cursor:pointer;opacity:0.7;font-size:10px">✕</span>`;
-        chip.querySelector('span:last-child').onclick = (e) => { e.stopPropagation(); toggleTag(tag, type); };
-        container.appendChild(chip);
+    function addCondition(preset) {
+      const cond = preset || { type: 'has', tag: '' };
+      filterConditions.push(cond);
+      if (filterConditions.length > 1) {
+        filterOperators.push('AND');
       }
+      renderFilterConstructor();
+      updateFilterMode();
+    }
+
+    function removeCondition(idx) {
+      filterConditions.splice(idx, 1);
+      // Удаляем связанный оператор
+      if (idx === 0 && filterOperators.length > 0) {
+        filterOperators.splice(0, 1);
+      } else if (idx > 0) {
+        filterOperators.splice(idx - 1, 1);
+      }
+      renderFilterConstructor();
+      updateFilterMode();
+      updateContactsCount();
+    }
+
+    function toggleOperator(idx) {
+      filterOperators[idx] = filterOperators[idx] === 'AND' ? 'OR' : 'AND';
+      renderFilterConstructor();
+      updateContactsCount();
+    }
+
+    function addCustomFilterTag() {
+      const input = document.getElementById('customFilterTag');
+      const tag = input.value.trim();
+      if (!tag) return;
+      if (!allTags.includes(tag)) allTags.push(tag);
+      addCondition({ type: 'has', tag });
+      input.value = '';
+      updateContactsCount();
     }
 
     function updateFilterMode() {
-      const hasTags = selectedIncludeTags.length > 0 || selectedExcludeTags.length > 0;
+      const hasConditions = filterConditions.some(c => c.tag);
       const hasListSelected = !!selectedListId;
       const listSelect = document.getElementById('listSelect');
       const listInfo = document.getElementById('listInfo');
-      const customIncludeInput = document.getElementById('customIncludeTag');
-      const customExcludeInput = document.getElementById('customExcludeTag');
-      const customIncludeBtn = customIncludeInput?.nextElementSibling;
-      const customExcludeBtn = customExcludeInput?.nextElementSibling;
+      const customInput = document.getElementById('customFilterTag');
+      const customBtn = customInput?.nextElementSibling;
+      const addCondBtn = document.querySelector('#tagsContent button[onclick="addCondition()"]');
 
-      if (hasTags) {
-        // Теги выбраны — блокируем список
+      if (hasConditions) {
+        // Условия заданы — блокируем список
         listSelect.disabled = true;
         listSelect.style.opacity = '0.4';
         if (listInfo) listInfo.style.opacity = '0.4';
       } else if (hasListSelected) {
-        // Список выбран — блокируем теги
+        // Список выбран — блокируем условия
         listSelect.disabled = false;
         listSelect.style.opacity = '1';
         if (listInfo) listInfo.style.opacity = '1';
-        document.querySelectorAll('#includeTagsContainer > div, #excludeTagsContainer > div').forEach(el => {
-          el.style.pointerEvents = 'none';
-          el.style.opacity = '0.4';
-        });
-        ['includeTagsDetails', 'excludeTagsDetails'].forEach(id => {
-          const d = document.getElementById(id);
-          if (d) { d.style.pointerEvents = 'none'; d.style.opacity = '0.4'; }
-        });
-        if (customIncludeInput) { customIncludeInput.disabled = true; customIncludeInput.style.opacity = '0.4'; }
-        if (customExcludeInput) { customExcludeInput.disabled = true; customExcludeInput.style.opacity = '0.4'; }
-        if (customIncludeBtn) { customIncludeBtn.disabled = true; customIncludeBtn.style.opacity = '0.4'; }
-        if (customExcludeBtn) { customExcludeBtn.disabled = true; customExcludeBtn.style.opacity = '0.4'; }
+        if (customInput) { customInput.disabled = true; customInput.style.opacity = '0.4'; }
+        if (customBtn) { customBtn.disabled = true; customBtn.style.opacity = '0.4'; }
+        if (addCondBtn) { addCondBtn.disabled = true; addCondBtn.style.opacity = '0.4'; }
+        renderFilterConstructor();
         return;
       } else {
         // Ничего не выбрано — всё активно
@@ -1526,41 +1673,9 @@
         if (listInfo) listInfo.style.opacity = '1';
       }
 
-      // Если hasTags или ничего — теги активны
-      if (customIncludeInput) { customIncludeInput.disabled = false; customIncludeInput.style.opacity = '1'; }
-      if (customExcludeInput) { customExcludeInput.disabled = false; customExcludeInput.style.opacity = '1'; }
-      if (customIncludeBtn) { customIncludeBtn.disabled = false; customIncludeBtn.style.opacity = '1'; }
-      if (customExcludeBtn) { customExcludeBtn.disabled = false; customExcludeBtn.style.opacity = '1'; }
-      document.querySelectorAll('#includeTagsContainer > div, #excludeTagsContainer > div').forEach(el => {
-        el.style.pointerEvents = '';
-        el.style.opacity = '1';
-      });
-      ['includeTagsDetails', 'excludeTagsDetails'].forEach(id => {
-        const d = document.getElementById(id);
-        if (d) { d.style.pointerEvents = ''; d.style.opacity = '1'; }
-      });
-    }
-
-    function toggleTag(tag, type) {
-      const arr = type === 'include' ? selectedIncludeTags : selectedExcludeTags;
-      const idx = arr.indexOf(tag);
-      if (idx >= 0) arr.splice(idx, 1); else arr.push(tag);
-      renderTags();
-      updateFilterMode();
-      updateContactsCount();
-    }
-
-    function addCustomTag(type) {
-      const inputId = type === 'include' ? 'customIncludeTag' : 'customExcludeTag';
-      const input = document.getElementById(inputId);
-      const tag = input.value.trim();
-      if (!tag) return;
-      const arr = type === 'include' ? selectedIncludeTags : selectedExcludeTags;
-      if (!arr.includes(tag)) arr.push(tag);
-      input.value = '';
-      renderTags();
-      updateFilterMode();
-      updateContactsCount();
+      if (customInput) { customInput.disabled = false; customInput.style.opacity = '1'; }
+      if (customBtn) { customBtn.disabled = false; customBtn.style.opacity = '1'; }
+      if (addCondBtn) { addCondBtn.disabled = false; addCondBtn.style.opacity = '1'; }
     }
 
     let countTimeout;
@@ -1568,7 +1683,10 @@
       clearTimeout(countTimeout);
       countTimeout = setTimeout(async () => {
         const el = document.getElementById('contactsCount');
-        if (selectedIncludeTags.length === 0 && selectedExcludeTags.length === 0 && !selectedListId) {
+        const active = getActiveFilters();
+        const hasFilters = active.conditions.length > 0 || !!selectedListId;
+
+        if (!hasFilters) {
           el.innerHTML = '<span class="text-sm" style="color:var(--text-secondary)">Будут выбраны все контакты с telegram_id</span>';
           try {
             const r = await apiFetch(appendBotParam('/api/contacts?count_only=true'));
@@ -1586,8 +1704,8 @@
             count = data.count || 0;
           } else {
             const params = new URLSearchParams();
-            if (selectedIncludeTags.length) params.set('include', selectedIncludeTags.join(','));
-            if (selectedExcludeTags.length) params.set('exclude', selectedExcludeTags.join(','));
+            params.set('conditions', JSON.stringify(active.conditions));
+            params.set('operators', JSON.stringify(active.operators));
             params.set('count_only', 'true');
             const r = await apiFetch(appendBotParam(`/api/contacts?${params}`));
             const data = await r.json();
@@ -1644,8 +1762,18 @@
       });
 
       const filtersHtml = [];
-      if (selectedIncludeTags.length > 0) filtersHtml.push('Содержит: ' + escapeHtml(selectedIncludeTags.join(', ')));
-      if (selectedExcludeTags.length > 0) filtersHtml.push('Исключить: ' + escapeHtml(selectedExcludeTags.join(', ')));
+      const active = getActiveFilters();
+      if (active.conditions.length > 0) {
+        const parts = [];
+        for (let i = 0; i < active.conditions.length; i++) {
+          const c = active.conditions[i];
+          parts.push(`${c.type === 'has' ? 'ЕСТЬ' : 'НЕТ'} "${escapeHtml(c.tag)}"`);
+          if (i < active.operators.length) {
+            parts.push(active.operators[i] === 'AND' ? 'И' : 'ИЛИ');
+          }
+        }
+        filtersHtml.push(parts.join(' '));
+      }
       if (selectedListId && selectedListName) filtersHtml.push('Список: ' + escapeHtml(selectedListName));
       if (filtersHtml.length === 0) filtersHtml.push('Все контакты');
       document.getElementById('confirmFilters').innerHTML = filtersHtml.join('<br>');
@@ -1669,9 +1797,12 @@
           const data = await r.json();
           count = data.count || 0;
         } else {
+          const active = getActiveFilters();
           const params = new URLSearchParams();
-          if (selectedIncludeTags.length) params.set('include', selectedIncludeTags.join(','));
-          if (selectedExcludeTags.length) params.set('exclude', selectedExcludeTags.join(','));
+          if (active.conditions.length) {
+            params.set('conditions', JSON.stringify(active.conditions));
+            params.set('operators', JSON.stringify(active.operators));
+          }
           params.set('count_only', 'true');
           const r = await apiFetch(appendBotParam(`/api/contacts?${params}`));
           const data = await r.json();
@@ -1698,8 +1829,11 @@
         if (selectedListId) {
           body.list_schema_id = selectedListId;
         } else {
-          if (selectedIncludeTags.length) body.include_tags = selectedIncludeTags;
-          if (selectedExcludeTags.length) body.exclude_tags = selectedExcludeTags;
+          const active = getActiveFilters();
+          if (active.conditions.length) {
+            body.conditions = active.conditions;
+            body.operators = active.operators;
+          }
         }
 
         const r = await apiFetch(appendBotParam('/api/recipients/preview'), {
@@ -1811,12 +1945,17 @@
               text: msg.text.trim(),
               buttons: msg.buttons.map(btn => ({ text: btn.text, type: btn.type, value: btn.value })),
             })),
-            filters: {
-              include_tags: selectedIncludeTags,
-              exclude_tags: selectedExcludeTags,
-              list_schema_id: selectedListId || null,
-              list_name: selectedListName || null,
-            },
+            filters: (() => {
+              const active = getActiveFilters();
+              const f = {};
+              if (active.conditions.length > 0) {
+                f.conditions = active.conditions;
+                f.operators = active.operators;
+              }
+              f.list_schema_id = selectedListId || null;
+              f.list_name = selectedListName || null;
+              return f;
+            })(),
             scheduled_at: scheduledAt,
             bot_id: selectedBotId || undefined,
           },
@@ -1840,8 +1979,8 @@
     function resetForm() {
       messages = [{ photo_url: '', text: '', buttons: [] }];
       currentMessageIndex = 0;
-      selectedIncludeTags = [];
-      selectedExcludeTags = [];
+      filterConditions = [];
+      filterOperators = [];
       selectedListId = '';
       selectedListName = '';
       document.getElementById('broadcastName').value = '';
@@ -1902,8 +2041,20 @@
           }
 
           const tagsInfo = [];
-          if (b.filters?.include_tags?.length) tagsInfo.push('+ ' + b.filters.include_tags.join(', '));
-          if (b.filters?.exclude_tags?.length) tagsInfo.push('- ' + b.filters.exclude_tags.join(', '));
+          if (b.filters?.conditions?.length) {
+            const parts = [];
+            for (let ci = 0; ci < b.filters.conditions.length; ci++) {
+              const cond = b.filters.conditions[ci];
+              parts.push(`${cond.type === 'has' ? 'ЕСТЬ' : 'НЕТ'} "${cond.tag}"`);
+              if (ci < (b.filters.operators || []).length) {
+                parts.push(b.filters.operators[ci] === 'AND' ? 'И' : 'ИЛИ');
+              }
+            }
+            tagsInfo.push(parts.join(' '));
+          } else {
+            if (b.filters?.include_tags?.length) tagsInfo.push('+ ' + b.filters.include_tags.join(', '));
+            if (b.filters?.exclude_tags?.length) tagsInfo.push('- ' + b.filters.exclude_tags.join(', '));
+          }
           if (b.filters?.list_name) tagsInfo.push('Список: ' + b.filters.list_name);
           if (tagsInfo.length) details += `<div class="text-xs mb-1" style="color:var(--text-secondary)">Фильтры: ${escapeHtml(tagsInfo.join(' | '))}</div>`;
 
