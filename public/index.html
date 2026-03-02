@@ -1044,6 +1044,17 @@
             showAlert(`Заполните текст сообщения ${i + 1}`);
             return;
           }
+          for (let j = 0; j < messages[i].buttons.length; j++) {
+            const btn = messages[i].buttons[j];
+            if (!btn.text.trim()) {
+              showAlert(`Укажите текст кнопки ${j + 1} в сообщении ${i + 1}`);
+              return;
+            }
+            if (!btn.value.trim()) {
+              showAlert(`Укажите действие (URL/команду) для кнопки "${btn.text}" в сообщении ${i + 1}`);
+              return;
+            }
+          }
         }
         showStep(3);
         return;

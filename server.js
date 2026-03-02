@@ -420,6 +420,17 @@ app.post('/api/broadcast/save', requireTenantAdmin, (req, res) => {
         if (Array.isArray(msg.buttons) && msg.buttons.length > 6) {
           return res.status(400).json({ error: `Максимум 6 кнопок в сообщении ${i + 1}` });
         }
+        if (Array.isArray(msg.buttons)) {
+          for (let j = 0; j < msg.buttons.length; j++) {
+            const btn = msg.buttons[j];
+            if (!btn.text || !btn.text.trim()) {
+              return res.status(400).json({ error: `Укажите текст кнопки ${j + 1} в сообщении ${i + 1}` });
+            }
+            if (!btn.value || !btn.value.trim()) {
+              return res.status(400).json({ error: `Укажите действие кнопки "${btn.text}" в сообщении ${i + 1}` });
+            }
+          }
+        }
       }
       normalizedMessages = messages.map(msg => ({
         photo_url: msg.photo_url?.trim() || '',
