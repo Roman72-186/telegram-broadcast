@@ -577,16 +577,6 @@
           </select>
         </div>
 
-        <div class="mb-3">
-          <label class="text-xs mb-1 flex items-center" style="color: var(--text-secondary)">Разметка текста<span class="tooltip-trigger">?<span class="tooltip-text">Markdown: *жирный* _курсив_. HTML: &lt;b&gt; &lt;i&gt;. Plain — без форматирования</span></span></label>
-          <select id="parseModeSelect" class="input-field w-full rounded-lg px-3 py-2 text-sm" onchange="onParseModeChange()">
-            <option value="Markdown">Markdown (*жирный*, _курсив_)</option>
-            <option value="MarkdownV2">MarkdownV2 (*жирный*, __подчёркнутый__, ~зачёркнутый~)</option>
-            <option value="HTML">HTML (&lt;b&gt;жирный&lt;/b&gt;, &lt;i&gt;курсив&lt;/i&gt;)</option>
-            <option value="">Без разметки (plain text)</option>
-          </select>
-        </div>
-
         <div id="messagesList"></div>
 
         <button id="addMessageBtn" onclick="addMessage()"
@@ -619,6 +609,16 @@
             <img id="editorPhotoImg" class="photo-preview" alt="Превью фото"
               onerror="this.parentElement.classList.add('hidden')" />
           </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="text-xs mb-1 flex items-center" style="color: var(--text-secondary)">Разметка текста<span class="tooltip-trigger">?<span class="tooltip-text">Markdown: *жирный* _курсив_. HTML: &lt;b&gt; &lt;i&gt;. Plain — без форматирования</span></span></label>
+          <select id="parseModeSelect" class="input-field w-full rounded-lg px-3 py-2 text-sm mb-3" onchange="onParseModeChange()">
+            <option value="Markdown">Markdown (*жирный*, _курсив_)</option>
+            <option value="MarkdownV2">MarkdownV2 (*жирный*, __подчёркнутый__, ~зачёркнутый~)</option>
+            <option value="HTML">HTML (&lt;b&gt;жирный&lt;/b&gt;, &lt;i&gt;курсив&lt;/i&gt;)</option>
+            <option value="">Без разметки (plain text)</option>
+          </select>
         </div>
 
         <div class="mb-3">
@@ -913,7 +913,7 @@
     let filterConditions = [];
     let filterOperators = [];
 
-    let messages = [{ photo_url: '', text: '', buttons: [] }];
+    let messages = [{ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown' }];
     let currentMessageIndex = 0;
 
     let allLists = [];
@@ -1313,6 +1313,8 @@
         const btnCount = msg.buttons.length > 0
           ? `<span class="text-xs ml-2" style="color:var(--text-muted)">${msg.buttons.length} кн.</span>`
           : '';
+        const pmLabel = msg.parse_mode || 'plain';
+        const pmBadge = `<span class="text-xs ml-2" style="color:var(--text-muted)">${escapeHtml(pmLabel)}</span>`;
         const deleteBtn = messages.length > 1
           ? `<button onclick="event.stopPropagation(); removeMessage(${i})" class="text-xs ml-2" style="color:var(--danger)">&#10005;</button>`
           : '';
@@ -1321,7 +1323,7 @@
             <div class="flex-1" onclick="editMessage(${i})">
               <div class="flex items-center mb-1">
                 <span class="text-xs font-medium" style="color:var(--text-secondary)">Сообщение ${i + 1}</span>
-                ${btnCount}${deleteBtn}
+                ${pmBadge}${btnCount}${deleteBtn}
               </div>
               <div class="text-sm preview-text">${photoIcon}${escapeHtml(textPreview)}</div>
             </div>
@@ -1334,7 +1336,7 @@
 
     function addMessage() {
       if (messages.length >= 5) { showAlert('Максимум 5 сообщений'); return; }
-      messages.push({ photo_url: '', text: '', buttons: [] });
+      messages.push({ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown' });
       renderMessagesList();
       editMessage(messages.length - 1);
     }
@@ -1351,6 +1353,7 @@
       document.getElementById('editorTitle').textContent = `Сообщение ${index + 1} из ${messages.length}`;
       document.getElementById('editorPhotoUrl').value = msg.photo_url || '';
       document.getElementById('editorText').value = msg.text || '';
+      document.getElementById('parseModeSelect').value = msg.parse_mode || 'Markdown';
       onEditorPhotoInput();
       onEditorTextInput();
       renderEditorButtons();
@@ -1362,6 +1365,8 @@
       const msg = messages[currentMessageIndex];
       msg.photo_url = document.getElementById('editorPhotoUrl').value.trim();
       msg.text = document.getElementById('editorText').value;
+      msg.parse_mode = document.getElementById('parseModeSelect').value || '';
+      document.getElementById('emojiPicker').classList.remove('open');
       showStep(1);
     }
 
@@ -2167,10 +2172,10 @@
           method: 'POST',
           body: {
             name: document.getElementById('broadcastName').value.trim(),
-            parse_mode: document.getElementById('parseModeSelect').value || null,
             messages: messages.map(msg => ({
               photo_url: msg.photo_url || '',
               text: msg.text.trim(),
+              parse_mode: msg.parse_mode || null,
               buttons: msg.buttons.map(btn => {
                 const b = { text: btn.text, type: btn.type, value: btn.value };
                 if (btn.style) b.style = btn.style;
@@ -2209,14 +2214,13 @@
     }
 
     function resetForm() {
-      messages = [{ photo_url: '', text: '', buttons: [] }];
+      messages = [{ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown' }];
       currentMessageIndex = 0;
       filterConditions = [];
       filterOperators = [];
       selectedListId = '';
       selectedListName = '';
       document.getElementById('broadcastName').value = '';
-      document.getElementById('parseModeSelect').value = 'Markdown';
       document.getElementById('sendNow').checked = true;
       document.getElementById('scheduleFields').classList.add('hidden');
       const listSelect = document.getElementById('listSelect');

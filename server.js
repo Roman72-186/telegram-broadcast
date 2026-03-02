@@ -579,7 +579,7 @@ app.post('/api/broadcast/save', requireTenantAdmin, (req, res) => {
   try {
     const { name, parse_mode, messages, text, buttons, filters, scheduled_at, bot_id } = req.body;
 
-    // Валидация parse_mode
+    // Валидация parse_mode (общий — для обратной совместимости)
     if (parse_mode && !VALID_PARSE_MODES.includes(parse_mode)) {
       return res.status(400).json({ error: `Невалидный parse_mode. Допустимые: ${VALID_PARSE_MODES.join(', ')}` });
     }
@@ -598,6 +598,9 @@ app.post('/api/broadcast/save', requireTenantAdmin, (req, res) => {
       }
       for (let i = 0; i < messages.length; i++) {
         const msg = messages[i];
+        if (msg.parse_mode && !VALID_PARSE_MODES.includes(msg.parse_mode)) {
+          return res.status(400).json({ error: `Невалидный parse_mode в сообщении ${i + 1}` });
+        }
         if (!msg.text || !msg.text.trim()) {
           return res.status(400).json({ error: `Текст сообщения ${i + 1} обязателен` });
         }
@@ -632,6 +635,7 @@ app.post('/api/broadcast/save', requireTenantAdmin, (req, res) => {
       normalizedMessages = messages.map(msg => ({
         photo_url: msg.photo_url?.trim() || '',
         text: msg.text.trim(),
+        parse_mode: msg.parse_mode || parse_mode || null,
         buttons: Array.isArray(msg.buttons) ? msg.buttons.slice(0, 6).map(b => {
           const nb = { text: b.text, type: b.type, value: b.value };
           if (b.style) nb.style = b.style;
@@ -645,6 +649,7 @@ app.post('/api/broadcast/save', requireTenantAdmin, (req, res) => {
       normalizedMessages = [{
         photo_url: '',
         text: text.trim(),
+        parse_mode: parse_mode || null,
         buttons: Array.isArray(buttons) ? buttons.slice(0, 6).map(b => {
           const nb = { text: b.text, type: b.type, value: b.value };
           if (b.style) nb.style = b.style;
@@ -1385,6 +1390,7 @@ async function sendBroadcast(broadcast) {
     text: msg.text || '',
     photoUrl: msg.photo_url || '',
     keyboard: buildKeyboard(msg.buttons || [], botUsername),
+    parseMode: msg.parse_mode || broadcast.parse_mode || null,
   }));
 
   // Сохраняем общее количество
@@ -1406,7 +1412,7 @@ async function sendBroadcast(broadcast) {
           msg.text,
           msg.photoUrl,
           msg.keyboard,
-          broadcast.parse_mode,
+          msg.parseMode,
           broadcast.tenant_id
         );
 
