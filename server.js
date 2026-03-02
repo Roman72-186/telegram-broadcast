@@ -938,6 +938,23 @@ app.post('/api/settings/admin/add', requireTenantOwner, (req, res) => {
     if (!telegram_id || !/^\d+$/.test(telegram_id)) {
       return res.status(400).json({ error: 'Невалидный Telegram ID' });
     }
+
+    // Проверяем: не является ли он уже арендатором (owner тенанта)
+    const ownerOf = db.isOwnerOfAnyTenant(telegram_id);
+    if (ownerOf) {
+      return res.status(400).json({
+        error: `Этот пользователь уже является арендатором ("${ownerOf.name}"). Арендатор не может быть помощником`
+      });
+    }
+
+    // Проверяем: не является ли он уже админом другого тенанта
+    const adminOf = db.isAdminOfAnyTenant(telegram_id);
+    if (adminOf && adminOf.tenant_id !== req.tenantId) {
+      return res.status(400).json({
+        error: `Этот пользователь уже является помощником другого арендатора ("${adminOf.tenant_name}")`
+      });
+    }
+
     db.addTenantAdmin(req.tenantId, telegram_id);
     res.json({ ok: true });
   } catch (e) {
@@ -1095,6 +1112,14 @@ app.post('/api/super/tenants', requireSuperAdmin, (req, res) => {
     // Проверяем нет ли уже
     const existing = db.getTenantByTelegramId(telegram_id);
     if (existing) return res.status(400).json({ error: 'Тенант с этим telegram_id уже существует' });
+
+    // Проверяем: не является ли он админом (помощником) другого тенанта
+    const adminOf = db.isAdminOfAnyTenant(telegram_id);
+    if (adminOf) {
+      return res.status(400).json({
+        error: `Этот пользователь является помощником арендатора "${adminOf.tenant_name}". Сначала удалите его оттуда`
+      });
+    }
 
     const tenantId = db.createTenant(String(telegram_id), name || '', leadteh_api_token || '');
 
