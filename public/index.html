@@ -143,7 +143,7 @@
       border: 1px solid var(--border);
     }
 
-    .auto-hint {
+    .hint-box {
       background: var(--bg-secondary);
       border: 1px solid var(--accent);
       border-left: 3px solid var(--accent);
@@ -515,6 +515,7 @@
     </div>
 
     <div class="space-y-4">
+      <div class="hint-box">Первоначальная настройка. Вам понадобятся: токен Leadteh API (из кабинета Leadteh → Настройки → API), ID бота в Leadteh и токен Telegram-бота от @BotFather. После настройки вы сможете создавать рассылки.</div>
       <div>
         <label class="text-sm font-medium mb-1 flex items-center">Leadteh API токен<span class="tooltip-trigger">?<span class="tooltip-text">Токен из Leadteh: Настройки → API. Общий для всех ботов</span></span></label>
         <input id="onboardLeadtehToken" type="text" placeholder="Токен из Leadteh: Настройки → API"
@@ -583,6 +584,10 @@
 
       <!-- Шаг 1: Список сообщений -->
       <div id="step1" class="step-content fade-in">
+        <div class="hint-box">
+          <strong>Шаг 1 из 4 — Сообщения</strong><br>
+          Создайте от 1 до 5 сообщений. Все они отправляются получателю подряд в одной рассылке. Нажмите на сообщение для редактирования текста, фото и кнопок.
+        </div>
         <h2 class="text-lg font-bold mb-1">Сообщения</h2>
         <p class="text-xs mb-3" style="color: var(--text-secondary)">От 1 до 5 сообщений, идут подряд получателю</p>
 
@@ -619,6 +624,9 @@
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-lg font-bold" id="editorTitle">Сообщение 1 из 1</h2>
           <button onclick="finishEditMessage()" class="text-sm btn-primary rounded-lg px-4 py-1.5">Готово</button>
+        </div>
+        <div class="hint-box">
+          Заполните текст сообщения. Можно прикрепить фото (ссылка или файл до 10 МБ) и до 6 кнопок. С фото лимит текста — 1024 символа, без фото — 4096. Выберите формат разметки: Markdown, HTML или MarkdownV2.
         </div>
 
         <div class="mb-3">
@@ -695,6 +703,10 @@
 
       <!-- Шаг 3: Фильтры -->
       <div id="step3" class="step-content hidden fade-in">
+        <div class="hint-box">
+          <strong>Шаг 2 из 4 — Фильтры</strong><br>
+          Выберите, кому отправить: по тегам (условия «ЕСТЬ / НЕТ тега» с операторами И/ИЛИ) или по списку Leadteh. Если ничего не выбрано — рассылка пойдёт всем контактам с telegram_id.
+        </div>
         <h2 class="text-lg font-bold mb-1">Фильтры</h2>
         <p class="text-xs mb-3" style="color: var(--text-secondary)">Выберите теги ИЛИ список для фильтрации получателей</p>
 
@@ -741,6 +753,8 @@
         <h2 class="text-lg font-bold mb-1">Название и время</h2>
         <p class="text-xs mb-3" style="color: var(--text-secondary)">Дайте рассылке название и выберите время</p>
 
+        <div class="hint-box">Шаг 3 из 4 — Название и время. Название видно только вам — для удобного поиска в списке. По умолчанию рассылка отправляется сразу; снимите галочку, чтобы запланировать на конкретную дату и время (МСК).</div>
+
         <div class="mb-4">
           <label class="text-sm font-medium mb-1 flex items-center">Название рассылки<span class="tooltip-trigger">?<span class="tooltip-text">Для удобства поиска в списке. Не видно получателям</span></span></label>
           <input type="text" id="broadcastName" placeholder="Например: Акция на розы"
@@ -773,6 +787,7 @@
       <!-- Шаг 5: Подтверждение -->
       <div id="step5" class="step-content hidden fade-in">
         <h2 class="text-lg font-bold mb-3">Подтверждение</h2>
+        <div class="hint-box">Шаг 4 из 4 — Проверка. Убедитесь, что всё верно: сообщения, фильтры, время и количество получателей. После нажатия «Отправить» рассылка встанет в очередь и начнёт отправляться.</div>
         <div id="confirmMessages"></div>
         <div class="broadcast-card mb-3">
           <div class="section-label">Фильтры</div>
@@ -803,6 +818,7 @@
 
     <!-- TAB: Список рассылок -->
     <div id="listTab" class="hidden">
+      <div class="hint-box">Здесь все ваши рассылки. Статусы: ожидает — ещё не отправлена, отправляется — в процессе, завершена — доставлена. Можно удалить ожидающую или повторить завершённую с редактированием.</div>
       <div id="listLoading" class="text-center py-8">
         <div class="text-sm" style="color: var(--text-secondary)">Загрузка...</div>
       </div>
@@ -839,7 +855,7 @@
 
         <!-- Шаг A1: Тип + название + бот -->
         <div id="autoStep1" class="step-content fade-in">
-          <div class="auto-hint">
+          <div class="hint-box">
             <strong>Шаг 1 из 4 — Основные настройки</strong><br>
             Выберите тип: <em>Цепочка</em> — серия шагов с задержками между ними (воронка), <em>Расписание</em> — повторяющаяся отправка по дням недели. Укажите название и бота.
           </div>
@@ -883,7 +899,7 @@
 
         <!-- Шаг A2: Шаги цепочки -->
         <div id="autoStep2" class="step-content fade-in hidden">
-          <div class="auto-hint">
+          <div class="hint-box">
             <strong>Шаг 2 из 4 — Шаги цепочки</strong><br>
             Добавьте от 1 до 5 шагов. Каждый шаг — это набор сообщений, которые отправляются получателю друг за другом. Между шагами задаётся задержка (минуты, часы, дни). Нажмите «Редактировать» чтобы наполнить шаг сообщениями.
           </div>
@@ -902,7 +918,7 @@
             <button onclick="autoBackToSteps()" class="mr-2 text-sm" style="color:var(--text-secondary)">← К шагам</button>
             <h3 class="text-sm font-bold" id="autoStepEditorTitle">Шаг 1 — Сообщения</h3>
           </div>
-          <div class="auto-hint">
+          <div class="hint-box">
             Добавьте от 1 до 5 сообщений для этого шага. Все сообщения шага отправляются получателю последовательно за одну отправку. Нажмите на сообщение чтобы редактировать текст, фото и кнопки.
           </div>
           <div id="autoMsgList"></div>
@@ -927,7 +943,7 @@
             <button onclick="autoBackToMsgList()" class="mr-2 text-sm" style="color:var(--text-secondary)">← К сообщениям</button>
             <h3 class="text-sm font-bold" id="autoMsgEditorTitle">Сообщение 1</h3>
           </div>
-          <div class="auto-hint">
+          <div class="hint-box">
             Заполните текст сообщения. Можно добавить фото (ссылка или загрузка) и до 6 кнопок (ссылки или команды бота). С фото максимум 1024 символа текста, без фото — до 4096.
           </div>
           <div class="broadcast-card mb-3">
@@ -962,7 +978,7 @@
 
         <!-- Шаг A5: Фильтры -->
         <div id="autoStep5" class="step-content fade-in hidden">
-          <div class="auto-hint">
+          <div class="hint-box">
             <strong>Шаг 3 из 4 — Фильтры получателей</strong><br>
             Определите, кому отправлять сообщения. Если фильтры не заданы — рассылка пойдёт всем контактам с telegram_id. Контакты пересобираются заново при каждой отправке, так что новые подписчики тоже получат сообщения.
           </div>
@@ -977,7 +993,7 @@
 
         <!-- Шаг A6: Подтверждение -->
         <div id="autoStep6" class="step-content fade-in hidden">
-          <div class="auto-hint">
+          <div class="hint-box">
             <strong>Шаг 4 из 4 — Проверьте и запустите</strong><br>
             Убедитесь, что всё верно. Для цепочки — первый шаг отправится сразу, следующие по заданным задержкам. Для расписания — отправка начнётся в ближайший указанный день и время.
           </div>
@@ -997,6 +1013,8 @@
         <div class="text-sm" style="color: var(--text-secondary)">Загрузка настроек...</div>
       </div>
       <div id="settingsContent" class="hidden">
+        <div class="hint-box">Управление аккаунтом: боты, администраторы и списки. Добавьте ботов через токен от @BotFather, назначьте администраторов по Telegram ID и привяжите списки Leadteh к ботам для фильтрации контактов.</div>
+
         <!-- Тариф и использование -->
         <div id="usageInfo" class="broadcast-card mb-4"></div>
 
@@ -1053,6 +1071,7 @@
 
     <!-- TAB: Суперадмин (скрыт для обычных тенантов) -->
     <div id="superTab" class="hidden">
+      <div class="hint-box">Панель суперадмина. Управляйте арендаторами (тенантами), настраивайте тарифные планы и отслеживайте статистику платформы. Через «Войти как» можно зайти в аккаунт любого тенанта.</div>
       <!-- Подтабы суперадмина -->
       <div class="flex gap-2 mb-4">
         <button onclick="showSuperSub('tenants')" id="superSubTenants" class="flex-1 py-1.5 px-2 rounded-lg text-xs font-medium btn-primary">Тенанты</button>
