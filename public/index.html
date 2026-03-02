@@ -155,6 +155,7 @@
     .status-pending { background: rgba(243, 156, 18, 0.15); color: var(--warning); border: 1px solid rgba(243, 156, 18, 0.3); }
     .status-sending { background: rgba(52, 152, 219, 0.15); color: #3498db; border: 1px solid rgba(52, 152, 219, 0.3); }
     .status-sent { background: rgba(46, 204, 113, 0.15); color: var(--success); border: 1px solid rgba(46, 204, 113, 0.3); }
+    .status-sent_partial { background: rgba(243, 156, 18, 0.15); color: var(--warning); border: 1px solid rgba(243, 156, 18, 0.3); }
     .status-error { background: rgba(231, 76, 60, 0.15); color: var(--danger); border: 1px solid rgba(231, 76, 60, 0.3); }
     .status-active { background: rgba(46, 204, 113, 0.15); color: var(--success); border: 1px solid rgba(46, 204, 113, 0.3); }
     .status-blocked { background: rgba(231, 76, 60, 0.15); color: var(--danger); border: 1px solid rgba(231, 76, 60, 0.3); }
@@ -2016,7 +2017,27 @@
           card.className = 'broadcast-card fade-in';
           card.style.cursor = 'pointer';
 
-          const statusText = { pending: 'Запланирована', sending: 'Отправляется...', sent: 'Отправлена', error: 'Ошибка' }[b.status] || b.status;
+          // Умная логика статусов для отправленных рассылок
+          let displayStatus = b.status;
+          let statusText;
+          if (b.status === 'sent') {
+            const sc = b.sent_count || 0;
+            const fc = b.failed_count || 0;
+            if (sc > 0 && fc === 0) {
+              displayStatus = 'sent';
+              statusText = 'Отправлена';
+            } else if (sc > 0 && fc > 0) {
+              displayStatus = 'sent_partial';
+              statusText = 'С ошибками';
+            } else if (sc === 0 && fc > 0) {
+              displayStatus = 'error';
+              statusText = 'Ошибка';
+            } else {
+              statusText = 'Отправлена';
+            }
+          } else {
+            statusText = { pending: 'Запланирована', sending: 'Отправляется...', error: 'Ошибка' }[b.status] || b.status;
+          }
           const scheduledDate = new Date(b.scheduled_at);
           const dateStr = scheduledDate.toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow', day: 'numeric', month: 'short' });
           const timeStr = scheduledDate.toLocaleTimeString('ru-RU', { timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit' });
@@ -2083,6 +2104,7 @@
             if (failedN > 0) details += `<div class="text-center"><div class="text-lg font-bold" style="color:var(--danger)">${failedN}</div><div class="text-xs" style="color:var(--text-muted)">Ошибок</div></div>`;
             if (total > 0) details += `<div class="text-center"><div class="text-lg font-bold">${pct}%</div><div class="text-xs" style="color:var(--text-muted)">Успех</div></div>`;
             details += `</div></div>`;
+            details += `<button onclick="event.stopPropagation();downloadBroadcastExcel('${b.id}')" class="w-full mt-2 py-1.5 px-3 rounded-lg text-xs font-medium" style="background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border)">Скачать отчёт в Excel</button>`;
           }
 
           if (b.status === 'error' && b.error) details += `<div class="text-xs mt-1" style="color:var(--danger)">${escapeHtml(b.error)}</div>`;
@@ -2098,7 +2120,7 @@
                   ${botLabel}
                 </div>
               </div>
-              <span class="status-badge status-${b.status} flex-shrink-0">${statusText}</span>
+              <span class="status-badge status-${displayStatus} flex-shrink-0">${statusText}</span>
             </div>
             <div class="broadcast-details hidden">${details}</div>`;
 
@@ -2109,6 +2131,29 @@
         console.error('Ошибка загрузки рассылок:', e);
         loading.classList.add('hidden');
         content.innerHTML = `<div class="text-center text-sm py-4" style="color:var(--danger)">Ошибка загрузки</div>`;
+      }
+    }
+
+    async function downloadBroadcastExcel(id) {
+      try {
+        const r = await apiFetch(`/api/broadcast/${id}/export`);
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}));
+          showAlert(err.error || 'Ошибка скачивания отчёта');
+          return;
+        }
+        const blob = await r.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `broadcast_report_${id}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        console.error('Ошибка скачивания отчёта:', e);
+        showAlert('Ошибка скачивания отчёта');
       }
     }
 

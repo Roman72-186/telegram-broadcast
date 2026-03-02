@@ -8,6 +8,7 @@ const db = require('./lib/db');
 const { validateInitData, getUserRole, isSuperAdmin } = require('./lib/auth');
 const { authMiddleware, requireSuperAdmin, requireTenantAdmin, requireTenantOwner } = require('./lib/middleware');
 const { fetchAllContacts, extractTags, fetchListSchemas, fetchListItems, extractTelegramIds } = require('./lib/leadteh');
+const ExcelJS = require('exceljs');
 
 const app = express();
 const config = loadConfig();
@@ -716,6 +717,92 @@ app.post('/api/broadcast/delete', requireTenantAdmin, (req, res) => {
 });
 
 // ============================================
+// API: Экспорт отчёта рассылки в Excel
+// ============================================
+app.get('/api/broadcast/:id/export', requireTenantAdmin, async (req, res) => {
+  try {
+    const broadcast = db.getBroadcast(req.params.id, req.tenantId);
+    if (!broadcast) return res.status(404).json({ error: 'Рассылка не найдена' });
+
+    const recipients = db.getBroadcastRecipients(broadcast.id);
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Отчёт');
+
+    // Шапка отчёта
+    const filtersDesc = [];
+    if (broadcast.filters?.conditions?.length) {
+      for (let i = 0; i < broadcast.filters.conditions.length; i++) {
+        const c = broadcast.filters.conditions[i];
+        filtersDesc.push(`${c.type === 'has' ? 'ЕСТЬ' : 'НЕТ'} "${c.tag}"`);
+        if (i < (broadcast.filters.operators || []).length) {
+          filtersDesc.push(broadcast.filters.operators[i] === 'AND' ? 'И' : 'ИЛИ');
+        }
+      }
+    } else {
+      if (broadcast.filters?.include_tags?.length) filtersDesc.push('Включить: ' + broadcast.filters.include_tags.join(', '));
+      if (broadcast.filters?.exclude_tags?.length) filtersDesc.push('Исключить: ' + broadcast.filters.exclude_tags.join(', '));
+    }
+    if (broadcast.filters?.list_name) filtersDesc.push('Список: ' + broadcast.filters.list_name);
+
+    const headerRows = [
+      ['Рассылка:', broadcast.name || 'Без названия'],
+      ['Дата отправки:', broadcast.sent_at ? new Date(broadcast.sent_at).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' }) : '—'],
+      ['Фильтры:', filtersDesc.join(' ') || 'Без фильтров'],
+      ['Всего получателей:', broadcast.total_recipients || 0],
+      ['Доставлено:', broadcast.sent_count || 0],
+      ['Ошибок:', broadcast.failed_count || 0],
+      [],
+    ];
+
+    headerRows.forEach(row => {
+      const r = sheet.addRow(row);
+      if (row.length >= 1 && row[0]) r.getCell(1).font = { bold: true };
+    });
+
+    // Таблица получателей
+    const tableHeader = sheet.addRow(['№', 'Telegram ID', 'Имя', 'Статус', 'Ошибка', 'Дата']);
+    tableHeader.eachCell(cell => {
+      cell.font = { bold: true };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+      cell.border = {
+        bottom: { style: 'thin' },
+      };
+    });
+
+    recipients.forEach((r, i) => {
+      sheet.addRow([
+        i + 1,
+        r.telegram_id,
+        r.name || '',
+        r.status === 'sent' ? 'Доставлено' : 'Ошибка',
+        r.error || '',
+        r.sent_at ? new Date(r.sent_at).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' }) : '',
+      ]);
+    });
+
+    // Ширина колонок
+    sheet.columns = [
+      { width: 6 },
+      { width: 16 },
+      { width: 25 },
+      { width: 14 },
+      { width: 35 },
+      { width: 20 },
+    ];
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="broadcast_report_${broadcast.id}.xlsx"`);
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (e) {
+    console.error('GET /api/broadcast/:id/export error:', e.message);
+    res.status(500).json({ error: 'Ошибка генерации отчёта' });
+  }
+});
+
+// ============================================
 // API: Настройки — получить (тенант)
 // ============================================
 app.get('/api/settings', requireTenantAdmin, (req, res) => {
@@ -1269,6 +1356,7 @@ async function sendBroadcast(broadcast) {
 
   for (const contact of recipients) {
     let contactFailed = false;
+    let lastError = '';
 
     for (let i = 0; i < prepared.length; i++) {
       const msg = prepared[i];
@@ -1285,11 +1373,13 @@ async function sendBroadcast(broadcast) {
 
         if (!r.ok) {
           const err = await r.json();
+          lastError = err.description || 'Telegram API error';
           console.error(`Не удалось отправить ${contact.telegram_id} (msg ${i + 1}):`, err.description);
           contactFailed = true;
           break;
         }
       } catch (e) {
+        lastError = e.message;
         console.error(`Ошибка отправки ${contact.telegram_id} (msg ${i + 1}):`, e.message);
         contactFailed = true;
         break;
@@ -1300,10 +1390,24 @@ async function sendBroadcast(broadcast) {
       }
     }
 
+    const contactName = [contact.first_name, contact.last_name].filter(Boolean).join(' ') || contact.name || '';
     if (contactFailed) {
       failed++;
+      db.saveBroadcastRecipient(broadcast.id, {
+        telegram_id: contact.telegram_id,
+        name: contactName,
+        status: 'failed',
+        error: lastError || 'Ошибка отправки',
+        sent_at: new Date().toISOString(),
+      });
     } else {
       sent++;
+      db.saveBroadcastRecipient(broadcast.id, {
+        telegram_id: contact.telegram_id,
+        name: contactName,
+        status: 'sent',
+        sent_at: new Date().toISOString(),
+      });
     }
 
     await new Promise(r => setTimeout(r, 35));

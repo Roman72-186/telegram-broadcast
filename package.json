@@ -9,8 +9,9 @@
     "dev": "node server.js"
   },
   "dependencies": {
-    "sql.js": "^1.11.0",
+    "exceljs": "^4.4.0",
     "express": "^4.21.0",
-    "node-cron": "^3.0.3"
+    "node-cron": "^3.0.3",
+    "sql.js": "^1.11.0"
   }
 }
