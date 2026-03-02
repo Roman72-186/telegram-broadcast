@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(ssh:*)"
+      "Bash(ssh:*)",
+      "WebFetch(domain:core.telegram.org)",
+      "Bash(node:*)"
     ]
   }
 }
