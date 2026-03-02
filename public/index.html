@@ -1238,6 +1238,7 @@
     function editorUpdateButton(index, field, value) {
       messages[currentMessageIndex].buttons[index][field] = value;
       if (field === 'type') renderEditorButtons();
+      else validateEditorButtons();
     }
 
     function renderEditorButtons() {
@@ -1277,9 +1278,26 @@
           </div>
           <input type="text" placeholder="${placeholder}" value="${escapeAttr(btn.value)}"
             oninput="editorUpdateButton(${i}, 'value', this.value)"
-            class="input-field w-full rounded-lg px-3 py-2 text-sm" />
+            class="input-field w-full rounded-lg px-3 py-2 text-sm" id="btnValue_${i}"
+            style="${btn.text.trim() && !btn.value.trim() ? 'border-color:var(--danger, #ef4444)' : ''}" />
+          ${btn.text.trim() && !btn.value.trim() ? '<div class="text-xs mt-1" style="color:var(--danger, #ef4444)">Обязательно укажите действие</div>' : ''}
           ${typeHint}`;
         container.appendChild(div);
+      });
+    }
+
+    function validateEditorButtons() {
+      const btns = messages[currentMessageIndex].buttons;
+      btns.forEach((btn, i) => {
+        const input = document.getElementById('btnValue_' + i);
+        if (!input) return;
+        const hasText = btn.text.trim();
+        const hasValue = btn.value.trim();
+        input.style.borderColor = hasText && !hasValue ? 'var(--danger, #ef4444)' : '';
+        const hint = input.nextElementSibling;
+        if (hint && hint.textContent === 'Обязательно укажите действие') {
+          hint.style.display = hasText && !hasValue ? '' : 'none';
+        }
       });
     }
 
