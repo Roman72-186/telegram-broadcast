@@ -46,6 +46,14 @@ setInterval(() => {
 
 app.use(express.json({ limit: '15mb' }));
 
+// Access log для диагностики
+app.use((req, res, next) => {
+  if (req.path !== '/health' && !req.path.startsWith('/api/cron')) {
+    console.log(`[http] ${req.method} ${req.originalUrl} from ${req.ip}`);
+  }
+  next();
+});
+
 // Cache-bust: редирект / без версии → /?v=timestamp (сбрасывает кэш Telegram WebApp)
 const APP_VERSION = Date.now().toString(36);
 app.get('/', (req, res, next) => {
