@@ -1810,6 +1810,7 @@
     let settingsAdminIds = [];
     let newBotValidated = false;
     let allLeadtehLists = [];
+    let listsPerBot = {};
     let botListsMapping = {};
 
     async function loadSettings() {
@@ -1859,6 +1860,7 @@
         const r = await apiFetch('/api/settings/bot-lists');
         const data = await r.json();
         allLeadtehLists = data.lists || [];
+        listsPerBot = data.listsPerBot || {};
         botListsMapping = data.mapping || {};
         renderBotListsMapping();
       } catch (e) {
@@ -1868,20 +1870,29 @@
 
     function renderBotListsMapping() {
       const container = document.getElementById('settingsBotListsContainer');
-      if (settingsBots.length === 0 || allLeadtehLists.length === 0) {
-        container.innerHTML = '<div class="text-xs" style="color:var(--text-muted)">Нет списков или ботов</div>';
+      if (settingsBots.length === 0) {
+        container.innerHTML = '<div class="text-xs" style="color:var(--text-muted)">Нет ботов</div>';
         return;
       }
       container.innerHTML = settingsBots.map(bot => {
+        const botLists = listsPerBot[bot.id] || allLeadtehLists;
         const assigned = botListsMapping[bot.id] || [];
-        const listCheckboxes = allLeadtehLists.map(l => {
+        if (botLists.length === 0) {
+          return `<div class="p-3 rounded-lg" style="background:var(--bg-secondary);border:1px solid var(--border)">
+            <div class="flex items-center justify-between">
+              <span class="text-sm font-medium">${escapeHtml(bot.name)}</span>
+              <span class="text-xs" style="color:var(--text-muted)">нет списков</span>
+            </div>
+          </div>`;
+        }
+        const listCheckboxes = botLists.map(l => {
           const checked = assigned.includes(String(l.id)) ? 'checked' : '';
           return `<label class="flex items-center gap-2 text-xs py-0.5 cursor-pointer">
             <input type="checkbox" ${checked} onchange="toggleBotList('${bot.id}','${l.id}')" class="rounded" style="accent-color:var(--accent)" />
             <span style="color:var(--text-secondary)">${escapeHtml(l.name)}</span>
           </label>`;
         }).join('');
-        const label = assigned.length > 0 ? `${assigned.length} из ${allLeadtehLists.length}` : 'списки не привязаны';
+        const label = assigned.length > 0 ? `${assigned.length} из ${botLists.length}` : 'списки не привязаны';
         return `<div class="p-3 rounded-lg" style="background:var(--bg-secondary);border:1px solid var(--border)">
           <div class="flex items-center justify-between mb-2">
             <span class="text-sm font-medium">${escapeHtml(bot.name)}</span>

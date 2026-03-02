@@ -669,22 +669,25 @@ app.get('/api/settings/bot-lists', requireTenantAdmin, async (req, res) => {
     const bots = db.getBotsByTenant(req.tenantId);
     if (!tenant || bots.length === 0) return res.json({ lists: [], mapping: {} });
 
-    // Загружаем списки для всех уникальных leadteh_bot_id
-    const uniqueBotIds = [...new Set(bots.map(b => b.leadteh_bot_id).filter(Boolean))];
-    const listsMap = new Map();
-    for (const leadtehBotId of uniqueBotIds) {
+    // Загружаем списки отдельно для каждого бота (по leadteh_bot_id)
+    const listsPerBot = {};
+    const allListsMap = new Map();
+    for (const bot of bots) {
+      if (!bot.leadteh_bot_id) { listsPerBot[bot.id] = []; continue; }
       try {
-        const schemas = await fetchListSchemas({ leadtehApiToken: tenant.leadteh_api_token, leadtehBotId });
-        for (const s of (Array.isArray(schemas) ? schemas : [])) {
-          if (!listsMap.has(s.id)) {
-            listsMap.set(s.id, { id: s.id, name: s.name || s.title || `Список ${s.id}` });
-          }
-        }
+        const schemas = await fetchListSchemas({ leadtehApiToken: tenant.leadteh_api_token, leadtehBotId: bot.leadteh_bot_id });
+        const botLists = (Array.isArray(schemas) ? schemas : []).map(s => {
+          const item = { id: s.id, name: s.name || s.title || `Список ${s.id}` };
+          allListsMap.set(s.id, item);
+          return item;
+        });
+        listsPerBot[bot.id] = botLists;
       } catch (e) {
-        console.error(`Ошибка загрузки списков для leadteh_bot_id=${leadtehBotId}:`, e.message);
+        console.error(`Ошибка загрузки списков для bot=${bot.id} leadteh_bot_id=${bot.leadteh_bot_id}:`, e.message);
+        listsPerBot[bot.id] = [];
       }
     }
-    const allLists = [...listsMap.values()];
+    const allLists = [...allListsMap.values()];
 
     // Собираем маппинг для ботов тенанта
     const mapping = {};
@@ -692,7 +695,7 @@ app.get('/api/settings/bot-lists', requireTenantAdmin, async (req, res) => {
       mapping[bot.id] = db.getBotListMappings(bot.id);
     }
 
-    res.json({ lists: allLists, mapping });
+    res.json({ lists: allLists, listsPerBot, mapping });
   } catch (e) {
     console.error('GET /api/settings/bot-lists error:', e.message);
     res.status(500).json({ error: 'Ошибка загрузки списков' });
