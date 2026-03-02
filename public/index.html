@@ -253,11 +253,7 @@
     }
     .tooltip-text {
       display: none;
-      position: absolute;
-      bottom: calc(100% + 8px);
-      right: -8px;
-      left: auto;
-      transform: none;
+      position: fixed;
       background-color: var(--bg-tertiary);
       color: var(--text-primary);
       border: 1px solid var(--border);
@@ -276,16 +272,11 @@
       content: '';
       position: absolute;
       top: 100%;
-      left: auto;
-      right: 10px;
-      transform: none;
+      right: var(--arrow-right, 10px);
       border: 6px solid transparent;
       border-top-color: var(--bg-tertiary);
     }
     .tooltip-trigger.active .tooltip-text { display: block; }
-    @media (hover: hover) {
-      .tooltip-trigger:hover .tooltip-text { display: block; }
-    }
   </style>
 </head>
 <body class="pb-24">
@@ -2279,6 +2270,21 @@
       });
       if (trigger) {
         trigger.classList.toggle('active');
+        // Позиционируем тултип динамически (fixed)
+        const tip = trigger.querySelector('.tooltip-text');
+        if (tip && trigger.classList.contains('active')) {
+          const rect = trigger.getBoundingClientRect();
+          const tipW = Math.min(260, window.innerWidth - 32);
+          let left = rect.right - tipW;
+          if (left < 16) left = 16;
+          if (left + tipW > window.innerWidth - 16) left = window.innerWidth - 16 - tipW;
+          tip.style.left = left + 'px';
+          tip.style.top = (rect.top - 8) + 'px';
+          tip.style.transform = 'translateY(-100%)';
+          // Стрелка: указывает на триггер
+          const arrowRight = Math.max(10, rect.right - left - rect.width / 2 - 6);
+          tip.style.setProperty('--arrow-right', arrowRight + 'px');
+        }
         e.preventDefault();
         e.stopPropagation();
       }
