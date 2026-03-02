@@ -805,7 +805,7 @@
       <!-- Список авторассылок -->
       <div id="autoListView">
         <div class="flex items-center justify-between mb-4">
-          <h2 class="text-lg font-bold">Авторассылки</h2>
+          <h2 class="text-lg font-bold flex items-center">Авторассылки<span class="tooltip-trigger">?<span class="tooltip-text">Автоматические рассылки: цепочки (воронки с задержками между шагами) и расписания (повтор по дням недели)</span></span></h2>
           <button onclick="showAutoCreate()" class="py-2 px-4 rounded-lg text-sm font-medium btn-primary">+ Создать</button>
         </div>
         <div id="autoLoading" class="text-center py-8">
@@ -828,7 +828,7 @@
         <!-- Шаг A1: Тип + название + бот -->
         <div id="autoStep1" class="step-content fade-in">
           <div class="mb-3">
-            <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Тип</label>
+            <label class="text-xs mb-1 flex items-center" style="color: var(--text-secondary)">Тип авторассылки<span class="tooltip-trigger">?<span class="tooltip-text">Цепочка — серия шагов с задержками (воронка). Расписание — повтор по дням недели в заданное время с пересбором контактов</span></span></label>
             <div class="flex gap-2">
               <button id="autoTypeChain" onclick="setAutoType('chain')" class="flex-1 py-2 px-3 rounded-lg text-sm font-medium btn-primary">Цепочка</button>
               <button id="autoTypeRecurring" onclick="setAutoType('recurring')" class="flex-1 py-2 px-3 rounded-lg text-sm font-medium btn-secondary">Расписание</button>
@@ -837,18 +837,18 @@
           </div>
 
           <div class="mb-3">
-            <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Название</label>
+            <label class="text-xs mb-1 flex items-center" style="color: var(--text-secondary)">Название<span class="tooltip-trigger">?<span class="tooltip-text">Название для удобства поиска в списке. Получатели его не видят</span></span></label>
             <input type="text" id="autoName" placeholder="Например: Приветственная цепочка" class="input-field w-full rounded-lg px-3 py-2 text-sm" />
           </div>
 
           <div class="mb-3" id="autoBotSelector">
-            <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Бот</label>
+            <label class="text-xs mb-1 flex items-center" style="color: var(--text-secondary)">Бот<span class="tooltip-trigger">?<span class="tooltip-text">От имени какого бота отправлять сообщения</span></span></label>
             <select id="autoBotSelect" class="input-field w-full rounded-lg px-3 py-2 text-sm font-medium"></select>
           </div>
 
           <!-- Расписание (только для recurring) -->
           <div id="autoScheduleBlock" class="hidden mb-3">
-            <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Дни недели</label>
+            <label class="text-xs mb-1 flex items-center" style="color: var(--text-secondary)">Дни недели<span class="tooltip-trigger">?<span class="tooltip-text">Выберите дни, когда будет выполняться рассылка. Контакты пересобираются при каждой отправке</span></span></label>
             <div class="flex gap-1 flex-wrap mb-2" id="autoDaysContainer">
               <label class="flex items-center gap-1 text-sm px-2 py-1 rounded-lg" style="background:var(--bg-card)"><input type="checkbox" value="1" onchange="onAutoDayChange()"> Пн</label>
               <label class="flex items-center gap-1 text-sm px-2 py-1 rounded-lg" style="background:var(--bg-card)"><input type="checkbox" value="2" onchange="onAutoDayChange()"> Вт</label>
@@ -858,7 +858,7 @@
               <label class="flex items-center gap-1 text-sm px-2 py-1 rounded-lg" style="background:var(--bg-card)"><input type="checkbox" value="6" onchange="onAutoDayChange()"> Сб</label>
               <label class="flex items-center gap-1 text-sm px-2 py-1 rounded-lg" style="background:var(--bg-card)"><input type="checkbox" value="0" onchange="onAutoDayChange()"> Вс</label>
             </div>
-            <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Время (МСК)</label>
+            <label class="text-xs mb-1 flex items-center" style="color: var(--text-secondary)">Время (МСК)<span class="tooltip-trigger">?<span class="tooltip-text">Время отправки по московскому времени (UTC+3). Рассылка запускается в указанную минуту</span></span></label>
             <input type="time" id="autoScheduleTime" value="10:00" class="input-field rounded-lg px-3 py-2 text-sm" />
           </div>
 
@@ -867,7 +867,7 @@
 
         <!-- Шаг A2: Шаги цепочки -->
         <div id="autoStep2" class="step-content fade-in hidden">
-          <h3 class="text-sm font-bold mb-2">Шаги цепочки</h3>
+          <h3 class="text-sm font-bold mb-2 flex items-center">Шаги цепочки<span class="tooltip-trigger">?<span class="tooltip-text">Каждый шаг — набор сообщений, которые отправляются одновременно. Между шагами задаётся задержка (минуты, часы, дни). Максимум 5 шагов</span></span></h3>
           <p class="text-xs mb-3" style="color: var(--text-secondary)">Каждый шаг — набор сообщений. Между шагами — задержка.</p>
           <div id="autoStepsList"></div>
           <button id="autoAddStepBtn" onclick="addAutoStep()" class="w-full py-2 rounded-xl text-sm btn-secondary mt-2">+ Добавить шаг</button>
@@ -887,7 +887,7 @@
           <button id="autoAddMsgBtn" onclick="addAutoMessage()" class="w-full py-2 rounded-xl text-sm btn-secondary mt-2">+ Добавить сообщение</button>
           <div class="mt-3">
             <label class="text-xs mb-1 flex items-center" style="color: var(--text-secondary)">
-              Задержка между сообщениями
+              Задержка между сообщениями<span class="tooltip-trigger">?<span class="tooltip-text">Пауза (в секундах) перед отправкой следующего сообщения одному получателю внутри шага. Делает рассылку естественнее</span></span>
             </label>
             <div class="flex items-center gap-3">
               <input type="range" id="autoMsgDelayRange" min="0" max="60" value="0" step="1"
@@ -906,14 +906,14 @@
             <h3 class="text-sm font-bold" id="autoMsgEditorTitle">Сообщение 1</h3>
           </div>
           <div class="broadcast-card mb-3">
-            <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Формат текста</label>
+            <label class="text-xs mb-1 flex items-center" style="color: var(--text-secondary)">Формат текста<span class="tooltip-trigger">?<span class="tooltip-text">Markdown: *жирный* _курсив_. HTML: &lt;b&gt; &lt;i&gt;. MarkdownV2 — расширенный Markdown с экранированием спецсимволов</span></span></label>
             <select id="autoMsgParseMode" onchange="onAutoMsgParseModeChange()"
               class="input-field w-full rounded-lg px-3 py-2 text-sm font-medium mb-2">
               <option value="Markdown">Markdown</option>
               <option value="MarkdownV2">MarkdownV2</option>
               <option value="HTML">HTML</option>
             </select>
-            <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Фото (необязательно)</label>
+            <label class="text-xs mb-1 flex items-center" style="color: var(--text-secondary)">Фото (необязательно)<span class="tooltip-trigger">?<span class="tooltip-text">Ссылка на изображение или загрузите файл (до 10 МБ). JPG, PNG, GIF, WebP</span></span></label>
             <div class="flex gap-2 mb-2">
               <input type="text" id="autoMsgPhotoUrl" placeholder="URL или загрузите" class="input-field flex-1 rounded-lg px-3 py-2 text-sm" oninput="onAutoMsgPhotoChange()" />
               <label class="py-2 px-3 rounded-lg text-sm font-medium btn-secondary cursor-pointer shrink-0">
@@ -922,12 +922,12 @@
               </label>
             </div>
             <div id="autoMsgPhotoPreview" class="hidden mb-2"><img class="w-full rounded-lg" style="max-height:150px;object-fit:cover" /></div>
-            <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Текст сообщения</label>
+            <label class="text-xs mb-1 flex items-center" style="color: var(--text-secondary)">Текст сообщения<span class="tooltip-trigger">?<span class="tooltip-text">Текст сообщения. С фото — до 1024 символов, без фото — до 4096</span></span></label>
             <textarea id="autoMsgText" rows="5" class="input-field w-full rounded-lg px-3 py-2 text-sm resize-y" placeholder="Текст сообщения..." oninput="onAutoMsgTextChange()"></textarea>
           </div>
           <div class="broadcast-card mb-3">
             <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-medium" style="color: var(--text-secondary)">Кнопки</span>
+              <span class="text-xs font-medium flex items-center" style="color: var(--text-secondary)">Кнопки<span class="tooltip-trigger">?<span class="tooltip-text">URL — открывает ссылку. Команда — /start param создаёт deep link, другие команды отправляются как callback. Максимум 6 кнопок</span></span></span>
               <button onclick="autoAddButton()" class="text-xs btn-secondary rounded-lg px-3 py-1" id="autoAddBtnBtn">+ Кнопка</button>
             </div>
             <div id="autoButtonsList"></div>
@@ -937,7 +937,7 @@
 
         <!-- Шаг A5: Фильтры -->
         <div id="autoStep5" class="step-content fade-in hidden">
-          <h3 class="text-sm font-bold mb-2">Фильтры получателей</h3>
+          <h3 class="text-sm font-bold mb-2 flex items-center">Фильтры получателей<span class="tooltip-trigger">?<span class="tooltip-text">Определяют, кому отправлять. Контакты пересобираются при каждой отправке шага — новые контакты тоже получат сообщения</span></span></h3>
           <p class="text-xs mb-3" style="color: var(--text-secondary)">Такие же как в обычной рассылке. При каждой отправке контакты пересобираются.</p>
           <div id="autoFiltersContainer"></div>
           <div id="autoContactsCount" class="mt-2"></div>
