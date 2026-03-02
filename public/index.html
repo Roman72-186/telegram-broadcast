@@ -1465,14 +1465,21 @@
       btns.forEach((btn, i) => {
         const div = document.createElement('div');
         div.className = 'broadcast-card mb-2 fade-in';
-        let placeholder = 'https://example.com';
-        let typeHint = '';
-        if (btn.type === 'command') {
-          placeholder = '/b или /start promo';
-          typeHint = '<div class="text-xs mt-1" style="color:var(--text-muted)">Отображается как обычная кнопка (без иконки ссылки)</div>';
-        } else if (btn.type === 'start') {
-          placeholder = 'Параметр (например: promo_123)';
-          typeHint = '<div class="text-xs mt-1" style="color:var(--text-muted)">Deep link через /start (иконка ссылки)</div>';
+        const isCmd = btn.type === 'command';
+        const placeholder = isCmd ? '/start promo или /b 123' : 'https://example.com';
+        const typeHint = isCmd
+          ? '<div class="text-xs mt-1" style="color:var(--text-muted)">/start param → deep link, остальные → callback</div>'
+          : '';
+
+        // Валидация значения
+        const val = (btn.value || '').trim();
+        let valError = '';
+        if (btn.text.trim() && !val) {
+          valError = 'Обязательно укажите действие';
+        } else if (val && btn.type === 'url' && !/^https?:\/\/.+/i.test(val)) {
+          valError = 'Ссылка должна начинаться с https://';
+        } else if (val && isCmd && !val.startsWith('/')) {
+          valError = 'Команда должна начинаться с /';
         }
 
         div.innerHTML = `
@@ -1487,15 +1494,14 @@
             <select onchange="editorUpdateButton(${i}, 'type', this.value)"
               class="input-field rounded-lg px-3 py-2 text-sm">
               <option value="url" ${btn.type === 'url' ? 'selected' : ''}>Ссылка (URL)</option>
-              <option value="command" ${btn.type === 'command' ? 'selected' : ''}>Команда бота</option>
-              <option value="start" ${btn.type === 'start' ? 'selected' : ''}>Deep link (/start)</option>
+              <option value="command" ${isCmd ? 'selected' : ''}>Команда бота</option>
             </select>
           </div>
           <input type="text" placeholder="${placeholder}" value="${escapeAttr(btn.value)}"
             oninput="editorUpdateButton(${i}, 'value', this.value)"
             class="input-field w-full rounded-lg px-3 py-2 text-sm mb-2" id="btnValue_${i}"
-            style="${btn.text.trim() && !btn.value.trim() ? 'border-color:var(--danger, #ef4444)' : ''}" />
-          ${btn.text.trim() && !btn.value.trim() ? '<div class="text-xs mt-1 mb-2" style="color:var(--danger, #ef4444)">Обязательно укажите действие</div>' : ''}
+            style="${valError ? 'border-color:var(--danger, #ef4444)' : ''}" />
+          ${valError ? `<div class="text-xs mt-1 mb-2" style="color:var(--danger, #ef4444)">${valError}</div>` : ''}
           ${typeHint}
           <div class="flex items-center gap-2 mt-2">
             <span class="text-xs" style="color:var(--text-muted)">Стиль:</span>
@@ -1512,18 +1518,8 @@
     }
 
     function validateEditorButtons() {
-      const btns = messages[currentMessageIndex].buttons;
-      btns.forEach((btn, i) => {
-        const input = document.getElementById('btnValue_' + i);
-        if (!input) return;
-        const hasText = btn.text.trim();
-        const hasValue = btn.value.trim();
-        input.style.borderColor = hasText && !hasValue ? 'var(--danger, #ef4444)' : '';
-        const hint = input.nextElementSibling;
-        if (hint && hint.textContent === 'Обязательно укажите действие') {
-          hint.style.display = hasText && !hasValue ? '' : 'none';
-        }
-      });
+      // Перерисовка обновит все ошибки валидации
+      renderEditorButtons();
     }
 
     // ============================================
@@ -1984,8 +1980,7 @@
           html += msg.buttons.map(b => {
             let label;
             if (b.type === 'url') label = escapeHtml(b.value);
-            else if (b.type === 'command') label = 'callback: ' + escapeHtml(b.value);
-            else label = '/start ' + escapeHtml(b.value);
+            else label = 'команда: ' + escapeHtml(b.value);
             const styleLabel = b.style ? ` [${b.style}]` : '';
             return `<div class="text-xs mb-0.5" style="color:var(--text-secondary)">[${escapeHtml(b.text)}] → ${label}${styleLabel}</div>`;
           }).join('');

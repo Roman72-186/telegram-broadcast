@@ -620,6 +620,12 @@ app.post('/api/broadcast/save', requireTenantAdmin, (req, res) => {
             if (!btn.value || !btn.value.trim()) {
               return res.status(400).json({ error: `Укажите действие кнопки "${btn.text}" в сообщении ${i + 1}` });
             }
+            if (btn.type === 'url' && !/^https?:\/\/.+/i.test(btn.value.trim())) {
+              return res.status(400).json({ error: `Невалидная ссылка в кнопке "${btn.text}". Используйте формат https://...` });
+            }
+            if (btn.type === 'command' && !btn.value.trim().startsWith('/')) {
+              return res.status(400).json({ error: `Команда должна начинаться с / в кнопке "${btn.text}"` });
+            }
           }
         }
       }
@@ -1459,14 +1465,24 @@ function buildKeyboard(buttons, botUsername) {
     let button;
     if (btn.type === 'url') {
       button = { text: btn.text, url: btn.value };
+    } else if (btn.type === 'command') {
+      // /start param → deep link, остальные команды → callback_data
+      const startMatch = btn.value.match(/^\/start\s+(.+)/);
+      if (startMatch && botUsername) {
+        const param = encodeURIComponent(startMatch[1].trim());
+        button = { text: btn.text, url: `https://t.me/${botUsername}?start=${param}` };
+      } else if (btn.value === '/start' && botUsername) {
+        button = { text: btn.text, url: `https://t.me/${botUsername}` };
+      } else {
+        button = { text: btn.text, callback_data: btn.value };
+      }
     } else if (btn.type === 'start') {
+      // Обратная совместимость со старыми рассылками
       const param = encodeURIComponent(btn.value);
       const url = botUsername
         ? `https://t.me/${botUsername}?start=${param}`
         : btn.value;
       button = { text: btn.text, url };
-    } else if (btn.type === 'command') {
-      button = { text: btn.text, callback_data: btn.value };
     } else {
       continue;
     }
