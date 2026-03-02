@@ -1408,6 +1408,9 @@ app.get('/api/auto/:id', requireTenantAdmin, (req, res) => {
   try {
     const ab = db.getAutoBroadcast(req.params.id, req.tenantId);
     if (!ab) return res.status(404).json({ error: 'Авторассылка не найдена' });
+    if (ab.type === 'chain') {
+      ab.enrollment_stats = db.getEnrollmentStats(ab.id);
+    }
     res.json({ auto_broadcast: ab });
   } catch (e) {
     console.error('GET /api/auto/:id error:', e.message);
@@ -1468,10 +1471,9 @@ app.post('/api/auto/:id/start', requireTenantAdmin, (req, res) => {
   try {
     const ab = db.getAutoBroadcast(req.params.id, req.tenantId);
     if (!ab) return res.status(404).json({ error: 'Авторассылка не найдена' });
-    if (ab.status !== 'active') return res.status(400).json({ error: 'Авторассылка не активна' });
     if (ab.type !== 'chain') return res.status(400).json({ error: 'Ручной запуск только для цепочек' });
-
-    db.createAutoRun(ab.id, new Date().toISOString());
+    // Активируем цепочку — cron начнёт мониторить контакты
+    db.updateAutoBroadcastStatus(ab.id, 'active');
     res.json({ ok: true });
   } catch (e) {
     console.error('POST /api/auto/:id/start error:', e.message);
@@ -1546,48 +1548,193 @@ async function processPendingBroadcasts() {
 }
 
 // ============================================
-// Авторассылки: обработка цепочек (chain runs)
+// Авторассылки: обработка цепочек (per-contact enrollment)
 // ============================================
 async function processChainRuns() {
-  const runs = db.getActiveRuns();
-  for (const run of runs) {
+  // 1. Найти новых контактов для активных цепочек → enroll + отправить шаг 0
+  const activeChains = db.getActiveChains();
+  for (const chain of activeChains) {
     try {
-      const ab = db.getAutoBroadcast(run.auto_broadcast_id);
+      const ab = db.getAutoBroadcast(chain.id);
+      if (!ab || !ab.steps || ab.steps.length === 0) continue;
+
+      const matchingContacts = await getFilteredContacts(ab);
+      if (matchingContacts.length === 0) continue;
+
+      const alreadyEnrolled = db.getEnrolledContactIds(ab.id);
+      const newContacts = matchingContacts.filter(c => !alreadyEnrolled.has(String(c.telegram_id)));
+      if (newContacts.length === 0) continue;
+
+      console.log(`[auto-chain] "${ab.name}": ${newContacts.length} новых контактов`);
+
+      const step0 = ab.steps[0];
+      const prepared = await prepareStepMessages(ab, step0);
+
+      for (const contact of newContacts) {
+        try {
+          const ok = await sendPreparedToContact(ab, prepared, contact.telegram_id);
+          if (ok) {
+            // Вычисляем время следующего шага
+            let nextStepAt = null;
+            if (ab.steps.length > 1) {
+              const delayMs = computeDelayMs(ab.steps[1].delay_value, ab.steps[1].delay_unit);
+              nextStepAt = new Date(Date.now() + delayMs).toISOString();
+            }
+            db.enrollContact(ab.id, contact.telegram_id, nextStepAt);
+            if (ab.steps.length <= 1) {
+              // Единственный шаг — сразу завершаем
+              const enrolled = db.getEnrolledContactIds(ab.id);
+              // enrollContact уже вставил — обновим статус
+            }
+          }
+        } catch (e) {
+          console.error(`[auto-chain] Ошибка отправки шага 0 контакту ${contact.telegram_id}:`, e.message);
+        }
+        await new Promise(r => setTimeout(r, 35));
+      }
+    } catch (e) {
+      console.error(`[auto-chain] Ошибка обработки цепочки ${chain.id}:`, e.message);
+    }
+  }
+
+  // 2. Обработать enrollments, у которых пришло время следующего шага
+  const dueEnrollments = db.getDueEnrollments();
+  for (const enrollment of dueEnrollments) {
+    try {
+      const ab = db.getAutoBroadcast(enrollment.auto_broadcast_id);
       if (!ab || ab.status !== 'active') {
-        db.updateAutoRun(run.id, { status: 'completed', completed_at: new Date().toISOString() });
+        db.updateEnrollment(enrollment.id, { status: 'completed' });
         continue;
       }
 
       const steps = ab.steps || [];
-      const nextStep = run.current_step;
+      const nextStepIdx = enrollment.current_step + 1;
 
-      if (nextStep >= steps.length) {
-        db.updateAutoRun(run.id, { status: 'completed', completed_at: new Date().toISOString() });
+      if (nextStepIdx >= steps.length) {
+        db.updateEnrollment(enrollment.id, { status: 'completed' });
         continue;
       }
 
-      const step = steps[nextStep];
-      console.log(`[auto-chain] Отправка шага ${nextStep + 1}/${steps.length} для ${ab.name} (run=${run.id})`);
+      const step = steps[nextStepIdx];
+      const prepared = await prepareStepMessages(ab, step);
+      const ok = await sendPreparedToContact(ab, prepared, enrollment.contact_telegram_id);
 
-      await sendStepMessages(ab, step);
-
-      const nextIdx = nextStep + 1;
-      if (nextIdx >= steps.length) {
-        db.updateAutoRun(run.id, { current_step: nextIdx, status: 'completed', completed_at: new Date().toISOString() });
-        console.log(`[auto-chain] Цепочка "${ab.name}" завершена`);
+      if (ok) {
+        const afterNextIdx = nextStepIdx + 1;
+        if (afterNextIdx >= steps.length) {
+          db.updateEnrollment(enrollment.id, { current_step: nextStepIdx, status: 'completed', next_step_at: null });
+          console.log(`[auto-chain] Контакт ${enrollment.contact_telegram_id} завершил цепочку "${ab.name}"`);
+        } else {
+          const nextDelay = computeDelayMs(steps[afterNextIdx].delay_value, steps[afterNextIdx].delay_unit);
+          const nextStepAt = new Date(Date.now() + nextDelay).toISOString();
+          db.updateEnrollment(enrollment.id, { current_step: nextStepIdx, next_step_at: nextStepAt });
+          console.log(`[auto-chain] Контакт ${enrollment.contact_telegram_id}: шаг ${nextStepIdx + 1}/${steps.length}, след. через ${steps[afterNextIdx].delay_value} ${steps[afterNextIdx].delay_unit}`);
+        }
       } else {
-        // Вычисляем время следующего шага
-        const nextStepData = steps[nextIdx];
-        const delayMs = computeDelayMs(nextStepData.delay_value, nextStepData.delay_unit);
-        const nextStepAt = new Date(Date.now() + delayMs).toISOString();
-        db.updateAutoRun(run.id, { current_step: nextIdx, next_step_at: nextStepAt });
-        console.log(`[auto-chain] Следующий шаг ${nextIdx + 1} запланирован на ${nextStepAt}`);
+        db.updateEnrollment(enrollment.id, { status: 'error' });
       }
     } catch (e) {
-      console.error(`[auto-chain] Ошибка run=${run.id}:`, e.message);
-      db.updateAutoRun(run.id, { status: 'error', error: e.message });
+      console.error(`[auto-chain] Ошибка enrollment ${enrollment.id}:`, e.message);
+      db.updateEnrollment(enrollment.id, { status: 'error' });
     }
   }
+}
+
+// Получить контакты, подходящие под фильтры авторассылки
+async function getFilteredContacts(autoBroadcast) {
+  const bot = autoBroadcast.bot_id ? db.getBotById(autoBroadcast.bot_id) : null;
+  if (!bot) return [];
+
+  const tenant = db.getTenantById(autoBroadcast.tenant_id);
+  if (!tenant) return [];
+
+  const botConfig = {
+    leadtehApiToken: tenant.leadteh_api_token,
+    leadtehBotId: bot.leadteh_bot_id,
+    telegramBotToken: bot.token,
+  };
+
+  const allContacts = await fetchAllContacts(botConfig);
+  const filters = autoBroadcast.filters || {};
+  const listSchemaId = filters.list_schema_id || null;
+
+  let listTelegramIds = null;
+  if (listSchemaId) {
+    try {
+      const schemas = await fetchListSchemas(botConfig);
+      const schema = (Array.isArray(schemas) ? schemas : []).find(s => String(s.id) === String(listSchemaId));
+      const fields = schema?.fields || [];
+      const items = await fetchListItems(botConfig, listSchemaId);
+      listTelegramIds = new Set(extractTelegramIds(Array.isArray(items) ? items : [], fields));
+    } catch (e) {
+      console.error('[auto] Ошибка загрузки списка:', e.message);
+    }
+  }
+
+  const filterConditions = Array.isArray(filters.conditions) ? filters.conditions : null;
+  const filterOperators = Array.isArray(filters.operators) ? filters.operators : [];
+
+  return allContacts.filter(contact => {
+    if (!contact.telegram_id) return false;
+    if (listTelegramIds) return listTelegramIds.has(String(contact.telegram_id));
+    const contactTags = extractTags(contact);
+    if (filterConditions && filterConditions.length > 0) {
+      return evaluateFilterConditions(contactTags, filterConditions, filterOperators);
+    }
+    return true;
+  });
+}
+
+// Подготовить сообщения шага (без отправки)
+async function prepareStepMessages(autoBroadcast, step) {
+  const bot = db.getBotById(autoBroadcast.bot_id);
+  let botUsername = bot.bot_username || '';
+  if (!botUsername) {
+    try {
+      const r = await fetch(`https://api.telegram.org/bot${bot.token}/getMe`);
+      const data = await r.json();
+      if (data.ok) botUsername = data.result.username;
+    } catch (e) { /* ignore */ }
+  }
+
+  const messages = step.messages || [];
+  return {
+    botToken: bot.token,
+    tenantId: autoBroadcast.tenant_id,
+    messageDelay: step.message_delay || 0,
+    messages: messages.map(msg => ({
+      text: msg.text || '',
+      photoUrl: msg.photo_url || '',
+      keyboard: buildKeyboard(msg.buttons || [], botUsername),
+      parseMode: msg.parse_mode || null,
+    })),
+  };
+}
+
+// Отправить подготовленные сообщения одному контакту
+async function sendPreparedToContact(autoBroadcast, prepared, telegramId) {
+  for (let i = 0; i < prepared.messages.length; i++) {
+    const msg = prepared.messages[i];
+    try {
+      const r = await sendSingleMessage(
+        prepared.botToken,
+        telegramId,
+        msg.text,
+        msg.photoUrl,
+        msg.keyboard,
+        msg.parseMode,
+        prepared.tenantId
+      );
+      if (!r.ok) return false;
+    } catch (e) {
+      return false;
+    }
+    if (i < prepared.messages.length - 1) {
+      const delayMs = prepared.messageDelay * 1000 || 500;
+      await new Promise(r => setTimeout(r, delayMs));
+    }
+  }
+  return true;
 }
 
 // ============================================
@@ -1637,104 +1784,19 @@ async function processRecurringBroadcasts() {
 }
 
 // ============================================
-// Общая логика отправки шага авторассылки
+// Общая логика отправки шага авторассылки (для recurring — всем сразу)
 // ============================================
 async function sendStepMessages(autoBroadcast, step) {
-  const bot = autoBroadcast.bot_id ? db.getBotById(autoBroadcast.bot_id) : null;
-  if (!bot) throw new Error('Бот не найден');
-
-  const tenant = db.getTenantById(autoBroadcast.tenant_id);
-  if (!tenant) throw new Error('Тенант не найден');
-
-  const botConfig = {
-    leadtehApiToken: tenant.leadteh_api_token,
-    leadtehBotId: bot.leadteh_bot_id,
-    telegramBotToken: bot.token,
-  };
-
-  const allContacts = await fetchAllContacts(botConfig);
-  const filters = autoBroadcast.filters || {};
-  const listSchemaId = filters.list_schema_id || null;
-
-  // Фильтрация по списку
-  let listTelegramIds = null;
-  if (listSchemaId) {
-    try {
-      const schemas = await fetchListSchemas(botConfig);
-      const schema = (Array.isArray(schemas) ? schemas : []).find(
-        s => String(s.id) === String(listSchemaId)
-      );
-      const fields = schema?.fields || [];
-      const items = await fetchListItems(botConfig, listSchemaId);
-      listTelegramIds = new Set(extractTelegramIds(Array.isArray(items) ? items : [], fields));
-    } catch (e) {
-      console.error('[auto] Ошибка загрузки списка:', e.message);
-    }
-  }
-
-  const filterConditions = Array.isArray(filters.conditions) ? filters.conditions : null;
-  const filterOperators = Array.isArray(filters.operators) ? filters.operators : [];
-
-  const recipients = allContacts.filter(contact => {
-    if (!contact.telegram_id) return false;
-    if (listTelegramIds) return listTelegramIds.has(String(contact.telegram_id));
-    const contactTags = extractTags(contact);
-    if (filterConditions && filterConditions.length > 0) {
-      return evaluateFilterConditions(contactTags, filterConditions, filterOperators);
-    }
-    return true;
-  });
-
-  // Получаем username бота
-  let botUsername = bot.bot_username || '';
-  if (!botUsername) {
-    try {
-      const r = await fetch(`https://api.telegram.org/bot${bot.token}/getMe`);
-      const data = await r.json();
-      if (data.ok) botUsername = data.result.username;
-    } catch (e) { /* ignore */ }
-  }
-
-  const messages = step.messages || [];
-  const prepared = messages.map(msg => ({
-    text: msg.text || '',
-    photoUrl: msg.photo_url || '',
-    keyboard: buildKeyboard(msg.buttons || [], botUsername),
-    parseMode: msg.parse_mode || null,
-  }));
+  const recipients = await getFilteredContacts(autoBroadcast);
+  const prepared = await prepareStepMessages(autoBroadcast, step);
 
   let sent = 0;
   let failed = 0;
 
   for (const contact of recipients) {
-    let contactFailed = false;
-    for (let i = 0; i < prepared.length; i++) {
-      const msg = prepared[i];
-      try {
-        const r = await sendSingleMessage(
-          bot.token,
-          contact.telegram_id,
-          msg.text,
-          msg.photoUrl,
-          msg.keyboard,
-          msg.parseMode,
-          autoBroadcast.tenant_id
-        );
-        if (!r.ok) {
-          contactFailed = true;
-          break;
-        }
-      } catch (e) {
-        contactFailed = true;
-        break;
-      }
-      if (i < prepared.length - 1) {
-        const delayMs = (step.message_delay || 0) * 1000 || 500;
-        await new Promise(r => setTimeout(r, delayMs));
-      }
-    }
-    if (contactFailed) failed++;
-    else sent++;
+    const ok = await sendPreparedToContact(autoBroadcast, prepared, contact.telegram_id);
+    if (ok) sent++;
+    else failed++;
     await new Promise(r => setTimeout(r, 35));
   }
 

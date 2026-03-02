@@ -857,7 +857,7 @@
         <div id="autoStep1" class="step-content fade-in">
           <div class="hint-box">
             <strong>Шаг 1 из 4 — Основные настройки</strong><br>
-            Выберите тип: <em>Цепочка</em> — серия шагов с задержками между ними (воронка), <em>Расписание</em> — повторяющаяся отправка по дням недели. Укажите название и бота.
+            Выберите тип: <em>Цепочка</em> — персональная воронка: каждый новый контакт, попадающий под фильтр, получает шаги со своими задержками. <em>Расписание</em> — повторяющаяся отправка всем по дням недели. Укажите название и бота.
           </div>
           <div class="mb-3">
             <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Тип авторассылки</label>
@@ -901,7 +901,7 @@
         <div id="autoStep2" class="step-content fade-in hidden">
           <div class="hint-box">
             <strong>Шаг 2 из 4 — Шаги цепочки</strong><br>
-            Добавьте от 1 до 5 шагов. Каждый шаг — это набор сообщений, которые отправляются получателю друг за другом. Между шагами задаётся задержка (минуты, часы, дни). Нажмите «Редактировать» чтобы наполнить шаг сообщениями.
+            Добавьте от 1 до 5 шагов воронки. Когда контакт попадает под фильтр, он получает шаг 1. Через заданную задержку — шаг 2, и так далее. Каждый контакт проходит цепочку индивидуально. Нажмите «Редактировать» чтобы наполнить шаг сообщениями.
           </div>
           <h3 class="text-sm font-bold mb-2">Шаги цепочки</h3>
           <div id="autoStepsList"></div>
@@ -980,7 +980,7 @@
         <div id="autoStep5" class="step-content fade-in hidden">
           <div class="hint-box">
             <strong>Шаг 3 из 4 — Фильтры получателей</strong><br>
-            Определите, кому отправлять сообщения. Если фильтры не заданы — рассылка пойдёт всем контактам с telegram_id. Контакты пересобираются заново при каждой отправке, так что новые подписчики тоже получат сообщения.
+            Определите, кому отправлять сообщения. Для цепочки: система каждую минуту проверяет, кто подходит под фильтр — новые контакты автоматически попадают в воронку и получают шаги с заданными задержками. Если фильтры не заданы — все контакты с telegram_id.
           </div>
           <h3 class="text-sm font-bold mb-2">Фильтры получателей</h3>
           <div id="autoFiltersContainer"></div>
@@ -3305,6 +3305,7 @@
           }
         }
         showAutoStep(5);
+        if (allTags.length === 0) loadTags();
         renderAutoFilters();
         return;
       }
@@ -3389,6 +3390,7 @@
       if (autoType === 'recurring') {
         // recurring — из редактора сообщений назад к фильтрам
         showAutoStep(5);
+        if (allTags.length === 0) loadTags();
         renderAutoFilters();
       } else {
         showAutoStep(2);
@@ -3563,6 +3565,7 @@
           </div>
         </div>`;
       renderAutoFilterConditions();
+      updateAutoContactsCount();
     }
 
     function renderAutoFilterConditions() {
@@ -3573,19 +3576,19 @@
         const div = document.createElement('div');
         div.className = 'flex items-center gap-2 mb-1';
         const operatorHtml = i > 0 ? `
-          <select onchange="autoFilterOperators[${i - 1}]=this.value" class="input-field rounded px-2 py-1 text-xs" style="width:55px">
+          <select onchange="autoFilterOperators[${i - 1}]=this.value;updateAutoContactsCount()" class="input-field rounded px-2 py-1 text-xs" style="width:55px">
             <option value="AND" ${(autoFilterOperators[i - 1] || 'AND') === 'AND' ? 'selected' : ''}>И</option>
             <option value="OR" ${autoFilterOperators[i - 1] === 'OR' ? 'selected' : ''}>ИЛИ</option>
           </select>` : '';
         div.innerHTML = `
           ${operatorHtml}
-          <select onchange="autoFilterConditions[${i}].type=this.value" class="input-field rounded px-2 py-1 text-xs">
+          <select onchange="autoFilterConditions[${i}].type=this.value;updateAutoContactsCount()" class="input-field rounded px-2 py-1 text-xs">
             <option value="has" ${cond.type === 'has' ? 'selected' : ''}>Есть тег</option>
             <option value="not" ${cond.type === 'not' ? 'selected' : ''}>Нет тега</option>
           </select>
-          <input type="text" value="${escapeAttr(cond.tag)}" placeholder="Тег" oninput="autoFilterConditions[${i}].tag=this.value"
+          <input type="text" value="${escapeAttr(cond.tag)}" placeholder="Тег" oninput="autoFilterConditions[${i}].tag=this.value;updateAutoContactsCount()"
             class="input-field flex-1 rounded px-2 py-1 text-xs" list="autoTagSuggestions" />
-          <button onclick="autoFilterConditions.splice(${i},1);if(${i}>0)autoFilterOperators.splice(${i}-1,1);renderAutoFilterConditions()" class="text-xs" style="color:var(--danger)">&#10005;</button>`;
+          <button onclick="autoFilterConditions.splice(${i},1);if(${i}>0)autoFilterOperators.splice(${i}-1,1);renderAutoFilterConditions();updateAutoContactsCount()" class="text-xs" style="color:var(--danger)">&#10005;</button>`;
         container.appendChild(div);
       });
       // datalist с тегами
@@ -3598,6 +3601,44 @@
       if (autoFilterConditions.length > 0) autoFilterOperators.push('AND');
       autoFilterConditions.push({ type: 'has', tag: '' });
       renderAutoFilterConditions();
+      updateAutoContactsCount();
+    }
+
+    let autoCountTimeout = null;
+    function updateAutoContactsCount() {
+      clearTimeout(autoCountTimeout);
+      autoCountTimeout = setTimeout(async () => {
+        const el = document.getElementById('autoContactsCount');
+        if (!el) return;
+        const botId = document.getElementById('autoBotSelect')?.value;
+        if (!botId) { el.innerHTML = '<span class="text-xs" style="color:var(--danger)">Бот не выбран</span>'; return; }
+        const botParam = `bot_id=${botId}`;
+        const active = autoFilterConditions.filter(c => c.tag.trim());
+        const hasFilters = active.length > 0;
+
+        if (!hasFilters) {
+          el.innerHTML = '<span class="text-sm" style="color:var(--text-secondary)">Подсчёт...</span>';
+          try {
+            const r = await apiFetch(`/api/contacts?count_only=true&${botParam}`);
+            const data = await r.json();
+            el.innerHTML = `<span class="text-sm font-medium" style="color:var(--accent)">Получателей: ~${data.count}</span>`;
+          } catch (e) { el.innerHTML = ''; }
+          return;
+        }
+        el.innerHTML = '<span class="text-sm" style="color:var(--text-secondary)">Подсчёт...</span>';
+        try {
+          const params = new URLSearchParams();
+          params.set('conditions', JSON.stringify(active));
+          params.set('operators', JSON.stringify(autoFilterOperators.slice(0, active.length - 1)));
+          params.set('count_only', 'true');
+          params.set('bot_id', botId);
+          const r = await apiFetch(`/api/contacts?${params}`);
+          const data = await r.json();
+          el.innerHTML = `<span class="text-sm font-medium" style="color:var(--accent)">Получателей: ~${data.count}</span>`;
+        } catch (e) {
+          el.innerHTML = '<span class="text-sm" style="color:var(--danger)">Ошибка подсчёта</span>';
+        }
+      }, 500);
     }
 
     // --- Подтверждение ---
@@ -3722,14 +3763,15 @@
             infoHtml += ` <span class="text-xs" style="color:var(--text-muted)">| ${days} в ${ab.schedule.time || '—'}</span>`;
           } else if (ab.type === 'chain') {
             infoHtml += ` <span class="text-xs" style="color:var(--text-muted)">| ${ab.steps_count || 0} шагов</span>`;
-            if (ab.active_runs > 0) infoHtml += ` <span class="text-xs" style="color:var(--accent)">| Запущена</span>`;
+            if (ab.enrolled_total > 0) {
+              infoHtml += ` <span class="text-xs" style="color:var(--accent)">| ${ab.enrolled_active || 0} в воронке, ${ab.enrolled_completed || 0} завершили</span>`;
+            }
           }
           if (ab.bot_name) infoHtml += ` <span class="text-xs" style="color:var(--text-muted)">| ${escapeHtml(ab.bot_name)}</span>`;
 
           let actionsHtml = '';
           if (ab.status === 'active') {
             actionsHtml += `<button onclick="toggleAutoStatus('${ab.id}','pause')" class="text-xs btn-secondary rounded-lg px-2 py-1">Пауза</button>`;
-            if (ab.type === 'chain') actionsHtml += ` <button onclick="toggleAutoStatus('${ab.id}','start')" class="text-xs btn-secondary rounded-lg px-2 py-1">Запустить</button>`;
           } else if (ab.status === 'paused') {
             actionsHtml += `<button onclick="toggleAutoStatus('${ab.id}','resume')" class="text-xs btn-primary rounded-lg px-2 py-1">Возобновить</button>`;
           }
