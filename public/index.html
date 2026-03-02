@@ -583,6 +583,19 @@
           class="w-full py-2 rounded-xl text-sm btn-secondary mt-2">
           + Добавить сообщение
         </button>
+
+        <div id="messageDelayBlock" class="hidden mt-3">
+          <label class="text-xs mb-1 flex items-center" style="color: var(--text-secondary)">
+            Задержка между сообщениями
+            <span class="tooltip-trigger">?<span class="tooltip-text">Пауза (в секундах) перед отправкой следующего сообщения одному получателю. Делает рассылку естественнее</span></span>
+          </label>
+          <div class="flex items-center gap-3">
+            <input type="range" id="messageDelayRange" min="0" max="60" value="0" step="1"
+              class="flex-1" style="accent-color: var(--accent)"
+              oninput="onMessageDelayChange(this.value)" />
+            <span id="messageDelayValue" class="text-sm font-medium" style="color: var(--accent); min-width: 40px; text-align: right">0 сек</span>
+          </div>
+        </div>
       </div>
 
       <!-- Шаг 2: Редактор сообщения -->
@@ -915,6 +928,7 @@
 
     let messages = [{ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown' }];
     let currentMessageIndex = 0;
+    let messageDelay = 0;
 
     let allLists = [];
     let selectedListId = '';
@@ -1332,6 +1346,12 @@
         container.appendChild(card);
       });
       document.getElementById('addMessageBtn').classList.toggle('hidden', messages.length >= 5);
+      document.getElementById('messageDelayBlock').classList.toggle('hidden', messages.length < 2);
+    }
+
+    function onMessageDelayChange(val) {
+      messageDelay = parseInt(val) || 0;
+      document.getElementById('messageDelayValue').textContent = messageDelay + ' сек';
     }
 
     function addMessage() {
@@ -1994,6 +2014,13 @@
         container.appendChild(card);
       });
 
+      if (messages.length > 1 && messageDelay > 0) {
+        const delayCard = document.createElement('div');
+        delayCard.className = 'broadcast-card mb-3';
+        delayCard.innerHTML = `<div class="text-xs" style="color:var(--text-secondary)">Задержка между сообщениями: <b>${messageDelay} сек</b></div>`;
+        container.appendChild(delayCard);
+      }
+
       const filtersHtml = [];
       const active = getActiveFilters();
       if (active.conditions.length > 0) {
@@ -2172,6 +2199,7 @@
           method: 'POST',
           body: {
             name: document.getElementById('broadcastName').value.trim(),
+            message_delay: messageDelay || 0,
             messages: messages.map(msg => ({
               photo_url: msg.photo_url || '',
               text: msg.text.trim(),
@@ -2216,6 +2244,9 @@
     function resetForm() {
       messages = [{ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown' }];
       currentMessageIndex = 0;
+      messageDelay = 0;
+      document.getElementById('messageDelayRange').value = 0;
+      document.getElementById('messageDelayValue').textContent = '0 сек';
       filterConditions = [];
       filterOperators = [];
       selectedListId = '';

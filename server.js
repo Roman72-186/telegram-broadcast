@@ -577,7 +577,7 @@ app.get('/api/recipients/preview/:cacheId', requireTenantAdmin, (req, res) => {
 // ============================================
 app.post('/api/broadcast/save', requireTenantAdmin, (req, res) => {
   try {
-    const { name, parse_mode, messages, text, buttons, filters, scheduled_at, bot_id } = req.body;
+    const { name, parse_mode, messages, text, buttons, filters, scheduled_at, bot_id, message_delay } = req.body;
 
     // Валидация parse_mode (общий — для обратной совместимости)
     if (parse_mode && !VALID_PARSE_MODES.includes(parse_mode)) {
@@ -682,6 +682,8 @@ app.post('/api/broadcast/save', requireTenantAdmin, (req, res) => {
     broadcastFilters.list_schema_id = filters?.list_schema_id || null;
     broadcastFilters.list_name = filters?.list_name || null;
 
+    const delaySeconds = Math.max(0, Math.min(300, parseInt(message_delay) || 0));
+
     const broadcast = {
       id,
       name: name || '',
@@ -691,6 +693,7 @@ app.post('/api/broadcast/save', requireTenantAdmin, (req, res) => {
       bot_id: broadcastBot ? broadcastBot.id : null,
       scheduled_at: scheduled_at || new Date().toISOString(),
       created_by: req.telegramId,
+      message_delay: delaySeconds,
     };
 
     db.saveBroadcast(req.tenantId, broadcast);
@@ -1431,7 +1434,8 @@ async function sendBroadcast(broadcast) {
       }
 
       if (i < prepared.length - 1) {
-        await new Promise(r => setTimeout(r, 500));
+        const delayMs = (broadcast.message_delay || 0) * 1000 || 500;
+        await new Promise(r => setTimeout(r, delayMs));
       }
     }
 
