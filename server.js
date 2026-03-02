@@ -45,6 +45,14 @@ setInterval(() => {
 }, 300000);
 
 app.use(express.json({ limit: '15mb' }));
+
+// Cache-bust: редирект / без версии → /?v=timestamp (сбрасывает кэш Telegram WebApp)
+const APP_VERSION = Date.now().toString(36);
+app.get('/', (req, res, next) => {
+  if (!req.query.v) return res.redirect(`/?v=${APP_VERSION}`);
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.html')) {
