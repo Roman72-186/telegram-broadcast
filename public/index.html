@@ -544,11 +544,15 @@
     <div id="mainTabs" class="flex gap-2 mb-4">
       <button id="tabCreate" onclick="showTab('create')"
         class="flex-1 py-2 px-3 rounded-lg text-sm font-medium btn-primary">
-        Создать рассылку
+        Создать
       </button>
       <button id="tabList" onclick="showTab('list')"
         class="flex-1 py-2 px-3 rounded-lg text-sm font-medium btn-secondary">
-        Мои рассылки
+        Рассылки
+      </button>
+      <button id="tabAuto" onclick="showTab('auto')"
+        class="flex-1 py-2 px-3 rounded-lg text-sm font-medium btn-secondary">
+        Авто
       </button>
       <button id="tabSettings" onclick="showTab('settings')"
         class="py-2 px-3 rounded-lg text-sm font-medium btn-secondary" title="Настройки">
@@ -793,6 +797,165 @@
       <div id="listContent"></div>
       <div id="listEmpty" class="hidden text-center py-8">
         <div class="text-sm" style="color: var(--text-secondary)">Нет рассылок</div>
+      </div>
+    </div>
+
+    <!-- TAB: Авторассылки -->
+    <div id="autoTab" class="hidden">
+      <!-- Список авторассылок -->
+      <div id="autoListView">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-bold">Авторассылки</h2>
+          <button onclick="showAutoCreate()" class="py-2 px-4 rounded-lg text-sm font-medium btn-primary">+ Создать</button>
+        </div>
+        <div id="autoLoading" class="text-center py-8">
+          <div class="text-sm" style="color: var(--text-secondary)">Загрузка...</div>
+        </div>
+        <div id="autoListContent"></div>
+        <div id="autoEmpty" class="hidden text-center py-8">
+          <div class="text-sm" style="color: var(--text-secondary)">Нет авторассылок</div>
+          <button onclick="showAutoCreate()" class="mt-3 py-2 px-4 rounded-lg text-sm font-medium btn-primary">Создать первую</button>
+        </div>
+      </div>
+
+      <!-- Создание авторассылки -->
+      <div id="autoCreateView" class="hidden">
+        <div class="flex items-center mb-4">
+          <button onclick="hideAutoCreate()" class="mr-2 text-sm" style="color:var(--text-secondary)">← Назад</button>
+          <h2 class="text-lg font-bold">Новая авторассылка</h2>
+        </div>
+
+        <!-- Шаг A1: Тип + название + бот -->
+        <div id="autoStep1" class="step-content fade-in">
+          <div class="mb-3">
+            <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Тип</label>
+            <div class="flex gap-2">
+              <button id="autoTypeChain" onclick="setAutoType('chain')" class="flex-1 py-2 px-3 rounded-lg text-sm font-medium btn-primary">Цепочка</button>
+              <button id="autoTypeRecurring" onclick="setAutoType('recurring')" class="flex-1 py-2 px-3 rounded-lg text-sm font-medium btn-secondary">Расписание</button>
+            </div>
+            <p id="autoTypeHint" class="text-xs mt-1" style="color: var(--text-secondary)">До 5 шагов с задержками между ними</p>
+          </div>
+
+          <div class="mb-3">
+            <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Название</label>
+            <input type="text" id="autoName" placeholder="Например: Приветственная цепочка" class="input-field w-full rounded-lg px-3 py-2 text-sm" />
+          </div>
+
+          <div class="mb-3" id="autoBotSelector">
+            <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Бот</label>
+            <select id="autoBotSelect" class="input-field w-full rounded-lg px-3 py-2 text-sm font-medium"></select>
+          </div>
+
+          <!-- Расписание (только для recurring) -->
+          <div id="autoScheduleBlock" class="hidden mb-3">
+            <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Дни недели</label>
+            <div class="flex gap-1 flex-wrap mb-2" id="autoDaysContainer">
+              <label class="flex items-center gap-1 text-sm px-2 py-1 rounded-lg" style="background:var(--bg-card)"><input type="checkbox" value="1" onchange="onAutoDayChange()"> Пн</label>
+              <label class="flex items-center gap-1 text-sm px-2 py-1 rounded-lg" style="background:var(--bg-card)"><input type="checkbox" value="2" onchange="onAutoDayChange()"> Вт</label>
+              <label class="flex items-center gap-1 text-sm px-2 py-1 rounded-lg" style="background:var(--bg-card)"><input type="checkbox" value="3" onchange="onAutoDayChange()"> Ср</label>
+              <label class="flex items-center gap-1 text-sm px-2 py-1 rounded-lg" style="background:var(--bg-card)"><input type="checkbox" value="4" onchange="onAutoDayChange()"> Чт</label>
+              <label class="flex items-center gap-1 text-sm px-2 py-1 rounded-lg" style="background:var(--bg-card)"><input type="checkbox" value="5" onchange="onAutoDayChange()"> Пт</label>
+              <label class="flex items-center gap-1 text-sm px-2 py-1 rounded-lg" style="background:var(--bg-card)"><input type="checkbox" value="6" onchange="onAutoDayChange()"> Сб</label>
+              <label class="flex items-center gap-1 text-sm px-2 py-1 rounded-lg" style="background:var(--bg-card)"><input type="checkbox" value="0" onchange="onAutoDayChange()"> Вс</label>
+            </div>
+            <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Время (МСК)</label>
+            <input type="time" id="autoScheduleTime" value="10:00" class="input-field rounded-lg px-3 py-2 text-sm" />
+          </div>
+
+          <button onclick="autoNextStep(1)" class="w-full py-3 rounded-xl text-sm font-bold btn-primary mt-2">Далее</button>
+        </div>
+
+        <!-- Шаг A2: Шаги цепочки -->
+        <div id="autoStep2" class="step-content fade-in hidden">
+          <h3 class="text-sm font-bold mb-2">Шаги цепочки</h3>
+          <p class="text-xs mb-3" style="color: var(--text-secondary)">Каждый шаг — набор сообщений. Между шагами — задержка.</p>
+          <div id="autoStepsList"></div>
+          <button id="autoAddStepBtn" onclick="addAutoStep()" class="w-full py-2 rounded-xl text-sm btn-secondary mt-2">+ Добавить шаг</button>
+          <div class="flex gap-2 mt-4">
+            <button onclick="autoBackStep(2)" class="flex-1 py-3 rounded-xl text-sm font-bold btn-secondary">Назад</button>
+            <button onclick="autoNextStep(2)" class="flex-1 py-3 rounded-xl text-sm font-bold btn-primary">Далее</button>
+          </div>
+        </div>
+
+        <!-- Шаг A3: Редактор сообщений шага -->
+        <div id="autoStep3" class="step-content fade-in hidden">
+          <div class="flex items-center mb-3">
+            <button onclick="autoBackToSteps()" class="mr-2 text-sm" style="color:var(--text-secondary)">← К шагам</button>
+            <h3 class="text-sm font-bold" id="autoStepEditorTitle">Шаг 1 — Сообщения</h3>
+          </div>
+          <div id="autoMsgList"></div>
+          <button id="autoAddMsgBtn" onclick="addAutoMessage()" class="w-full py-2 rounded-xl text-sm btn-secondary mt-2">+ Добавить сообщение</button>
+          <div class="mt-3">
+            <label class="text-xs mb-1 flex items-center" style="color: var(--text-secondary)">
+              Задержка между сообщениями
+            </label>
+            <div class="flex items-center gap-3">
+              <input type="range" id="autoMsgDelayRange" min="0" max="60" value="0" step="1"
+                class="flex-1" style="accent-color: var(--accent)"
+                oninput="onAutoMsgDelayChange(this.value)" />
+              <span id="autoMsgDelayValue" class="text-sm font-medium" style="color: var(--accent); min-width: 40px; text-align: right">0 сек</span>
+            </div>
+          </div>
+          <button onclick="autoBackToSteps()" class="w-full py-3 rounded-xl text-sm font-bold btn-primary mt-4">Готово</button>
+        </div>
+
+        <!-- Шаг A4: Редактор одного сообщения авторассылки -->
+        <div id="autoStep4" class="step-content fade-in hidden">
+          <div class="flex items-center mb-3">
+            <button onclick="autoBackToMsgList()" class="mr-2 text-sm" style="color:var(--text-secondary)">← К сообщениям</button>
+            <h3 class="text-sm font-bold" id="autoMsgEditorTitle">Сообщение 1</h3>
+          </div>
+          <div class="broadcast-card mb-3">
+            <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Формат текста</label>
+            <select id="autoMsgParseMode" onchange="onAutoMsgParseModeChange()"
+              class="input-field w-full rounded-lg px-3 py-2 text-sm font-medium mb-2">
+              <option value="Markdown">Markdown</option>
+              <option value="MarkdownV2">MarkdownV2</option>
+              <option value="HTML">HTML</option>
+            </select>
+            <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Фото (необязательно)</label>
+            <div class="flex gap-2 mb-2">
+              <input type="text" id="autoMsgPhotoUrl" placeholder="URL или загрузите" class="input-field flex-1 rounded-lg px-3 py-2 text-sm" oninput="onAutoMsgPhotoChange()" />
+              <label class="py-2 px-3 rounded-lg text-sm font-medium btn-secondary cursor-pointer shrink-0">
+                Загрузить
+                <input type="file" accept="image/*" class="hidden" onchange="autoUploadPhoto(event)" />
+              </label>
+            </div>
+            <div id="autoMsgPhotoPreview" class="hidden mb-2"><img class="w-full rounded-lg" style="max-height:150px;object-fit:cover" /></div>
+            <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Текст сообщения</label>
+            <textarea id="autoMsgText" rows="5" class="input-field w-full rounded-lg px-3 py-2 text-sm resize-y" placeholder="Текст сообщения..." oninput="onAutoMsgTextChange()"></textarea>
+          </div>
+          <div class="broadcast-card mb-3">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-medium" style="color: var(--text-secondary)">Кнопки</span>
+              <button onclick="autoAddButton()" class="text-xs btn-secondary rounded-lg px-3 py-1" id="autoAddBtnBtn">+ Кнопка</button>
+            </div>
+            <div id="autoButtonsList"></div>
+          </div>
+          <button onclick="autoBackToMsgList()" class="w-full py-3 rounded-xl text-sm font-bold btn-primary">Готово</button>
+        </div>
+
+        <!-- Шаг A5: Фильтры -->
+        <div id="autoStep5" class="step-content fade-in hidden">
+          <h3 class="text-sm font-bold mb-2">Фильтры получателей</h3>
+          <p class="text-xs mb-3" style="color: var(--text-secondary)">Такие же как в обычной рассылке. При каждой отправке контакты пересобираются.</p>
+          <div id="autoFiltersContainer"></div>
+          <div id="autoContactsCount" class="mt-2"></div>
+          <div class="flex gap-2 mt-4">
+            <button onclick="autoBackStep(5)" class="flex-1 py-3 rounded-xl text-sm font-bold btn-secondary">Назад</button>
+            <button onclick="autoNextStep(5)" class="flex-1 py-3 rounded-xl text-sm font-bold btn-primary">Далее</button>
+          </div>
+        </div>
+
+        <!-- Шаг A6: Подтверждение -->
+        <div id="autoStep6" class="step-content fade-in hidden">
+          <h3 class="text-sm font-bold mb-2">Подтверждение</h3>
+          <div id="autoConfirmContent" class="broadcast-card mb-3 text-sm"></div>
+          <div class="flex gap-2 mt-4">
+            <button onclick="autoBackStep(6)" class="flex-1 py-3 rounded-xl text-sm font-bold btn-secondary">Назад</button>
+            <button id="autoSaveBtn" onclick="saveAutoBroadcast()" class="flex-1 py-3 rounded-xl text-sm font-bold btn-primary">Сохранить и запустить</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1184,12 +1347,14 @@
       const tabs = {
         create: document.getElementById('createTab'),
         list: document.getElementById('listTab'),
+        auto: document.getElementById('autoTab'),
         settings: document.getElementById('settingsTab'),
         super: document.getElementById('superTab'),
       };
       const buttons = {
         create: document.getElementById('tabCreate'),
         list: document.getElementById('tabList'),
+        auto: document.getElementById('tabAuto'),
         settings: document.getElementById('tabSettings'),
         super: document.getElementById('tabSuper'),
       };
@@ -1215,6 +1380,7 @@
       }
 
       if (tab === 'list') loadBroadcasts();
+      if (tab === 'auto') loadAutoBroadcasts();
       if (tab === 'settings') loadSettings();
       if (tab === 'super') loadSuperData();
     }
@@ -2427,19 +2593,56 @@
     }
 
     async function repeatBroadcast(id) {
-      if (!confirm('Повторить эту рассылку? Будет создана копия и отправлена сейчас.')) return;
       try {
-        const r = await apiFetch('/api/broadcast/repeat', { method: 'POST', body: { id } });
+        const r = await apiFetch(`/api/broadcast/${id}/data`);
         const data = await r.json();
-        if (data.ok) {
-          showAlert('Рассылка создана и запланирована!');
-          loadBroadcasts();
-        } else {
-          showAlert(data.error || 'Ошибка повтора');
-        }
+        if (!data.broadcast) { showAlert(data.error || 'Ошибка загрузки данных'); return; }
+        fillFormFromBroadcast(data.broadcast);
       } catch (e) {
-        showAlert('Ошибка повтора рассылки');
+        showAlert('Ошибка загрузки данных рассылки');
       }
+    }
+
+    function fillFormFromBroadcast(data) {
+      // Заполняем сообщения
+      messages = (data.messages || []).map(m => ({
+        photo_url: m.photo_url || '',
+        text: m.text || '',
+        buttons: (m.buttons || []).map(b => ({ text: b.text, type: b.type, value: b.value, style: b.style || '' })),
+        parse_mode: m.parse_mode || 'Markdown',
+      }));
+      if (messages.length === 0) messages = [{ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown' }];
+      currentMessageIndex = 0;
+
+      // Заполняем фильтры
+      const f = data.filters || {};
+      filterConditions = Array.isArray(f.conditions) ? f.conditions : [];
+      filterOperators = Array.isArray(f.operators) ? f.operators : [];
+      selectedListId = f.list_schema_id || '';
+      selectedListName = f.list_name || '';
+
+      // Бот и задержка
+      selectedBotId = data.bot_id ? String(data.bot_id) : '';
+      messageDelay = data.message_delay || 0;
+
+      // Название
+      const nameInput = document.getElementById('broadcastName');
+      if (nameInput) nameInput.value = (data.name || '') + ' (повтор)';
+
+      // Задержка между сообщениями
+      const delayRange = document.getElementById('messageDelayRange');
+      if (delayRange) delayRange.value = messageDelay;
+      const delayLabel = document.getElementById('messageDelayValue');
+      if (delayLabel) delayLabel.textContent = messageDelay + ' сек';
+
+      // Выбираем бота в селекте
+      const botSelect = document.getElementById('step1BotSelect');
+      if (botSelect && selectedBotId) botSelect.value = selectedBotId;
+
+      // Переключаемся на таб создания
+      showTab('create');
+      showStep(1);
+      showAlert('Данные рассылки загружены. Измените что нужно и отправьте.');
     }
 
     async function deleteBroadcast(id) {
@@ -2949,6 +3152,575 @@
         e.stopPropagation();
       }
     });
+
+    // ============================================
+    // Авторассылки
+    // ============================================
+    let autoType = 'chain';
+    let autoSteps = [{ messages: [{ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown' }], delay_value: 0, delay_unit: 'hours', message_delay: 0 }];
+    let autoSchedule = { days: [], time: '10:00' };
+    let currentAutoStep = 0;
+    let currentAutoMsgIndex = 0;
+    let autoFilterConditions = [];
+    let autoFilterOperators = [];
+    let autoSelectedListId = '';
+    let autoSelectedListName = '';
+
+    function setAutoType(type) {
+      autoType = type;
+      document.getElementById('autoTypeChain').className = 'flex-1 py-2 px-3 rounded-lg text-sm font-medium ' + (type === 'chain' ? 'btn-primary' : 'btn-secondary');
+      document.getElementById('autoTypeRecurring').className = 'flex-1 py-2 px-3 rounded-lg text-sm font-medium ' + (type === 'recurring' ? 'btn-primary' : 'btn-secondary');
+      document.getElementById('autoScheduleBlock').classList.toggle('hidden', type !== 'recurring');
+      document.getElementById('autoTypeHint').textContent = type === 'chain' ? 'До 5 шагов с задержками между ними' : 'Повтор по дням недели в заданное время';
+    }
+
+    function onAutoDayChange() {
+      autoSchedule.days = [];
+      document.querySelectorAll('#autoDaysContainer input:checked').forEach(cb => {
+        autoSchedule.days.push(parseInt(cb.value));
+      });
+    }
+
+    function showAutoCreate() {
+      document.getElementById('autoListView').classList.add('hidden');
+      document.getElementById('autoCreateView').classList.remove('hidden');
+      // Сбрасываем состояние
+      autoType = 'chain';
+      autoSteps = [{ messages: [{ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown' }], delay_value: 0, delay_unit: 'hours', message_delay: 0 }];
+      autoSchedule = { days: [], time: '10:00' };
+      autoFilterConditions = [];
+      autoFilterOperators = [];
+      autoSelectedListId = '';
+      autoSelectedListName = '';
+      currentAutoStep = 0;
+      currentAutoMsgIndex = 0;
+      document.getElementById('autoName').value = '';
+      document.getElementById('autoScheduleTime').value = '10:00';
+      document.querySelectorAll('#autoDaysContainer input').forEach(cb => cb.checked = false);
+      setAutoType('chain');
+      // Заполняем боты
+      const select = document.getElementById('autoBotSelect');
+      select.innerHTML = '';
+      for (const bot of allBots) {
+        const opt = document.createElement('option');
+        opt.value = bot.id;
+        opt.textContent = bot.name;
+        select.appendChild(opt);
+      }
+      showAutoStep(1);
+    }
+
+    function hideAutoCreate() {
+      document.getElementById('autoCreateView').classList.add('hidden');
+      document.getElementById('autoListView').classList.remove('hidden');
+    }
+
+    function showAutoStep(step) {
+      for (let i = 1; i <= 6; i++) {
+        const el = document.getElementById('autoStep' + i);
+        if (el) el.classList.add('hidden');
+      }
+      const el = document.getElementById('autoStep' + step);
+      if (el) { el.classList.remove('hidden'); el.classList.add('fade-in'); }
+    }
+
+    function autoNextStep(current) {
+      if (current === 1) {
+        const name = document.getElementById('autoName').value.trim();
+        if (!name) { showAlert('Введите название'); return; }
+        if (autoType === 'recurring') {
+          autoSchedule.time = document.getElementById('autoScheduleTime').value;
+          if (autoSchedule.days.length === 0) { showAlert('Выберите дни недели'); return; }
+          // recurring — 1 шаг, сразу к редактору сообщений
+          if (autoSteps.length === 0) autoSteps = [{ messages: [{ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown' }], delay_value: 0, delay_unit: 'hours', message_delay: 0 }];
+          currentAutoStep = 0;
+          showAutoStep(3);
+          renderAutoMsgList();
+          return;
+        }
+        // chain — к шагам
+        showAutoStep(2);
+        renderAutoSteps();
+        return;
+      }
+      if (current === 2) {
+        // Валидация: все шаги должны иметь хотя бы одно сообщение с текстом
+        for (let i = 0; i < autoSteps.length; i++) {
+          for (let j = 0; j < autoSteps[i].messages.length; j++) {
+            if (!autoSteps[i].messages[j].text.trim()) {
+              showAlert(`Заполните текст в шаге ${i + 1}, сообщении ${j + 1}`);
+              return;
+            }
+          }
+        }
+        showAutoStep(5);
+        renderAutoFilters();
+        return;
+      }
+      if (current === 5) {
+        showAutoStep(6);
+        renderAutoConfirm();
+        return;
+      }
+    }
+
+    function autoBackStep(current) {
+      if (current === 2) { showAutoStep(1); return; }
+      if (current === 5) {
+        if (autoType === 'recurring') { showAutoStep(3); renderAutoMsgList(); }
+        else { showAutoStep(2); renderAutoSteps(); }
+        return;
+      }
+      if (current === 6) { showAutoStep(5); return; }
+    }
+
+    // --- Шаги цепочки ---
+    function renderAutoSteps() {
+      const container = document.getElementById('autoStepsList');
+      container.innerHTML = '';
+      autoSteps.forEach((step, i) => {
+        const div = document.createElement('div');
+        div.className = 'broadcast-card mb-2 fade-in';
+        const msgCount = step.messages.length;
+        const hasText = step.messages.some(m => m.text.trim());
+        const statusIcon = hasText ? '<span style="color:var(--accent)">&#10003;</span>' : '<span style="color:var(--text-muted)">&#9744;</span>';
+        const delayHtml = i > 0 ? `
+          <div class="flex items-center gap-2 mt-2 pt-2" style="border-top:1px solid var(--border)">
+            <span class="text-xs" style="color:var(--text-secondary)">Задержка:</span>
+            <input type="number" min="0" max="999" value="${step.delay_value}" onchange="autoSteps[${i}].delay_value=parseInt(this.value)||0"
+              class="input-field rounded px-2 py-1 text-xs" style="width:60px" />
+            <select onchange="autoSteps[${i}].delay_unit=this.value" class="input-field rounded px-2 py-1 text-xs">
+              <option value="minutes" ${step.delay_unit === 'minutes' ? 'selected' : ''}>мин</option>
+              <option value="hours" ${step.delay_unit === 'hours' ? 'selected' : ''}>час</option>
+              <option value="days" ${step.delay_unit === 'days' ? 'selected' : ''}>дн</option>
+            </select>
+          </div>` : '';
+        const removeBtn = autoSteps.length > 1 ? `<button onclick="event.stopPropagation();removeAutoStep(${i})" class="text-xs" style="color:var(--danger)">&#10005;</button>` : '';
+        div.innerHTML = `
+          <div class="flex items-center justify-between" onclick="editAutoStep(${i})" style="cursor:pointer">
+            <div>
+              <span class="text-sm font-medium">Шаг ${i + 1}</span>
+              <span class="text-xs ml-2" style="color:var(--text-muted)">${msgCount} сообщ.</span>
+              ${statusIcon}
+            </div>
+            <div class="flex items-center gap-2">
+              ${removeBtn}
+              <span class="text-xs btn-secondary rounded-lg px-3 py-1">Редактировать</span>
+            </div>
+          </div>
+          ${delayHtml}`;
+        container.appendChild(div);
+      });
+      document.getElementById('autoAddStepBtn').classList.toggle('hidden', autoSteps.length >= 5);
+    }
+
+    function addAutoStep() {
+      if (autoSteps.length >= 5) { showAlert('Максимум 5 шагов'); return; }
+      autoSteps.push({ messages: [{ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown' }], delay_value: 1, delay_unit: 'hours', message_delay: 0 });
+      renderAutoSteps();
+    }
+
+    function removeAutoStep(i) {
+      if (autoSteps.length <= 1) return;
+      autoSteps.splice(i, 1);
+      renderAutoSteps();
+    }
+
+    function editAutoStep(i) {
+      currentAutoStep = i;
+      currentAutoMsgIndex = 0;
+      document.getElementById('autoStepEditorTitle').textContent = `Шаг ${i + 1} — Сообщения`;
+      showAutoStep(3);
+      renderAutoMsgList();
+    }
+
+    function autoBackToSteps() {
+      if (autoType === 'recurring') {
+        // recurring — из редактора сообщений назад к фильтрам
+        showAutoStep(5);
+        renderAutoFilters();
+      } else {
+        showAutoStep(2);
+        renderAutoSteps();
+      }
+    }
+
+    // --- Сообщения шага ---
+    function renderAutoMsgList() {
+      const step = autoSteps[currentAutoStep];
+      const container = document.getElementById('autoMsgList');
+      container.innerHTML = '';
+      step.messages.forEach((msg, i) => {
+        const card = document.createElement('div');
+        card.className = 'msg-card fade-in';
+        const textPreview = msg.text ? (msg.text.length > 60 ? msg.text.slice(0, 60) + '...' : msg.text) : '(пустое сообщение)';
+        const photoIcon = msg.photo_url ? '<span class="text-xs mr-2" style="color:var(--text-muted)">&#128247;</span>' : '';
+        const btnCount = msg.buttons.length > 0 ? `<span class="text-xs ml-2" style="color:var(--text-muted)">${msg.buttons.length} кн.</span>` : '';
+        const deleteBtn = step.messages.length > 1 ? `<button onclick="event.stopPropagation();removeAutoMessage(${i})" class="text-xs ml-2" style="color:var(--danger)">&#10005;</button>` : '';
+        card.innerHTML = `
+          <div class="flex items-start justify-between">
+            <div class="flex-1" onclick="editAutoMessage(${i})" style="cursor:pointer">
+              <div class="flex items-center mb-1">
+                <span class="text-xs font-medium" style="color:var(--text-secondary)">Сообщение ${i + 1}</span>
+                ${btnCount}${deleteBtn}
+              </div>
+              <div class="text-sm preview-text">${photoIcon}${escapeHtml(textPreview)}</div>
+            </div>
+            <button onclick="editAutoMessage(${i})" class="text-xs btn-secondary rounded-lg px-3 py-1 ml-2 shrink-0">Редактировать</button>
+          </div>`;
+        container.appendChild(card);
+      });
+      document.getElementById('autoAddMsgBtn').classList.toggle('hidden', step.messages.length >= 5);
+      // Задержка
+      document.getElementById('autoMsgDelayRange').value = step.message_delay || 0;
+      document.getElementById('autoMsgDelayValue').textContent = (step.message_delay || 0) + ' сек';
+    }
+
+    function addAutoMessage() {
+      const step = autoSteps[currentAutoStep];
+      if (step.messages.length >= 5) { showAlert('Максимум 5 сообщений'); return; }
+      step.messages.push({ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown' });
+      renderAutoMsgList();
+    }
+
+    function removeAutoMessage(i) {
+      const step = autoSteps[currentAutoStep];
+      if (step.messages.length <= 1) return;
+      step.messages.splice(i, 1);
+      renderAutoMsgList();
+    }
+
+    function onAutoMsgDelayChange(val) {
+      autoSteps[currentAutoStep].message_delay = parseInt(val) || 0;
+      document.getElementById('autoMsgDelayValue').textContent = val + ' сек';
+    }
+
+    // --- Редактор одного сообщения ---
+    function editAutoMessage(i) {
+      currentAutoMsgIndex = i;
+      const msg = autoSteps[currentAutoStep].messages[i];
+      document.getElementById('autoMsgEditorTitle').textContent = `Сообщение ${i + 1}`;
+      document.getElementById('autoMsgParseMode').value = msg.parse_mode || 'Markdown';
+      document.getElementById('autoMsgPhotoUrl').value = msg.photo_url || '';
+      document.getElementById('autoMsgText').value = msg.text || '';
+      // Фото превью
+      const preview = document.getElementById('autoMsgPhotoPreview');
+      if (msg.photo_url) {
+        preview.classList.remove('hidden');
+        preview.querySelector('img').src = msg.photo_url;
+      } else {
+        preview.classList.add('hidden');
+      }
+      renderAutoButtons();
+      showAutoStep(4);
+    }
+
+    function autoBackToMsgList() {
+      showAutoStep(3);
+      renderAutoMsgList();
+    }
+
+    function onAutoMsgParseModeChange() {
+      autoSteps[currentAutoStep].messages[currentAutoMsgIndex].parse_mode = document.getElementById('autoMsgParseMode').value;
+    }
+
+    function onAutoMsgPhotoChange() {
+      const url = document.getElementById('autoMsgPhotoUrl').value.trim();
+      autoSteps[currentAutoStep].messages[currentAutoMsgIndex].photo_url = url;
+      const preview = document.getElementById('autoMsgPhotoPreview');
+      if (url) { preview.classList.remove('hidden'); preview.querySelector('img').src = url; }
+      else { preview.classList.add('hidden'); }
+    }
+
+    function onAutoMsgTextChange() {
+      autoSteps[currentAutoStep].messages[currentAutoMsgIndex].text = document.getElementById('autoMsgText').value;
+    }
+
+    async function autoUploadPhoto(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        try {
+          const r = await apiFetch('/api/upload', { method: 'POST', body: { data: e.target.result, filename: file.name } });
+          const data = await r.json();
+          if (data.ok) {
+            document.getElementById('autoMsgPhotoUrl').value = data.url;
+            onAutoMsgPhotoChange();
+          } else {
+            showAlert(data.error || 'Ошибка загрузки');
+          }
+        } catch (err) { showAlert('Ошибка загрузки фото'); }
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // --- Кнопки сообщения авторассылки ---
+    function renderAutoButtons() {
+      const btns = autoSteps[currentAutoStep].messages[currentAutoMsgIndex].buttons;
+      const container = document.getElementById('autoButtonsList');
+      container.innerHTML = '';
+      document.getElementById('autoAddBtnBtn').classList.toggle('hidden', btns.length >= 6);
+      btns.forEach((btn, i) => {
+        const div = document.createElement('div');
+        div.className = 'broadcast-card mb-2';
+        const isCmd = btn.type === 'command';
+        div.innerHTML = `
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-medium" style="color:var(--text-secondary)">Кнопка ${i + 1}</span>
+            <button onclick="autoRemoveButton(${i})" class="text-xs" style="color:var(--danger)">Удалить</button>
+          </div>
+          <input type="text" value="${escapeAttr(btn.text)}" placeholder="Текст кнопки"
+            oninput="autoSteps[currentAutoStep].messages[currentAutoMsgIndex].buttons[${i}].text=this.value"
+            class="input-field w-full rounded-lg px-3 py-2 text-sm mb-2" />
+          <div class="flex gap-2 mb-2">
+            <select onchange="autoSteps[currentAutoStep].messages[currentAutoMsgIndex].buttons[${i}].type=this.value;renderAutoButtons()"
+              class="input-field rounded-lg px-3 py-2 text-sm">
+              <option value="url" ${btn.type === 'url' ? 'selected' : ''}>Ссылка</option>
+              <option value="command" ${btn.type === 'command' ? 'selected' : ''}>Команда</option>
+            </select>
+            <input type="text" value="${escapeAttr(btn.value)}" placeholder="${isCmd ? '/start promo' : 'https://...'}"
+              oninput="autoSteps[currentAutoStep].messages[currentAutoMsgIndex].buttons[${i}].value=this.value"
+              class="input-field flex-1 rounded-lg px-3 py-2 text-sm" />
+          </div>`;
+        container.appendChild(div);
+      });
+    }
+
+    function autoAddButton() {
+      const btns = autoSteps[currentAutoStep].messages[currentAutoMsgIndex].buttons;
+      if (btns.length >= 6) { showAlert('Максимум 6 кнопок'); return; }
+      btns.push({ text: '', type: 'url', value: '', style: '' });
+      renderAutoButtons();
+    }
+
+    function autoRemoveButton(i) {
+      autoSteps[currentAutoStep].messages[currentAutoMsgIndex].buttons.splice(i, 1);
+      renderAutoButtons();
+    }
+
+    // --- Фильтры авторассылки (упрощённые) ---
+    function renderAutoFilters() {
+      const container = document.getElementById('autoFiltersContainer');
+      container.innerHTML = `
+        <div class="broadcast-card mb-2">
+          <p class="text-xs mb-2" style="color:var(--text-secondary)">Фильтры определяют, кому отправлять. Если не заданы — всем контактам.</p>
+          <div class="mb-2">
+            <label class="text-xs" style="color:var(--text-secondary)">Условия по тегам</label>
+            <div id="autoFilterConditions"></div>
+            <button onclick="addAutoFilterCondition()" class="text-xs btn-secondary rounded-lg px-3 py-1 mt-1">+ Условие</button>
+          </div>
+        </div>`;
+      renderAutoFilterConditions();
+    }
+
+    function renderAutoFilterConditions() {
+      const container = document.getElementById('autoFilterConditions');
+      if (!container) return;
+      container.innerHTML = '';
+      autoFilterConditions.forEach((cond, i) => {
+        const div = document.createElement('div');
+        div.className = 'flex items-center gap-2 mb-1';
+        const operatorHtml = i > 0 ? `
+          <select onchange="autoFilterOperators[${i - 1}]=this.value" class="input-field rounded px-2 py-1 text-xs" style="width:55px">
+            <option value="AND" ${(autoFilterOperators[i - 1] || 'AND') === 'AND' ? 'selected' : ''}>И</option>
+            <option value="OR" ${autoFilterOperators[i - 1] === 'OR' ? 'selected' : ''}>ИЛИ</option>
+          </select>` : '';
+        div.innerHTML = `
+          ${operatorHtml}
+          <select onchange="autoFilterConditions[${i}].type=this.value" class="input-field rounded px-2 py-1 text-xs">
+            <option value="has" ${cond.type === 'has' ? 'selected' : ''}>Есть тег</option>
+            <option value="not" ${cond.type === 'not' ? 'selected' : ''}>Нет тега</option>
+          </select>
+          <input type="text" value="${escapeAttr(cond.tag)}" placeholder="Тег" oninput="autoFilterConditions[${i}].tag=this.value"
+            class="input-field flex-1 rounded px-2 py-1 text-xs" list="autoTagSuggestions" />
+          <button onclick="autoFilterConditions.splice(${i},1);if(${i}>0)autoFilterOperators.splice(${i}-1,1);renderAutoFilterConditions()" class="text-xs" style="color:var(--danger)">&#10005;</button>`;
+        container.appendChild(div);
+      });
+      // datalist с тегами
+      let dl = document.getElementById('autoTagSuggestions');
+      if (!dl) { dl = document.createElement('datalist'); dl.id = 'autoTagSuggestions'; document.body.appendChild(dl); }
+      dl.innerHTML = allTags.map(t => `<option value="${escapeAttr(t)}">`).join('');
+    }
+
+    function addAutoFilterCondition() {
+      if (autoFilterConditions.length > 0) autoFilterOperators.push('AND');
+      autoFilterConditions.push({ type: 'has', tag: '' });
+      renderAutoFilterConditions();
+    }
+
+    // --- Подтверждение ---
+    function renderAutoConfirm() {
+      const name = document.getElementById('autoName').value.trim();
+      const botSelect = document.getElementById('autoBotSelect');
+      const botName = botSelect.options[botSelect.selectedIndex]?.text || '—';
+      let html = `<div class="mb-2"><strong>Название:</strong> ${escapeHtml(name)}</div>`;
+      html += `<div class="mb-2"><strong>Тип:</strong> ${autoType === 'chain' ? 'Цепочка' : 'Расписание'}</div>`;
+      html += `<div class="mb-2"><strong>Бот:</strong> ${escapeHtml(botName)}</div>`;
+
+      if (autoType === 'recurring') {
+        const dayNames = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+        const days = autoSchedule.days.sort().map(d => dayNames[d]).join(', ');
+        html += `<div class="mb-2"><strong>Расписание:</strong> ${days} в ${autoSchedule.time} МСК</div>`;
+      }
+
+      html += `<div class="mb-2"><strong>Шагов:</strong> ${autoSteps.length}</div>`;
+      autoSteps.forEach((step, i) => {
+        html += `<div class="ml-2 mb-1 text-xs" style="color:var(--text-secondary)">`;
+        html += `Шаг ${i + 1}: ${step.messages.length} сообщ.`;
+        if (i > 0 && autoType === 'chain') {
+          const unitNames = { minutes: 'мин', hours: 'ч', days: 'дн' };
+          html += ` (задержка: ${step.delay_value} ${unitNames[step.delay_unit] || step.delay_unit})`;
+        }
+        html += `</div>`;
+      });
+
+      if (autoFilterConditions.length > 0) {
+        html += `<div class="mb-2 mt-2"><strong>Фильтры:</strong></div>`;
+        autoFilterConditions.forEach((c, i) => {
+          if (i > 0) html += `<span class="text-xs mx-1">${autoFilterOperators[i - 1] === 'OR' ? 'ИЛИ' : 'И'}</span>`;
+          html += `<span class="text-xs">${c.type === 'has' ? 'ЕСТЬ' : 'НЕТ'} "${escapeHtml(c.tag)}"</span> `;
+        });
+      }
+
+      document.getElementById('autoConfirmContent').innerHTML = html;
+    }
+
+    // --- Сохранение авторассылки ---
+    async function saveAutoBroadcast() {
+      const btn = document.getElementById('autoSaveBtn');
+      btn.disabled = true;
+      btn.textContent = 'Сохранение...';
+      try {
+        const botId = document.getElementById('autoBotSelect').value;
+        const filters = {};
+        if (autoFilterConditions.length > 0) {
+          filters.conditions = autoFilterConditions.filter(c => c.tag.trim());
+          filters.operators = autoFilterOperators;
+        }
+
+        const body = {
+          name: document.getElementById('autoName').value.trim(),
+          type: autoType,
+          bot_id: botId,
+          steps: autoSteps.map(s => ({
+            delay_value: s.delay_value || 0,
+            delay_unit: s.delay_unit || 'hours',
+            message_delay: s.message_delay || 0,
+            messages: s.messages.map(m => ({
+              photo_url: m.photo_url || '',
+              text: m.text,
+              parse_mode: m.parse_mode || null,
+              buttons: m.buttons.map(b => ({ text: b.text, type: b.type, value: b.value })),
+            })),
+          })),
+          filters,
+        };
+
+        if (autoType === 'recurring') {
+          body.schedule = {
+            days: autoSchedule.days,
+            time: document.getElementById('autoScheduleTime').value,
+          };
+        }
+
+        const r = await apiFetch('/api/auto/save', { method: 'POST', body });
+        const data = await r.json();
+        if (data.ok) {
+          showAlert(autoType === 'chain' ? 'Цепочка создана и запущена!' : 'Расписание создано!');
+          hideAutoCreate();
+          loadAutoBroadcasts();
+        } else {
+          showAlert(data.error || 'Ошибка сохранения');
+        }
+      } catch (e) {
+        console.error('Ошибка сохранения авторассылки:', e);
+        showAlert('Ошибка сохранения');
+      }
+      btn.disabled = false;
+      btn.textContent = 'Сохранить и запустить';
+    }
+
+    // --- Список авторассылок ---
+    async function loadAutoBroadcasts() {
+      const loading = document.getElementById('autoLoading');
+      const content = document.getElementById('autoListContent');
+      const empty = document.getElementById('autoEmpty');
+      loading.classList.remove('hidden');
+      content.innerHTML = '';
+      empty.classList.add('hidden');
+      try {
+        const r = await apiFetch('/api/auto/list');
+        const data = await r.json();
+        const list = data.auto_broadcasts || [];
+        loading.classList.add('hidden');
+        if (list.length === 0) { empty.classList.remove('hidden'); return; }
+
+        for (const ab of list) {
+          const card = document.createElement('div');
+          card.className = 'broadcast-card fade-in mb-2';
+
+          const statusColors = { active: 'var(--accent)', paused: '#f59e0b', stopped: 'var(--text-muted)' };
+          const statusNames = { active: 'Активна', paused: 'Пауза', stopped: 'Остановлена' };
+          const typeNames = { chain: 'Цепочка', recurring: 'Расписание' };
+
+          let infoHtml = `<span class="text-xs" style="color:var(--text-muted)">${typeNames[ab.type] || ab.type}</span>`;
+          if (ab.type === 'recurring' && ab.schedule) {
+            const dayNames = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+            const days = (ab.schedule.days || []).sort().map(d => dayNames[d]).join(', ');
+            infoHtml += ` <span class="text-xs" style="color:var(--text-muted)">| ${days} в ${ab.schedule.time || '—'}</span>`;
+          } else if (ab.type === 'chain') {
+            infoHtml += ` <span class="text-xs" style="color:var(--text-muted)">| ${ab.steps_count || 0} шагов</span>`;
+            if (ab.active_runs > 0) infoHtml += ` <span class="text-xs" style="color:var(--accent)">| Запущена</span>`;
+          }
+          if (ab.bot_name) infoHtml += ` <span class="text-xs" style="color:var(--text-muted)">| ${escapeHtml(ab.bot_name)}</span>`;
+
+          let actionsHtml = '';
+          if (ab.status === 'active') {
+            actionsHtml += `<button onclick="toggleAutoStatus('${ab.id}','pause')" class="text-xs btn-secondary rounded-lg px-2 py-1">Пауза</button>`;
+            if (ab.type === 'chain') actionsHtml += ` <button onclick="toggleAutoStatus('${ab.id}','start')" class="text-xs btn-secondary rounded-lg px-2 py-1">Запустить</button>`;
+          } else if (ab.status === 'paused') {
+            actionsHtml += `<button onclick="toggleAutoStatus('${ab.id}','resume')" class="text-xs btn-primary rounded-lg px-2 py-1">Возобновить</button>`;
+          }
+          if (ab.status !== 'stopped') {
+            actionsHtml += ` <button onclick="toggleAutoStatus('${ab.id}','stop')" class="text-xs rounded-lg px-2 py-1" style="color:var(--danger);border:1px solid var(--danger)">Стоп</button>`;
+          }
+          actionsHtml += ` <button onclick="toggleAutoStatus('${ab.id}','delete')" class="text-xs rounded-lg px-2 py-1" style="color:var(--danger)">Удалить</button>`;
+
+          card.innerHTML = `
+            <div class="flex items-start justify-between mb-1">
+              <div>
+                <div class="text-sm font-medium">${escapeHtml(ab.name || 'Без названия')}</div>
+                <div class="flex items-center gap-1 mt-1">
+                  <span class="text-xs font-medium" style="color:${statusColors[ab.status] || 'var(--text-muted)'}">${statusNames[ab.status] || ab.status}</span>
+                </div>
+              </div>
+            </div>
+            <div class="mb-2">${infoHtml}</div>
+            <div class="flex gap-1 flex-wrap">${actionsHtml}</div>`;
+          content.appendChild(card);
+        }
+      } catch (e) {
+        loading.classList.add('hidden');
+        content.innerHTML = `<div class="text-center text-sm py-8" style="color:var(--danger)">${escapeHtml(e.message)}</div>`;
+      }
+    }
+
+    async function toggleAutoStatus(id, action) {
+      if (action === 'delete' && !confirm('Удалить авторассылку?')) return;
+      if (action === 'stop' && !confirm('Остановить авторассылку? Это действие нельзя отменить.')) return;
+      try {
+        const r = await apiFetch(`/api/auto/${id}/${action}`, { method: 'POST' });
+        const data = await r.json();
+        if (data.ok) {
+          loadAutoBroadcasts();
+        } else {
+          showAlert(data.error || 'Ошибка');
+        }
+      } catch (e) {
+        showAlert('Ошибка: ' + e.message);
+      }
+    }
 
     // ============================================
     // Утилиты

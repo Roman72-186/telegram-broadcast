@@ -739,47 +739,25 @@ app.post('/api/broadcast/delete', requireTenantAdmin, (req, res) => {
 });
 
 // ============================================
-// API: Повторить рассылку
+// API: Данные рассылки для повтора с редактированием
 // ============================================
-app.post('/api/broadcast/repeat', requireTenantAdmin, (req, res) => {
+app.get('/api/broadcast/:id/data', requireTenantAdmin, (req, res) => {
   try {
-    const { id } = req.body;
-    if (!id) return res.status(400).json({ error: 'id обязателен' });
+    const broadcast = db.getBroadcast(req.params.id, req.tenantId);
+    if (!broadcast) return res.status(404).json({ error: 'Рассылка не найдена' });
 
-    const original = db.getBroadcast(id, req.tenantId);
-    if (!original) return res.status(404).json({ error: 'Рассылка не найдена' });
-
-    // Проверка тарифных лимитов
-    const limits = db.checkTariffLimits(req.tenantId);
-    if (!limits.allowed) {
-      return res.status(403).json({ error: limits.reason });
-    }
-
-    const newId = generateId();
-    const newBroadcast = {
-      id: newId,
-      name: (original.name || '') + ' (повтор)',
-      parse_mode: original.parse_mode || null,
-      messages: (original.messages || []).map(m => ({
-        photo_url: m.photo_url || '',
-        text: m.text || '',
-        buttons: m.buttons || [],
-        parse_mode: m.parse_mode || null,
-      })),
-      filters: original.filters || {},
-      bot_id: original.bot_id || null,
-      scheduled_at: new Date().toISOString(),
-      created_by: req.telegramId,
-      message_delay: original.message_delay || 0,
-    };
-
-    db.saveBroadcast(req.tenantId, newBroadcast);
-    db.incrementUsage(req.tenantId);
-
-    res.json({ ok: true, id: newId });
+    res.json({
+      broadcast: {
+        name: broadcast.name || '',
+        bot_id: broadcast.bot_id,
+        messages: broadcast.messages || [],
+        filters: broadcast.filters || {},
+        message_delay: broadcast.message_delay || 0,
+      },
+    });
   } catch (e) {
-    console.error('POST /api/broadcast/repeat error:', e.message);
-    res.status(500).json({ error: 'Ошибка повтора рассылки' });
+    console.error('GET /api/broadcast/:id/data error:', e.message);
+    res.status(500).json({ error: 'Ошибка загрузки данных рассылки' });
   }
 });
 
@@ -1289,6 +1267,219 @@ app.get('/api/super/stats', requireSuperAdmin, (req, res) => {
 });
 
 // ============================================
+// API: Авторассылки
+// ============================================
+app.post('/api/auto/save', requireTenantAdmin, (req, res) => {
+  try {
+    const { name, type, bot_id, steps, schedule, filters } = req.body;
+
+    if (!name || !name.trim()) return res.status(400).json({ error: 'Название обязательно' });
+    if (!['chain', 'recurring'].includes(type)) return res.status(400).json({ error: 'Тип должен быть chain или recurring' });
+    if (!bot_id) return res.status(400).json({ error: 'Выберите бота' });
+
+    // Проверка бота
+    const bots = db.getBotsByTenant(req.tenantId);
+    const bot = bots.find(b => b.id === Number(bot_id));
+    if (!bot) return res.status(400).json({ error: 'Бот не найден' });
+
+    // Валидация шагов
+    if (!Array.isArray(steps) || steps.length === 0 || steps.length > 5) {
+      return res.status(400).json({ error: 'От 1 до 5 шагов' });
+    }
+
+    for (let si = 0; si < steps.length; si++) {
+      const step = steps[si];
+      if (!Array.isArray(step.messages) || step.messages.length === 0 || step.messages.length > 5) {
+        return res.status(400).json({ error: `Шаг ${si + 1}: от 1 до 5 сообщений` });
+      }
+      for (let mi = 0; mi < step.messages.length; mi++) {
+        const msg = step.messages[mi];
+        if (!msg.text || !msg.text.trim()) {
+          return res.status(400).json({ error: `Шаг ${si + 1}, сообщение ${mi + 1}: текст обязателен` });
+        }
+        if (msg.parse_mode && !VALID_PARSE_MODES.includes(msg.parse_mode)) {
+          return res.status(400).json({ error: `Шаг ${si + 1}, сообщение ${mi + 1}: невалидный parse_mode` });
+        }
+        if (msg.photo_url && msg.photo_url.trim()) {
+          if (!msg.photo_url.startsWith('/api/uploads/')) {
+            try { new URL(msg.photo_url); } catch {
+              return res.status(400).json({ error: `Шаг ${si + 1}, сообщение ${mi + 1}: невалидный URL фото` });
+            }
+          }
+        }
+        // Валидация кнопок
+        if (Array.isArray(msg.buttons)) {
+          if (msg.buttons.length > 6) {
+            return res.status(400).json({ error: `Шаг ${si + 1}, сообщение ${mi + 1}: максимум 6 кнопок` });
+          }
+          for (let j = 0; j < msg.buttons.length; j++) {
+            const btn = msg.buttons[j];
+            if (!btn.text || !btn.text.trim()) {
+              return res.status(400).json({ error: `Укажите текст кнопки ${j + 1} в шаге ${si + 1}, сообщении ${mi + 1}` });
+            }
+            if (!btn.value || !btn.value.trim()) {
+              return res.status(400).json({ error: `Укажите действие кнопки "${btn.text}" в шаге ${si + 1}` });
+            }
+            if (btn.type === 'url' && !/^https?:\/\/.+/i.test(btn.value.trim())) {
+              return res.status(400).json({ error: `Невалидная ссылка в кнопке "${btn.text}"` });
+            }
+            if (btn.type === 'command' && !btn.value.trim().startsWith('/')) {
+              return res.status(400).json({ error: `Команда должна начинаться с / в кнопке "${btn.text}"` });
+            }
+          }
+        }
+      }
+    }
+
+    // Для recurring — валидация расписания
+    if (type === 'recurring') {
+      if (!schedule || !Array.isArray(schedule.days) || schedule.days.length === 0) {
+        return res.status(400).json({ error: 'Выберите дни недели' });
+      }
+      if (!schedule.time || !/^\d{2}:\d{2}$/.test(schedule.time)) {
+        return res.status(400).json({ error: 'Укажите время в формате HH:MM' });
+      }
+    }
+
+    // Нормализация
+    const id = generateId();
+    const normalizedSteps = steps.map((step, si) => ({
+      delay_value: si === 0 ? 0 : (parseInt(step.delay_value) || 0),
+      delay_unit: step.delay_unit || 'hours',
+      message_delay: Math.max(0, Math.min(300, parseInt(step.message_delay) || 0)),
+      messages: step.messages.map(msg => ({
+        photo_url: msg.photo_url?.trim() || '',
+        text: msg.text.trim(),
+        parse_mode: msg.parse_mode || null,
+        buttons: Array.isArray(msg.buttons) ? msg.buttons.slice(0, 6).map(b => {
+          const nb = { text: b.text, type: b.type, value: b.value };
+          if (b.style) nb.style = b.style;
+          return nb;
+        }) : [],
+      })),
+    }));
+
+    // Фильтры
+    const autoFilters = {};
+    if (Array.isArray(filters?.conditions) && filters.conditions.length > 0) {
+      autoFilters.conditions = filters.conditions;
+      autoFilters.operators = Array.isArray(filters.operators) ? filters.operators : [];
+    }
+    autoFilters.list_schema_id = filters?.list_schema_id || null;
+    autoFilters.list_name = filters?.list_name || null;
+
+    const autoData = {
+      id,
+      name: name.trim(),
+      type,
+      bot_id: bot.id,
+      filters: autoFilters,
+      schedule: type === 'recurring' ? (schedule || {}) : {},
+      status: 'active',
+      created_by: req.telegramId,
+      steps: normalizedSteps,
+    };
+
+    db.saveAutoBroadcast(req.tenantId, autoData);
+
+    // Для chain — сразу создаём run, первый шаг отправляется немедленно
+    if (type === 'chain') {
+      db.createAutoRun(id, new Date().toISOString());
+    }
+
+    res.json({ ok: true, id });
+  } catch (e) {
+    console.error('POST /api/auto/save error:', e.message);
+    res.status(500).json({ error: 'Ошибка сохранения авторассылки' });
+  }
+});
+
+app.get('/api/auto/list', requireTenantAdmin, (req, res) => {
+  try {
+    const list = db.listAutoBroadcasts(req.tenantId);
+    res.json({ auto_broadcasts: list });
+  } catch (e) {
+    console.error('GET /api/auto/list error:', e.message);
+    res.status(500).json({ error: 'Ошибка загрузки авторассылок' });
+  }
+});
+
+app.get('/api/auto/:id', requireTenantAdmin, (req, res) => {
+  try {
+    const ab = db.getAutoBroadcast(req.params.id, req.tenantId);
+    if (!ab) return res.status(404).json({ error: 'Авторассылка не найдена' });
+    res.json({ auto_broadcast: ab });
+  } catch (e) {
+    console.error('GET /api/auto/:id error:', e.message);
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+app.post('/api/auto/:id/pause', requireTenantAdmin, (req, res) => {
+  try {
+    const ab = db.getAutoBroadcast(req.params.id, req.tenantId);
+    if (!ab) return res.status(404).json({ error: 'Авторассылка не найдена' });
+    if (ab.status !== 'active') return res.status(400).json({ error: 'Можно приостановить только активную авторассылку' });
+    db.updateAutoBroadcastStatus(req.params.id, 'paused');
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('POST /api/auto/:id/pause error:', e.message);
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+app.post('/api/auto/:id/resume', requireTenantAdmin, (req, res) => {
+  try {
+    const ab = db.getAutoBroadcast(req.params.id, req.tenantId);
+    if (!ab) return res.status(404).json({ error: 'Авторассылка не найдена' });
+    if (ab.status !== 'paused') return res.status(400).json({ error: 'Можно возобновить только приостановленную авторассылку' });
+    db.updateAutoBroadcastStatus(req.params.id, 'active');
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('POST /api/auto/:id/resume error:', e.message);
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+app.post('/api/auto/:id/stop', requireTenantAdmin, (req, res) => {
+  try {
+    const ab = db.getAutoBroadcast(req.params.id, req.tenantId);
+    if (!ab) return res.status(404).json({ error: 'Авторассылка не найдена' });
+    db.updateAutoBroadcastStatus(req.params.id, 'stopped');
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('POST /api/auto/:id/stop error:', e.message);
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+app.post('/api/auto/:id/delete', requireTenantAdmin, (req, res) => {
+  try {
+    const result = db.deleteAutoBroadcast(req.params.id, req.tenantId);
+    if (result.changes === 0) return res.status(404).json({ error: 'Авторассылка не найдена' });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('POST /api/auto/:id/delete error:', e.message);
+    res.status(500).json({ error: 'Ошибка удаления' });
+  }
+});
+
+app.post('/api/auto/:id/start', requireTenantAdmin, (req, res) => {
+  try {
+    const ab = db.getAutoBroadcast(req.params.id, req.tenantId);
+    if (!ab) return res.status(404).json({ error: 'Авторассылка не найдена' });
+    if (ab.status !== 'active') return res.status(400).json({ error: 'Авторассылка не активна' });
+    if (ab.type !== 'chain') return res.status(400).json({ error: 'Ручной запуск только для цепочек' });
+
+    db.createAutoRun(ab.id, new Date().toISOString());
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('POST /api/auto/:id/start error:', e.message);
+    res.status(500).json({ error: 'Ошибка запуска' });
+  }
+});
+
+// ============================================
 // API: Ручной запуск отправки (для теста)
 // ============================================
 app.get('/api/cron/send', async (req, res) => {
@@ -1311,6 +1502,10 @@ cron.schedule('* * * * *', async () => {
     if (results.length > 0) {
       console.log('[cron] Обработано:', results);
     }
+    // Авторассылки: цепочки
+    await processChainRuns();
+    // Авторассылки: рекурренция
+    await processRecurringBroadcasts();
     // Очистка просроченных сессий
     db.deleteExpiredSessions();
   } catch (e) {
@@ -1348,6 +1543,213 @@ async function processPendingBroadcasts() {
   }
 
   return results;
+}
+
+// ============================================
+// Авторассылки: обработка цепочек (chain runs)
+// ============================================
+async function processChainRuns() {
+  const runs = db.getActiveRuns();
+  for (const run of runs) {
+    try {
+      const ab = db.getAutoBroadcast(run.auto_broadcast_id);
+      if (!ab || ab.status !== 'active') {
+        db.updateAutoRun(run.id, { status: 'completed', completed_at: new Date().toISOString() });
+        continue;
+      }
+
+      const steps = ab.steps || [];
+      const nextStep = run.current_step;
+
+      if (nextStep >= steps.length) {
+        db.updateAutoRun(run.id, { status: 'completed', completed_at: new Date().toISOString() });
+        continue;
+      }
+
+      const step = steps[nextStep];
+      console.log(`[auto-chain] Отправка шага ${nextStep + 1}/${steps.length} для ${ab.name} (run=${run.id})`);
+
+      await sendStepMessages(ab, step);
+
+      const nextIdx = nextStep + 1;
+      if (nextIdx >= steps.length) {
+        db.updateAutoRun(run.id, { current_step: nextIdx, status: 'completed', completed_at: new Date().toISOString() });
+        console.log(`[auto-chain] Цепочка "${ab.name}" завершена`);
+      } else {
+        // Вычисляем время следующего шага
+        const nextStepData = steps[nextIdx];
+        const delayMs = computeDelayMs(nextStepData.delay_value, nextStepData.delay_unit);
+        const nextStepAt = new Date(Date.now() + delayMs).toISOString();
+        db.updateAutoRun(run.id, { current_step: nextIdx, next_step_at: nextStepAt });
+        console.log(`[auto-chain] Следующий шаг ${nextIdx + 1} запланирован на ${nextStepAt}`);
+      }
+    } catch (e) {
+      console.error(`[auto-chain] Ошибка run=${run.id}:`, e.message);
+      db.updateAutoRun(run.id, { status: 'error', error: e.message });
+    }
+  }
+}
+
+// ============================================
+// Авторассылки: обработка рекурренции (recurring)
+// ============================================
+async function processRecurringBroadcasts() {
+  const recurring = db.getRecurringDue();
+  const now = new Date();
+  // МСК = UTC+3
+  const mskOffset = 3 * 60 * 60 * 1000;
+  const mskNow = new Date(now.getTime() + mskOffset);
+  const mskDay = mskNow.getUTCDay(); // 0=Вс, 1=Пн..6=Сб
+  const mskHour = mskNow.getUTCHours();
+  const mskMinute = mskNow.getUTCMinutes();
+  const mskTimeStr = String(mskHour).padStart(2, '0') + ':' + String(mskMinute).padStart(2, '0');
+
+  for (const ab of recurring) {
+    try {
+      const schedule = JSON.parse(ab.schedule_json);
+      if (!schedule.days || !schedule.time) continue;
+
+      // Проверяем день недели
+      if (!schedule.days.includes(mskDay)) continue;
+
+      // Проверяем время (минутная точность)
+      if (mskTimeStr !== schedule.time) continue;
+
+      // Проверяем: уже отправляли сегодня?
+      if (db.hasRunToday(ab.id)) continue;
+
+      console.log(`[auto-recurring] Запуск "${ab.name}" (${schedule.time}, день ${mskDay})`);
+
+      const fullAb = db.getAutoBroadcast(ab.id);
+      if (!fullAb || !fullAb.steps || fullAb.steps.length === 0) continue;
+
+      const runId = db.createAutoRun(ab.id, null);
+      const step = fullAb.steps[0]; // recurring — всегда 1 шаг
+
+      await sendStepMessages(fullAb, step);
+
+      db.updateAutoRun(runId, { current_step: 1, status: 'completed', completed_at: new Date().toISOString() });
+      console.log(`[auto-recurring] "${ab.name}" отправлена`);
+    } catch (e) {
+      console.error(`[auto-recurring] Ошибка ${ab.id}:`, e.message);
+    }
+  }
+}
+
+// ============================================
+// Общая логика отправки шага авторассылки
+// ============================================
+async function sendStepMessages(autoBroadcast, step) {
+  const bot = autoBroadcast.bot_id ? db.getBotById(autoBroadcast.bot_id) : null;
+  if (!bot) throw new Error('Бот не найден');
+
+  const tenant = db.getTenantById(autoBroadcast.tenant_id);
+  if (!tenant) throw new Error('Тенант не найден');
+
+  const botConfig = {
+    leadtehApiToken: tenant.leadteh_api_token,
+    leadtehBotId: bot.leadteh_bot_id,
+    telegramBotToken: bot.token,
+  };
+
+  const allContacts = await fetchAllContacts(botConfig);
+  const filters = autoBroadcast.filters || {};
+  const listSchemaId = filters.list_schema_id || null;
+
+  // Фильтрация по списку
+  let listTelegramIds = null;
+  if (listSchemaId) {
+    try {
+      const schemas = await fetchListSchemas(botConfig);
+      const schema = (Array.isArray(schemas) ? schemas : []).find(
+        s => String(s.id) === String(listSchemaId)
+      );
+      const fields = schema?.fields || [];
+      const items = await fetchListItems(botConfig, listSchemaId);
+      listTelegramIds = new Set(extractTelegramIds(Array.isArray(items) ? items : [], fields));
+    } catch (e) {
+      console.error('[auto] Ошибка загрузки списка:', e.message);
+    }
+  }
+
+  const filterConditions = Array.isArray(filters.conditions) ? filters.conditions : null;
+  const filterOperators = Array.isArray(filters.operators) ? filters.operators : [];
+
+  const recipients = allContacts.filter(contact => {
+    if (!contact.telegram_id) return false;
+    if (listTelegramIds) return listTelegramIds.has(String(contact.telegram_id));
+    const contactTags = extractTags(contact);
+    if (filterConditions && filterConditions.length > 0) {
+      return evaluateFilterConditions(contactTags, filterConditions, filterOperators);
+    }
+    return true;
+  });
+
+  // Получаем username бота
+  let botUsername = bot.bot_username || '';
+  if (!botUsername) {
+    try {
+      const r = await fetch(`https://api.telegram.org/bot${bot.token}/getMe`);
+      const data = await r.json();
+      if (data.ok) botUsername = data.result.username;
+    } catch (e) { /* ignore */ }
+  }
+
+  const messages = step.messages || [];
+  const prepared = messages.map(msg => ({
+    text: msg.text || '',
+    photoUrl: msg.photo_url || '',
+    keyboard: buildKeyboard(msg.buttons || [], botUsername),
+    parseMode: msg.parse_mode || null,
+  }));
+
+  let sent = 0;
+  let failed = 0;
+
+  for (const contact of recipients) {
+    let contactFailed = false;
+    for (let i = 0; i < prepared.length; i++) {
+      const msg = prepared[i];
+      try {
+        const r = await sendSingleMessage(
+          bot.token,
+          contact.telegram_id,
+          msg.text,
+          msg.photoUrl,
+          msg.keyboard,
+          msg.parseMode,
+          autoBroadcast.tenant_id
+        );
+        if (!r.ok) {
+          contactFailed = true;
+          break;
+        }
+      } catch (e) {
+        contactFailed = true;
+        break;
+      }
+      if (i < prepared.length - 1) {
+        const delayMs = (step.message_delay || 0) * 1000 || 500;
+        await new Promise(r => setTimeout(r, delayMs));
+      }
+    }
+    if (contactFailed) failed++;
+    else sent++;
+    await new Promise(r => setTimeout(r, 35));
+  }
+
+  console.log(`[auto] Отправлено: ${sent}, ошибок: ${failed}`);
+  return { sent, failed };
+}
+
+function computeDelayMs(value, unit) {
+  const v = parseInt(value) || 0;
+  switch (unit) {
+    case 'minutes': return v * 60 * 1000;
+    case 'hours': return v * 60 * 60 * 1000;
+    case 'days': return v * 24 * 60 * 60 * 1000;
+    default: return v * 60 * 60 * 1000;
+  }
 }
 
 async function sendBroadcast(broadcast) {
