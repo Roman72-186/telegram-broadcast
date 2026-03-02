@@ -3621,7 +3621,7 @@
           try {
             const r = await apiFetch(`/api/contacts?count_only=true&${botParam}`);
             const data = await r.json();
-            el.innerHTML = `<span class="text-sm font-medium" style="color:var(--accent)">Получателей: ~${data.count}</span>`;
+            el.innerHTML = `<span class="text-sm font-medium" style="color:var(--accent)">Получателей: ~${data.count}</span> <span class="show-recipients-link" onclick="openAutoRecipientsModal()">Показать</span>`;
           } catch (e) { el.innerHTML = ''; }
           return;
         }
@@ -3634,11 +3634,49 @@
           params.set('bot_id', botId);
           const r = await apiFetch(`/api/contacts?${params}`);
           const data = await r.json();
-          el.innerHTML = `<span class="text-sm font-medium" style="color:var(--accent)">Получателей: ~${data.count}</span>`;
+          el.innerHTML = `<span class="text-sm font-medium" style="color:var(--accent)">Получателей: ~${data.count}</span> <span class="show-recipients-link" onclick="openAutoRecipientsModal()">Показать</span>`;
         } catch (e) {
           el.innerHTML = '<span class="text-sm" style="color:var(--danger)">Ошибка подсчёта</span>';
         }
       }, 500);
+    }
+
+    async function openAutoRecipientsModal() {
+      const modal = document.getElementById('recipientsModal');
+      const list = document.getElementById('recipientsList');
+      list.innerHTML = '<div class="text-center text-sm py-8" style="color:var(--text-secondary)">Загрузка...</div>';
+      document.getElementById('recipientsTitle').textContent = 'Получатели';
+      modal.classList.remove('hidden');
+
+      try {
+        const botId = document.getElementById('autoBotSelect')?.value;
+        if (!botId) throw new Error('Бот не выбран');
+
+        const body = { bot_id: Number(botId) };
+        const active = autoFilterConditions.filter(c => c.tag.trim());
+        if (active.length > 0) {
+          body.conditions = active;
+          body.operators = autoFilterOperators.slice(0, active.length - 1);
+        }
+
+        const r = await apiFetch(`/api/recipients/preview?bot_id=${botId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || 'Ошибка');
+
+        previewCacheId = data.cache_id;
+        previewCurrentPage = 1;
+        previewTotalPages = Math.max(1, Math.ceil(data.total / data.per_page));
+
+        document.getElementById('recipientsTitle').textContent = `Получатели (${data.total})`;
+        renderRecipients(data.contacts, 0);
+        updatePaginationButtons();
+      } catch (e) {
+        list.innerHTML = `<div class="text-center text-sm py-8" style="color:var(--danger)">${escapeHtml(e.message)}</div>`;
+      }
     }
 
     // --- Подтверждение ---
