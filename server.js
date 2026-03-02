@@ -626,7 +626,11 @@ app.post('/api/broadcast/save', requireTenantAdmin, (req, res) => {
       normalizedMessages = messages.map(msg => ({
         photo_url: msg.photo_url?.trim() || '',
         text: msg.text.trim(),
-        buttons: Array.isArray(msg.buttons) ? msg.buttons.slice(0, 6) : [],
+        buttons: Array.isArray(msg.buttons) ? msg.buttons.slice(0, 6).map(b => {
+          const nb = { text: b.text, type: b.type, value: b.value };
+          if (b.style) nb.style = b.style;
+          return nb;
+        }) : [],
       }));
     } else {
       if (!text || !text.trim()) {
@@ -635,7 +639,11 @@ app.post('/api/broadcast/save', requireTenantAdmin, (req, res) => {
       normalizedMessages = [{
         photo_url: '',
         text: text.trim(),
-        buttons: Array.isArray(buttons) ? buttons.slice(0, 6) : [],
+        buttons: Array.isArray(buttons) ? buttons.slice(0, 6).map(b => {
+          const nb = { text: b.text, type: b.type, value: b.value };
+          if (b.style) nb.style = b.style;
+          return nb;
+        }) : [],
       }];
     }
 
@@ -1437,6 +1445,8 @@ function buildKeyboard(buttons, botUsername) {
     } else {
       continue;
     }
+
+    if (btn.style) button.style = btn.style;
 
     currentRow.push(button);
     if (currentRow.length >= 2) {

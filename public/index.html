@@ -398,6 +398,87 @@
     .recipients-footer button:disabled { opacity: 0.4; cursor: default; }
     .recipients-footer .page-info { font-size: 13px; color: var(--text-secondary); min-width: 50px; text-align: center; }
     .show-recipients-link { color: var(--accent); cursor: pointer; text-decoration: underline; font-size: 13px; margin-left: 6px; }
+
+    /* Тулбар форматирования */
+    .format-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      padding: 4px 6px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-bottom: none;
+      border-radius: 12px 12px 0 0;
+    }
+    .format-toolbar button {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+      padding: 0;
+    }
+    .format-toolbar button:hover:not(:disabled) {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+    }
+    .format-toolbar button:disabled {
+      opacity: 0.25;
+      cursor: not-allowed;
+    }
+    .format-toolbar .separator {
+      width: 1px;
+      height: 20px;
+      background: var(--border);
+      margin: 0 4px;
+    }
+    .has-toolbar {
+      border-radius: 0 0 12px 12px !important;
+    }
+
+    /* Emoji picker */
+    .emoji-picker-panel {
+      max-height: 200px;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      border-top: none;
+      border-radius: 0 0 12px 12px;
+      background: var(--bg-secondary);
+      padding: 8px;
+      display: none;
+    }
+    .emoji-picker-panel.open { display: block; }
+    .emoji-category { font-size: 11px; color: var(--text-muted); margin: 4px 0 2px; font-weight: 600; }
+    .emoji-grid { display: flex; flex-wrap: wrap; gap: 2px; }
+    .emoji-btn {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      background: transparent;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 18px;
+      transition: background 0.1s;
+    }
+    .emoji-btn:hover { background: var(--bg-tertiary); }
+
+    /* Стили кнопок Telegram */
+    .btn-style-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 4px;
+    }
   </style>
 </head>
 <body class="pb-24">
@@ -498,8 +579,9 @@
 
         <div class="mb-3">
           <label class="text-xs mb-1 flex items-center" style="color: var(--text-secondary)">Разметка текста<span class="tooltip-trigger">?<span class="tooltip-text">Markdown: *жирный* _курсив_. HTML: &lt;b&gt; &lt;i&gt;. Plain — без форматирования</span></span></label>
-          <select id="parseModeSelect" class="input-field w-full rounded-lg px-3 py-2 text-sm">
+          <select id="parseModeSelect" class="input-field w-full rounded-lg px-3 py-2 text-sm" onchange="onParseModeChange()">
             <option value="Markdown">Markdown (*жирный*, _курсив_)</option>
+            <option value="MarkdownV2">MarkdownV2 (*жирный*, __подчёркнутый__, ~зачёркнутый~)</option>
             <option value="HTML">HTML (&lt;b&gt;жирный&lt;/b&gt;, &lt;i&gt;курсив&lt;/i&gt;)</option>
             <option value="">Без разметки (plain text)</option>
           </select>
@@ -544,10 +626,32 @@
             <label class="text-sm font-medium flex items-center">Текст сообщения<span class="tooltip-trigger">?<span class="tooltip-text">Текст сообщения. С фото — до 1024 символов, без — до 4096</span></span></label>
             <div id="editorCharCounter" class="char-counter hidden">0 / 1024</div>
           </div>
-          <p class="text-xs mb-1" style="color: var(--text-secondary)">Поддержка Markdown: *жирный*, _курсив_, `код`</p>
+          <p id="parseModeHint" class="text-xs mb-1" style="color: var(--text-secondary)">Поддержка Markdown: *жирный*, _курсив_, `код`</p>
+          <div id="formatToolbar" class="format-toolbar">
+            <button type="button" onclick="applyFormat('bold')" title="Жирный" id="fmtBold">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/></svg>
+            </button>
+            <button type="button" onclick="applyFormat('italic')" title="Курсив" id="fmtItalic">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/></svg>
+            </button>
+            <button type="button" onclick="applyFormat('underline')" title="Подчёркнутый" id="fmtUnderline">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"/><line x1="4" y1="21" x2="20" y2="21"/></svg>
+            </button>
+            <button type="button" onclick="applyFormat('strikethrough')" title="Зачёркнутый" id="fmtStrike">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="12" x2="20" y2="12"/><path d="M17.5 7.5c0-2-1.5-3.5-5.5-3.5S6.5 5.5 6.5 7.5c0 4 11 4 11 8.5 0 2-1.5 3.5-5.5 3.5s-5.5-1.5-5.5-3.5"/></svg>
+            </button>
+            <button type="button" onclick="applyFormat('code')" title="Код" id="fmtCode">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            </button>
+            <div class="separator"></div>
+            <button type="button" onclick="toggleEmojiPicker()" title="Эмодзи" id="fmtEmoji">
+              😊
+            </button>
+          </div>
           <textarea id="editorText" rows="6" placeholder="Введите текст..."
-            class="input-field w-full rounded-xl px-4 py-3 text-sm resize-none"
+            class="input-field w-full has-toolbar px-4 py-3 text-sm resize-none"
             oninput="onEditorTextInput()"></textarea>
+          <div id="emojiPicker" class="emoji-picker-panel"></div>
         </div>
 
         <div class="mb-3">
@@ -1250,6 +1354,7 @@
       onEditorPhotoInput();
       onEditorTextInput();
       renderEditorButtons();
+      onParseModeChange();
       showStep(2);
     }
 
@@ -1336,7 +1441,7 @@
     function editorAddButton() {
       const btns = messages[currentMessageIndex].buttons;
       if (btns.length >= 6) { showAlert('Максимум 6 кнопок'); return; }
-      btns.push({ text: '', type: 'url', value: '' });
+      btns.push({ text: '', type: 'url', value: '', style: '' });
       renderEditorButtons();
     }
 
@@ -1388,10 +1493,20 @@
           </div>
           <input type="text" placeholder="${placeholder}" value="${escapeAttr(btn.value)}"
             oninput="editorUpdateButton(${i}, 'value', this.value)"
-            class="input-field w-full rounded-lg px-3 py-2 text-sm" id="btnValue_${i}"
+            class="input-field w-full rounded-lg px-3 py-2 text-sm mb-2" id="btnValue_${i}"
             style="${btn.text.trim() && !btn.value.trim() ? 'border-color:var(--danger, #ef4444)' : ''}" />
-          ${btn.text.trim() && !btn.value.trim() ? '<div class="text-xs mt-1" style="color:var(--danger, #ef4444)">Обязательно укажите действие</div>' : ''}
-          ${typeHint}`;
+          ${btn.text.trim() && !btn.value.trim() ? '<div class="text-xs mt-1 mb-2" style="color:var(--danger, #ef4444)">Обязательно укажите действие</div>' : ''}
+          ${typeHint}
+          <div class="flex items-center gap-2 mt-2">
+            <span class="text-xs" style="color:var(--text-muted)">Стиль:</span>
+            <select onchange="editorUpdateButton(${i}, 'style', this.value)"
+              class="input-field rounded-lg px-2 py-1 text-xs flex-1">
+              <option value="" ${!btn.style ? 'selected' : ''}>По умолчанию</option>
+              <option value="primary" ${btn.style === 'primary' ? 'selected' : ''}>🔵 Primary</option>
+              <option value="success" ${btn.style === 'success' ? 'selected' : ''}>🟢 Success</option>
+              <option value="danger" ${btn.style === 'danger' ? 'selected' : ''}>🔴 Danger</option>
+            </select>
+          </div>`;
         container.appendChild(div);
       });
     }
@@ -1411,9 +1526,125 @@
       });
     }
 
+    // ============================================
+    // Тулбар форматирования
+    // ============================================
+    function getFormatTags(type, parseMode) {
+      const map = {
+        Markdown: {
+          bold: { open: '*', close: '*' },
+          italic: { open: '_', close: '_' },
+          code: { open: '`', close: '`' },
+        },
+        MarkdownV2: {
+          bold: { open: '*', close: '*' },
+          italic: { open: '_', close: '_' },
+          underline: { open: '__', close: '__' },
+          strikethrough: { open: '~', close: '~' },
+          code: { open: '`', close: '`' },
+        },
+        HTML: {
+          bold: { open: '<b>', close: '</b>' },
+          italic: { open: '<i>', close: '</i>' },
+          underline: { open: '<u>', close: '</u>' },
+          strikethrough: { open: '<s>', close: '</s>' },
+          code: { open: '<code>', close: '</code>' },
+        },
+      };
+      return (map[parseMode] || {})[type] || null;
+    }
+
+    function applyFormat(type) {
+      const parseMode = document.getElementById('parseModeSelect').value;
+      const tags = getFormatTags(type, parseMode);
+      if (!tags) return;
+      const ta = document.getElementById('editorText');
+      const start = ta.selectionStart;
+      const end = ta.selectionEnd;
+      const text = ta.value;
+      const selected = text.substring(start, end);
+      const replacement = tags.open + (selected || 'текст') + tags.close;
+      ta.value = text.substring(0, start) + replacement + text.substring(end);
+      // Позиционируем курсор
+      if (selected) {
+        ta.selectionStart = start;
+        ta.selectionEnd = start + replacement.length;
+      } else {
+        ta.selectionStart = start + tags.open.length;
+        ta.selectionEnd = start + tags.open.length + 'текст'.length;
+      }
+      ta.focus();
+      onEditorTextInput();
+    }
+
+    function onParseModeChange() {
+      const parseMode = document.getElementById('parseModeSelect').value;
+      const toolbar = document.getElementById('formatToolbar');
+      const hint = document.getElementById('parseModeHint');
+      const textarea = document.getElementById('editorText');
+      const emojiPanel = document.getElementById('emojiPicker');
+
+      if (!parseMode) {
+        toolbar.style.display = 'none';
+        textarea.classList.remove('has-toolbar');
+        hint.textContent = 'Без форматирования';
+        emojiPanel.classList.remove('open');
+      } else {
+        toolbar.style.display = 'flex';
+        textarea.classList.add('has-toolbar');
+        const noUS = (parseMode === 'Markdown');
+        document.getElementById('fmtUnderline').disabled = noUS;
+        document.getElementById('fmtStrike').disabled = noUS;
+
+        if (parseMode === 'Markdown') hint.textContent = 'Поддержка Markdown: *жирный*, _курсив_, `код`';
+        else if (parseMode === 'MarkdownV2') hint.textContent = 'MarkdownV2: *жирный*, _курсив_, __подчёркнутый__, ~зачёркнутый~, `код`';
+        else if (parseMode === 'HTML') hint.textContent = 'HTML: <b>, <i>, <u>, <s>, <code>';
+      }
+    }
+
+    // ============================================
+    // Emoji Picker
+    // ============================================
+    const EMOJI_DATA = [
+      { name: 'Смайлы', items: ['😀','😃','😄','😁','😆','😅','🤣','😂','🙂','😊','😇','🥰','😍','😘','😗','😋','😛','😜','🤪','😝','🤑','🤗','🤭','🤫','🤔','😐','😑','😶','😏','😒','🙄','😬','😮','😯','😲','😳','🥺','😢','😭','😤','😡','🤬','😈','💀','💩','🤡','👻','👽','🤖','😺','😸','😹','😻','😼','😽','🙀','😿','😾'] },
+      { name: 'Жесты', items: ['👋','🤚','🖐','✋','🖖','👌','🤌','🤏','✌','🤞','🤟','🤘','🤙','👈','👉','👆','👇','☝','👍','👎','✊','👊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏'] },
+      { name: 'Сердца', items: ['❤','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❣','💕','💞','💓','💗','💖','💘','💝','💟'] },
+      { name: 'Объекты', items: ['🔥','⭐','🌟','💫','✨','⚡','💥','🎉','🎊','🏆','🥇','🎯','💰','💎','🔔','📢','📌','📎','✅','❌','⚠','🚀','💡','📊','📈','🎁','🛒','💬','📝','🔗'] },
+    ];
+    let emojiPickerRendered = false;
+
+    function toggleEmojiPicker() {
+      const panel = document.getElementById('emojiPicker');
+      if (!emojiPickerRendered) {
+        let html = '';
+        for (const cat of EMOJI_DATA) {
+          html += `<div class="emoji-category">${cat.name}</div><div class="emoji-grid">`;
+          for (const em of cat.items) {
+            html += `<button type="button" class="emoji-btn" onclick="insertEmoji('${em}')">${em}</button>`;
+          }
+          html += '</div>';
+        }
+        panel.innerHTML = html;
+        emojiPickerRendered = true;
+      }
+      panel.classList.toggle('open');
+    }
+
+    function insertEmoji(emoji) {
+      const ta = document.getElementById('editorText');
+      const start = ta.selectionStart;
+      const end = ta.selectionEnd;
+      ta.value = ta.value.substring(0, start) + emoji + ta.value.substring(end);
+      ta.selectionStart = ta.selectionEnd = start + emoji.length;
+      ta.focus();
+      onEditorTextInput();
+    }
+
     function formatMarkdown(text) {
       return text
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/__([^_]+)__/g, '<u>$1</u>')
+        .replace(/~([^~]+)~/g, '<s>$1</s>')
         .replace(/\*([^*]+)\*/g, '<b>$1</b>')
         .replace(/_([^_]+)_/g, '<i>$1</i>')
         .replace(/`([^`]+)`/g, '<code style="background:var(--accent-subtle);padding:1px 4px;border-radius:3px;">$1</code>');
@@ -1755,7 +1986,8 @@
             if (b.type === 'url') label = escapeHtml(b.value);
             else if (b.type === 'command') label = 'callback: ' + escapeHtml(b.value);
             else label = '/start ' + escapeHtml(b.value);
-            return `<div class="text-xs mb-0.5" style="color:var(--text-secondary)">[${escapeHtml(b.text)}] → ${label}</div>`;
+            const styleLabel = b.style ? ` [${b.style}]` : '';
+            return `<div class="text-xs mb-0.5" style="color:var(--text-secondary)">[${escapeHtml(b.text)}] → ${label}${styleLabel}</div>`;
           }).join('');
         }
         card.innerHTML = html;
@@ -1944,7 +2176,11 @@
             messages: messages.map(msg => ({
               photo_url: msg.photo_url || '',
               text: msg.text.trim(),
-              buttons: msg.buttons.map(btn => ({ text: btn.text, type: btn.type, value: btn.value })),
+              buttons: msg.buttons.map(btn => {
+                const b = { text: btn.text, type: btn.type, value: btn.value };
+                if (btn.style) b.style = btn.style;
+                return b;
+              }),
             })),
             filters: (() => {
               const active = getActiveFilters();
