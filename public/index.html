@@ -1237,7 +1237,11 @@
           renderMessagesList();
           await loadSubscriptionInfo();
         } else if (userRole === 'super_admin') {
-          // Суперадмин без тенанта — показать панель суперадмина
+          // Суперадмин без тенанта — скрыть обычные табы, только панель управления
+          document.getElementById('tabCreate').classList.add('hidden');
+          document.getElementById('tabList').classList.add('hidden');
+          document.getElementById('tabAuto').classList.add('hidden');
+          document.getElementById('tabSettings').classList.add('hidden');
           showTab('super');
         }
       } catch (e) {
