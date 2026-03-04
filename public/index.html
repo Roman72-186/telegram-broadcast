@@ -566,10 +566,6 @@
         class="flex-1 py-2 px-3 rounded-lg text-sm font-medium btn-secondary">
         Рассылки
       </button>
-      <button id="tabAuto" onclick="showTab('auto')"
-        class="flex-1 py-2 px-3 rounded-lg text-sm font-medium btn-secondary">
-        Авто
-      </button>
       <button id="tabSettings" onclick="showTab('settings')"
         class="py-2 px-3 rounded-lg text-sm font-medium btn-secondary" title="Настройки">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -578,6 +574,18 @@
 
     <!-- TAB: Создание рассылки -->
     <div id="createTab">
+      <!-- Подтабы создания -->
+      <div id="createSubtabs" class="flex gap-1 mb-4 p-1 rounded-lg" style="background: var(--bg-secondary)">
+        <button id="subtabBtnOneshot" onclick="showCreateSubtab('oneshot')"
+          class="flex-1 py-1.5 px-2 rounded-md text-xs font-medium transition-colors" style="background: var(--accent); color: #fff">Разовая</button>
+        <button id="subtabBtnChain" onclick="showCreateSubtab('chain')"
+          class="flex-1 py-1.5 px-2 rounded-md text-xs font-medium transition-colors" style="color: var(--text-secondary)">Цепочка</button>
+        <button id="subtabBtnRecurring" onclick="showCreateSubtab('recurring')"
+          class="flex-1 py-1.5 px-2 rounded-md text-xs font-medium transition-colors" style="color: var(--text-secondary)">Расписание</button>
+      </div>
+
+      <!-- Подтаб: Разовая рассылка -->
+      <div id="subtabOneshot">
       <div class="step-indicator flex items-center justify-center gap-2 mb-6">
         <div class="step active" data-step="1"></div>
         <div class="step" data-step="3"></div>
@@ -817,194 +825,207 @@
           Далее
         </button>
       </div>
+      </div><!-- /subtabOneshot -->
+
+      <!-- Подтаб: Авторассылка (Цепочка / Расписание) -->
+      <div id="subtabAuto" class="hidden">
+        <div id="autoCreateView">
+          <div class="flex items-center mb-4">
+            <button onclick="showCreateSubtab('oneshot')" class="mr-2 text-sm" style="color:var(--text-secondary)">← Назад</button>
+            <h2 class="text-lg font-bold">Новая авторассылка</h2>
+          </div>
+
+          <!-- Шаг A1: Тип + название + бот -->
+          <div id="autoStep1" class="step-content fade-in">
+            <div class="hint-box">
+              <strong>Шаг 1 из 4 — Основные настройки</strong><br>
+              Выберите тип: <em>Цепочка</em> — персональная воронка: каждый новый контакт, попадающий под фильтр, получает шаги со своими задержками. <em>Расписание</em> — повторяющаяся отправка всем по дням недели. Укажите название и бота.
+            </div>
+            <div class="mb-3">
+              <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Тип авторассылки</label>
+              <div class="flex gap-2">
+                <button id="autoTypeChain" onclick="setAutoType('chain')" class="flex-1 py-2 px-3 rounded-lg text-sm font-medium btn-primary">Цепочка</button>
+                <button id="autoTypeRecurring" onclick="setAutoType('recurring')" class="flex-1 py-2 px-3 rounded-lg text-sm font-medium btn-secondary">Расписание</button>
+              </div>
+              <p id="autoTypeHint" class="text-xs mt-1" style="color: var(--text-secondary)">До 5 шагов с задержками между ними</p>
+            </div>
+
+            <div class="mb-3">
+              <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Название</label>
+              <input type="text" id="autoName" placeholder="Например: Приветственная цепочка" class="input-field w-full rounded-lg px-3 py-2 text-sm" />
+            </div>
+
+            <div class="mb-3" id="autoBotSelector">
+              <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Бот для отправки</label>
+              <select id="autoBotSelect" class="input-field w-full rounded-lg px-3 py-2 text-sm font-medium"></select>
+            </div>
+
+            <!-- Расписание (только для recurring) -->
+            <div id="autoScheduleBlock" class="hidden mb-3">
+              <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Дни недели</label>
+              <div class="flex gap-1 flex-wrap mb-2" id="autoDaysContainer">
+                <label class="flex items-center gap-1 text-sm px-2 py-1 rounded-lg" style="background:var(--bg-card)"><input type="checkbox" value="1" onchange="onAutoDayChange()"> Пн</label>
+                <label class="flex items-center gap-1 text-sm px-2 py-1 rounded-lg" style="background:var(--bg-card)"><input type="checkbox" value="2" onchange="onAutoDayChange()"> Вт</label>
+                <label class="flex items-center gap-1 text-sm px-2 py-1 rounded-lg" style="background:var(--bg-card)"><input type="checkbox" value="3" onchange="onAutoDayChange()"> Ср</label>
+                <label class="flex items-center gap-1 text-sm px-2 py-1 rounded-lg" style="background:var(--bg-card)"><input type="checkbox" value="4" onchange="onAutoDayChange()"> Чт</label>
+                <label class="flex items-center gap-1 text-sm px-2 py-1 rounded-lg" style="background:var(--bg-card)"><input type="checkbox" value="5" onchange="onAutoDayChange()"> Пт</label>
+                <label class="flex items-center gap-1 text-sm px-2 py-1 rounded-lg" style="background:var(--bg-card)"><input type="checkbox" value="6" onchange="onAutoDayChange()"> Сб</label>
+                <label class="flex items-center gap-1 text-sm px-2 py-1 rounded-lg" style="background:var(--bg-card)"><input type="checkbox" value="0" onchange="onAutoDayChange()"> Вс</label>
+              </div>
+              <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Время отправки (МСК, UTC+3)</label>
+              <input type="time" id="autoScheduleTime" value="10:00" class="input-field rounded-lg px-3 py-2 text-sm" />
+            </div>
+
+            <button onclick="autoNextStep(1)" class="w-full py-3 rounded-xl text-sm font-bold btn-primary mt-2">Далее</button>
+          </div>
+
+          <!-- Шаг A2: Шаги цепочки -->
+          <div id="autoStep2" class="step-content fade-in hidden">
+            <div class="hint-box">
+              <strong>Шаг 2 из 4 — Шаги цепочки</strong><br>
+              Добавьте от 1 до 5 шагов воронки. Когда контакт попадает под фильтр, он получает шаг 1. Через заданную задержку — шаг 2, и так далее. Каждый контакт проходит цепочку индивидуально. Нажмите «Редактировать» чтобы наполнить шаг сообщениями.
+            </div>
+            <h3 class="text-sm font-bold mb-2">Шаги цепочки</h3>
+            <div id="autoStepsList"></div>
+            <button id="autoAddStepBtn" onclick="addAutoStep()" class="w-full py-2 rounded-xl text-sm btn-secondary mt-2">+ Добавить шаг</button>
+            <div class="flex gap-2 mt-4">
+              <button onclick="autoBackStep(2)" class="flex-1 py-3 rounded-xl text-sm font-bold btn-secondary">Назад</button>
+              <button onclick="autoNextStep(2)" class="flex-1 py-3 rounded-xl text-sm font-bold btn-primary">Далее</button>
+            </div>
+          </div>
+
+          <!-- Шаг A3: Редактор сообщений шага -->
+          <div id="autoStep3" class="step-content fade-in hidden">
+            <div class="flex items-center mb-3">
+              <button onclick="autoBackToSteps()" class="mr-2 text-sm" style="color:var(--text-secondary)">← К шагам</button>
+              <h3 class="text-sm font-bold" id="autoStepEditorTitle">Шаг 1 — Сообщения</h3>
+            </div>
+            <div class="hint-box">
+              Добавьте от 1 до 5 сообщений для этого шага. Все сообщения шага отправляются получателю последовательно за одну отправку. Нажмите на сообщение чтобы редактировать текст, фото и кнопки.
+            </div>
+            <div id="autoMsgList"></div>
+            <button id="autoAddMsgBtn" onclick="addAutoMessage()" class="w-full py-2 rounded-xl text-sm btn-secondary mt-2">+ Добавить сообщение</button>
+            <div class="mt-3">
+              <label class="text-xs mb-1 block" style="color: var(--text-secondary)">
+                Задержка между сообщениями (сек)
+              </label>
+              <div class="flex items-center gap-3">
+                <input type="range" id="autoMsgDelayRange" min="0" max="60" value="0" step="1"
+                  class="flex-1" style="accent-color: var(--accent)"
+                  oninput="onAutoMsgDelayChange(this.value)" />
+                <span id="autoMsgDelayValue" class="text-sm font-medium" style="color: var(--accent); min-width: 40px; text-align: right">0 сек</span>
+              </div>
+            </div>
+            <button onclick="autoBackToSteps()" class="w-full py-3 rounded-xl text-sm font-bold btn-primary mt-4">Готово</button>
+          </div>
+
+          <!-- Шаг A4: Редактор одного сообщения авторассылки -->
+          <div id="autoStep4" class="step-content fade-in hidden">
+            <div class="flex items-center mb-3">
+              <button onclick="autoBackToMsgList()" class="mr-2 text-sm" style="color:var(--text-secondary)">← К сообщениям</button>
+              <h3 class="text-sm font-bold" id="autoMsgEditorTitle">Сообщение 1</h3>
+            </div>
+            <div class="hint-box">
+              Заполните текст сообщения. Можно добавить фото (ссылка или загрузка) и до 6 кнопок (ссылки или команды бота). С фото максимум 1024 символа текста, без фото — до 4096.
+            </div>
+            <div class="broadcast-card mb-3">
+              <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Формат текста</label>
+              <select id="autoMsgParseMode" onchange="onAutoMsgParseModeChange()"
+                class="input-field w-full rounded-lg px-3 py-2 text-sm font-medium mb-2">
+                <option value="Markdown">Markdown</option>
+                <option value="MarkdownV2">MarkdownV2</option>
+                <option value="HTML">HTML</option>
+              </select>
+              <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Фото (необязательно)</label>
+              <div class="flex gap-2 mb-2">
+                <input type="text" id="autoMsgPhotoUrl" placeholder="URL или загрузите" class="input-field flex-1 rounded-lg px-3 py-2 text-sm" oninput="onAutoMsgPhotoChange()" />
+                <label class="py-2 px-3 rounded-lg text-sm font-medium btn-secondary cursor-pointer shrink-0">
+                  Загрузить
+                  <input type="file" accept="image/*" class="hidden" onchange="autoUploadPhoto(event)" />
+                </label>
+              </div>
+              <div id="autoMsgPhotoPreview" class="hidden mb-2"><img class="w-full rounded-lg" style="max-height:150px;object-fit:cover" /></div>
+              <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Текст сообщения</label>
+              <textarea id="autoMsgText" rows="5" class="input-field w-full rounded-lg px-3 py-2 text-sm resize-y" placeholder="Текст сообщения..." oninput="onAutoMsgTextChange()"></textarea>
+            </div>
+            <div class="broadcast-card mb-3">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-medium" style="color: var(--text-secondary)">Кнопки (макс. 6)</span>
+                <button onclick="autoAddButton()" class="text-xs btn-secondary rounded-lg px-3 py-1" id="autoAddBtnBtn">+ Кнопка</button>
+              </div>
+              <div id="autoButtonsList"></div>
+            </div>
+            <button onclick="autoBackToMsgList()" class="w-full py-3 rounded-xl text-sm font-bold btn-primary">Готово</button>
+          </div>
+
+          <!-- Шаг A5: Фильтры -->
+          <div id="autoStep5" class="step-content fade-in hidden">
+            <div class="hint-box">
+              <strong>Шаг 3 из 4 — Фильтры получателей</strong><br>
+              Определите, кому отправлять сообщения. Для цепочки: система каждую минуту проверяет, кто подходит под фильтр — новые контакты автоматически попадают в воронку и получают шаги с заданными задержками. Если фильтры не заданы — все контакты с telegram_id.
+            </div>
+            <h3 class="text-sm font-bold mb-2">Фильтры получателей</h3>
+            <div id="autoFiltersContainer"></div>
+            <div id="autoContactsCount" class="mt-2"></div>
+            <div class="flex gap-2 mt-4">
+              <button onclick="autoBackStep(5)" class="flex-1 py-3 rounded-xl text-sm font-bold btn-secondary">Назад</button>
+              <button onclick="autoNextStep(5)" class="flex-1 py-3 rounded-xl text-sm font-bold btn-primary">Далее</button>
+            </div>
+          </div>
+
+          <!-- Шаг A6: Подтверждение -->
+          <div id="autoStep6" class="step-content fade-in hidden">
+            <div class="hint-box">
+              <strong>Шаг 4 из 4 — Проверьте и запустите</strong><br>
+              Убедитесь, что всё верно. Для цепочки — первый шаг отправится сразу, следующие по заданным задержкам. Для расписания — отправка начнётся в ближайший указанный день и время.
+            </div>
+            <h3 class="text-sm font-bold mb-2">Подтверждение</h3>
+            <div id="autoConfirmContent" class="broadcast-card mb-3 text-sm"></div>
+            <div class="flex gap-2 mt-4">
+              <button onclick="autoBackStep(6)" class="flex-1 py-3 rounded-xl text-sm font-bold btn-secondary">Назад</button>
+              <button id="autoSaveBtn" onclick="saveAutoBroadcast()" class="flex-1 py-3 rounded-xl text-sm font-bold btn-primary">Сохранить и запустить</button>
+            </div>
+          </div>
+        </div>
+      </div><!-- /subtabAuto -->
     </div>
 
     <!-- TAB: Список рассылок -->
     <div id="listTab" class="hidden">
-      <div class="hint-box">Здесь все ваши рассылки. Статусы: ожидает — ещё не отправлена, отправляется — в процессе, завершена — доставлена. Можно удалить ожидающую или повторить завершённую с редактированием.</div>
-      <div id="listLoading" class="text-center py-8">
-        <div class="text-sm" style="color: var(--text-secondary)">Загрузка...</div>
+      <!-- Подтабы списка -->
+      <div id="listSubtabs" class="flex gap-1 mb-4 p-1 rounded-lg" style="background: var(--bg-secondary)">
+        <button id="listSubBtnOneshot" onclick="showListSubtab('oneshot')"
+          class="flex-1 py-1.5 px-2 rounded-md text-xs font-medium transition-colors" style="background: var(--accent); color: #fff">Разовые</button>
+        <button id="listSubBtnAuto" onclick="showListSubtab('auto')"
+          class="flex-1 py-1.5 px-2 rounded-md text-xs font-medium transition-colors" style="color: var(--text-secondary)">Авторассылки</button>
       </div>
-      <div id="listContent"></div>
-      <div id="listEmpty" class="hidden text-center py-8">
-        <div class="text-sm" style="color: var(--text-secondary)">Нет рассылок</div>
-      </div>
-    </div>
 
-    <!-- TAB: Авторассылки -->
-    <div id="autoTab" class="hidden">
-      <!-- Список авторассылок -->
-      <div id="autoListView">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-lg font-bold">Авторассылки</h2>
-          <button onclick="showAutoCreate()" class="py-2 px-4 rounded-lg text-sm font-medium btn-primary">+ Создать</button>
-        </div>
-        <div id="autoLoading" class="text-center py-8">
+      <!-- Подтаб: Разовые рассылки -->
+      <div id="listSubOneshot">
+        <div class="hint-box">Здесь все ваши рассылки. Статусы: ожидает — ещё не отправлена, отправляется — в процессе, завершена — доставлена. Можно удалить ожидающую или повторить завершённую с редактированием.</div>
+        <div id="listLoading" class="text-center py-8">
           <div class="text-sm" style="color: var(--text-secondary)">Загрузка...</div>
         </div>
-        <div id="autoListContent"></div>
-        <div id="autoEmpty" class="hidden text-center py-8">
-          <div class="text-sm" style="color: var(--text-secondary)">Нет авторассылок</div>
-          <button onclick="showAutoCreate()" class="mt-3 py-2 px-4 rounded-lg text-sm font-medium btn-primary">Создать первую</button>
+        <div id="listContent"></div>
+        <div id="listEmpty" class="hidden text-center py-8">
+          <div class="text-sm" style="color: var(--text-secondary)">Нет рассылок</div>
         </div>
       </div>
 
-      <!-- Создание авторассылки -->
-      <div id="autoCreateView" class="hidden">
-        <div class="flex items-center mb-4">
-          <button onclick="hideAutoCreate()" class="mr-2 text-sm" style="color:var(--text-secondary)">← Назад</button>
-          <h2 class="text-lg font-bold">Новая авторассылка</h2>
-        </div>
-
-        <!-- Шаг A1: Тип + название + бот -->
-        <div id="autoStep1" class="step-content fade-in">
-          <div class="hint-box">
-            <strong>Шаг 1 из 4 — Основные настройки</strong><br>
-            Выберите тип: <em>Цепочка</em> — персональная воронка: каждый новый контакт, попадающий под фильтр, получает шаги со своими задержками. <em>Расписание</em> — повторяющаяся отправка всем по дням недели. Укажите название и бота.
+      <!-- Подтаб: Авторассылки -->
+      <div id="listSubAuto" class="hidden">
+        <div id="autoListView">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-bold">Авторассылки</h2>
+            <button onclick="showCreateSubtab('chain')" class="py-2 px-4 rounded-lg text-sm font-medium btn-primary">+ Создать</button>
           </div>
-          <div class="mb-3">
-            <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Тип авторассылки</label>
-            <div class="flex gap-2">
-              <button id="autoTypeChain" onclick="setAutoType('chain')" class="flex-1 py-2 px-3 rounded-lg text-sm font-medium btn-primary">Цепочка</button>
-              <button id="autoTypeRecurring" onclick="setAutoType('recurring')" class="flex-1 py-2 px-3 rounded-lg text-sm font-medium btn-secondary">Расписание</button>
-            </div>
-            <p id="autoTypeHint" class="text-xs mt-1" style="color: var(--text-secondary)">До 5 шагов с задержками между ними</p>
+          <div id="autoLoading" class="text-center py-8">
+            <div class="text-sm" style="color: var(--text-secondary)">Загрузка...</div>
           </div>
-
-          <div class="mb-3">
-            <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Название</label>
-            <input type="text" id="autoName" placeholder="Например: Приветственная цепочка" class="input-field w-full rounded-lg px-3 py-2 text-sm" />
-          </div>
-
-          <div class="mb-3" id="autoBotSelector">
-            <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Бот для отправки</label>
-            <select id="autoBotSelect" class="input-field w-full rounded-lg px-3 py-2 text-sm font-medium"></select>
-          </div>
-
-          <!-- Расписание (только для recurring) -->
-          <div id="autoScheduleBlock" class="hidden mb-3">
-            <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Дни недели</label>
-            <div class="flex gap-1 flex-wrap mb-2" id="autoDaysContainer">
-              <label class="flex items-center gap-1 text-sm px-2 py-1 rounded-lg" style="background:var(--bg-card)"><input type="checkbox" value="1" onchange="onAutoDayChange()"> Пн</label>
-              <label class="flex items-center gap-1 text-sm px-2 py-1 rounded-lg" style="background:var(--bg-card)"><input type="checkbox" value="2" onchange="onAutoDayChange()"> Вт</label>
-              <label class="flex items-center gap-1 text-sm px-2 py-1 rounded-lg" style="background:var(--bg-card)"><input type="checkbox" value="3" onchange="onAutoDayChange()"> Ср</label>
-              <label class="flex items-center gap-1 text-sm px-2 py-1 rounded-lg" style="background:var(--bg-card)"><input type="checkbox" value="4" onchange="onAutoDayChange()"> Чт</label>
-              <label class="flex items-center gap-1 text-sm px-2 py-1 rounded-lg" style="background:var(--bg-card)"><input type="checkbox" value="5" onchange="onAutoDayChange()"> Пт</label>
-              <label class="flex items-center gap-1 text-sm px-2 py-1 rounded-lg" style="background:var(--bg-card)"><input type="checkbox" value="6" onchange="onAutoDayChange()"> Сб</label>
-              <label class="flex items-center gap-1 text-sm px-2 py-1 rounded-lg" style="background:var(--bg-card)"><input type="checkbox" value="0" onchange="onAutoDayChange()"> Вс</label>
-            </div>
-            <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Время отправки (МСК, UTC+3)</label>
-            <input type="time" id="autoScheduleTime" value="10:00" class="input-field rounded-lg px-3 py-2 text-sm" />
-          </div>
-
-          <button onclick="autoNextStep(1)" class="w-full py-3 rounded-xl text-sm font-bold btn-primary mt-2">Далее</button>
-        </div>
-
-        <!-- Шаг A2: Шаги цепочки -->
-        <div id="autoStep2" class="step-content fade-in hidden">
-          <div class="hint-box">
-            <strong>Шаг 2 из 4 — Шаги цепочки</strong><br>
-            Добавьте от 1 до 5 шагов воронки. Когда контакт попадает под фильтр, он получает шаг 1. Через заданную задержку — шаг 2, и так далее. Каждый контакт проходит цепочку индивидуально. Нажмите «Редактировать» чтобы наполнить шаг сообщениями.
-          </div>
-          <h3 class="text-sm font-bold mb-2">Шаги цепочки</h3>
-          <div id="autoStepsList"></div>
-          <button id="autoAddStepBtn" onclick="addAutoStep()" class="w-full py-2 rounded-xl text-sm btn-secondary mt-2">+ Добавить шаг</button>
-          <div class="flex gap-2 mt-4">
-            <button onclick="autoBackStep(2)" class="flex-1 py-3 rounded-xl text-sm font-bold btn-secondary">Назад</button>
-            <button onclick="autoNextStep(2)" class="flex-1 py-3 rounded-xl text-sm font-bold btn-primary">Далее</button>
-          </div>
-        </div>
-
-        <!-- Шаг A3: Редактор сообщений шага -->
-        <div id="autoStep3" class="step-content fade-in hidden">
-          <div class="flex items-center mb-3">
-            <button onclick="autoBackToSteps()" class="mr-2 text-sm" style="color:var(--text-secondary)">← К шагам</button>
-            <h3 class="text-sm font-bold" id="autoStepEditorTitle">Шаг 1 — Сообщения</h3>
-          </div>
-          <div class="hint-box">
-            Добавьте от 1 до 5 сообщений для этого шага. Все сообщения шага отправляются получателю последовательно за одну отправку. Нажмите на сообщение чтобы редактировать текст, фото и кнопки.
-          </div>
-          <div id="autoMsgList"></div>
-          <button id="autoAddMsgBtn" onclick="addAutoMessage()" class="w-full py-2 rounded-xl text-sm btn-secondary mt-2">+ Добавить сообщение</button>
-          <div class="mt-3">
-            <label class="text-xs mb-1 block" style="color: var(--text-secondary)">
-              Задержка между сообщениями (сек)
-            </label>
-            <div class="flex items-center gap-3">
-              <input type="range" id="autoMsgDelayRange" min="0" max="60" value="0" step="1"
-                class="flex-1" style="accent-color: var(--accent)"
-                oninput="onAutoMsgDelayChange(this.value)" />
-              <span id="autoMsgDelayValue" class="text-sm font-medium" style="color: var(--accent); min-width: 40px; text-align: right">0 сек</span>
-            </div>
-          </div>
-          <button onclick="autoBackToSteps()" class="w-full py-3 rounded-xl text-sm font-bold btn-primary mt-4">Готово</button>
-        </div>
-
-        <!-- Шаг A4: Редактор одного сообщения авторассылки -->
-        <div id="autoStep4" class="step-content fade-in hidden">
-          <div class="flex items-center mb-3">
-            <button onclick="autoBackToMsgList()" class="mr-2 text-sm" style="color:var(--text-secondary)">← К сообщениям</button>
-            <h3 class="text-sm font-bold" id="autoMsgEditorTitle">Сообщение 1</h3>
-          </div>
-          <div class="hint-box">
-            Заполните текст сообщения. Можно добавить фото (ссылка или загрузка) и до 6 кнопок (ссылки или команды бота). С фото максимум 1024 символа текста, без фото — до 4096.
-          </div>
-          <div class="broadcast-card mb-3">
-            <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Формат текста</label>
-            <select id="autoMsgParseMode" onchange="onAutoMsgParseModeChange()"
-              class="input-field w-full rounded-lg px-3 py-2 text-sm font-medium mb-2">
-              <option value="Markdown">Markdown</option>
-              <option value="MarkdownV2">MarkdownV2</option>
-              <option value="HTML">HTML</option>
-            </select>
-            <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Фото (необязательно)</label>
-            <div class="flex gap-2 mb-2">
-              <input type="text" id="autoMsgPhotoUrl" placeholder="URL или загрузите" class="input-field flex-1 rounded-lg px-3 py-2 text-sm" oninput="onAutoMsgPhotoChange()" />
-              <label class="py-2 px-3 rounded-lg text-sm font-medium btn-secondary cursor-pointer shrink-0">
-                Загрузить
-                <input type="file" accept="image/*" class="hidden" onchange="autoUploadPhoto(event)" />
-              </label>
-            </div>
-            <div id="autoMsgPhotoPreview" class="hidden mb-2"><img class="w-full rounded-lg" style="max-height:150px;object-fit:cover" /></div>
-            <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Текст сообщения</label>
-            <textarea id="autoMsgText" rows="5" class="input-field w-full rounded-lg px-3 py-2 text-sm resize-y" placeholder="Текст сообщения..." oninput="onAutoMsgTextChange()"></textarea>
-          </div>
-          <div class="broadcast-card mb-3">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-medium" style="color: var(--text-secondary)">Кнопки (макс. 6)</span>
-              <button onclick="autoAddButton()" class="text-xs btn-secondary rounded-lg px-3 py-1" id="autoAddBtnBtn">+ Кнопка</button>
-            </div>
-            <div id="autoButtonsList"></div>
-          </div>
-          <button onclick="autoBackToMsgList()" class="w-full py-3 rounded-xl text-sm font-bold btn-primary">Готово</button>
-        </div>
-
-        <!-- Шаг A5: Фильтры -->
-        <div id="autoStep5" class="step-content fade-in hidden">
-          <div class="hint-box">
-            <strong>Шаг 3 из 4 — Фильтры получателей</strong><br>
-            Определите, кому отправлять сообщения. Для цепочки: система каждую минуту проверяет, кто подходит под фильтр — новые контакты автоматически попадают в воронку и получают шаги с заданными задержками. Если фильтры не заданы — все контакты с telegram_id.
-          </div>
-          <h3 class="text-sm font-bold mb-2">Фильтры получателей</h3>
-          <div id="autoFiltersContainer"></div>
-          <div id="autoContactsCount" class="mt-2"></div>
-          <div class="flex gap-2 mt-4">
-            <button onclick="autoBackStep(5)" class="flex-1 py-3 rounded-xl text-sm font-bold btn-secondary">Назад</button>
-            <button onclick="autoNextStep(5)" class="flex-1 py-3 rounded-xl text-sm font-bold btn-primary">Далее</button>
-          </div>
-        </div>
-
-        <!-- Шаг A6: Подтверждение -->
-        <div id="autoStep6" class="step-content fade-in hidden">
-          <div class="hint-box">
-            <strong>Шаг 4 из 4 — Проверьте и запустите</strong><br>
-            Убедитесь, что всё верно. Для цепочки — первый шаг отправится сразу, следующие по заданным задержкам. Для расписания — отправка начнётся в ближайший указанный день и время.
-          </div>
-          <h3 class="text-sm font-bold mb-2">Подтверждение</h3>
-          <div id="autoConfirmContent" class="broadcast-card mb-3 text-sm"></div>
-          <div class="flex gap-2 mt-4">
-            <button onclick="autoBackStep(6)" class="flex-1 py-3 rounded-xl text-sm font-bold btn-secondary">Назад</button>
-            <button id="autoSaveBtn" onclick="saveAutoBroadcast()" class="flex-1 py-3 rounded-xl text-sm font-bold btn-primary">Сохранить и запустить</button>
+          <div id="autoListContent"></div>
+          <div id="autoEmpty" class="hidden text-center py-8">
+            <div class="text-sm" style="color: var(--text-secondary)">Нет авторассылок</div>
+            <button onclick="showCreateSubtab('chain')" class="mt-3 py-2 px-4 rounded-lg text-sm font-medium btn-primary">Создать первую</button>
           </div>
         </div>
       </div>
@@ -1245,7 +1266,6 @@
           showTab('super');
           document.getElementById('tabCreate').style.display = 'none';
           document.getElementById('tabList').style.display = 'none';
-          document.getElementById('tabAuto').style.display = 'none';
           document.getElementById('tabSettings').style.display = 'none';
         }
       } catch (e) {
@@ -1281,20 +1301,20 @@
 
       banner.classList.remove('hidden');
       const tabCreate = document.getElementById('tabCreate');
-      const tabAuto = document.getElementById('tabAuto');
+      const isExpired = subscriptionInfo.status === 'trial_expired' || subscriptionInfo.status === 'no_subscription';
 
       if (subscriptionInfo.status === 'trial') {
         banner.style.background = 'var(--info-bg, #e0f2fe)';
         banner.style.color = 'var(--info-text, #0369a1)';
         banner.innerHTML = `<strong>Пробный период:</strong> осталось ${subscriptionInfo.trialDaysLeft} дн. <a href="javascript:void(0)" onclick="showPaymentModal()" style="text-decoration:underline;color:inherit">Оплатить</a>`;
         if (tabCreate) { tabCreate.style.opacity = ''; tabCreate.style.pointerEvents = ''; }
-        if (tabAuto) { tabAuto.style.opacity = ''; tabAuto.style.pointerEvents = ''; }
-      } else if (subscriptionInfo.status === 'trial_expired' || subscriptionInfo.status === 'no_subscription') {
+        updateCreateSubtabsDisabled(false);
+      } else if (isExpired) {
         banner.style.background = 'var(--danger-bg, #fee2e2)';
         banner.style.color = 'var(--danger-text, #dc2626)';
         banner.innerHTML = `<strong>Подписка истекла.</strong> Создание рассылок заблокировано. <a href="javascript:void(0)" onclick="showPaymentModal()" style="text-decoration:underline;color:inherit">Оплатить</a>`;
         if (tabCreate) { tabCreate.style.opacity = '0.5'; tabCreate.style.pointerEvents = 'none'; }
-        if (tabAuto) { tabAuto.style.opacity = '0.5'; tabAuto.style.pointerEvents = 'none'; }
+        updateCreateSubtabsDisabled(true);
       } else if (subscriptionInfo.status === 'paid' && subscriptionInfo.paidUntil) {
         const paidDate = new Date(subscriptionInfo.paidUntil);
         const isPermanent = paidDate.getFullYear() >= 2090;
@@ -1307,11 +1327,11 @@
           banner.innerHTML = `<strong>Подписка до ${paidDate.toLocaleDateString('ru-RU')}</strong> (осталось ${daysLeft} дн.) <a href="javascript:void(0)" onclick="showPaymentModal()" style="text-decoration:underline;color:inherit">Продлить</a>`;
         }
         if (tabCreate) { tabCreate.style.opacity = ''; tabCreate.style.pointerEvents = ''; }
-        if (tabAuto) { tabAuto.style.opacity = ''; tabAuto.style.pointerEvents = ''; }
+        updateCreateSubtabsDisabled(false);
       } else {
         banner.classList.add('hidden');
         if (tabCreate) { tabCreate.style.opacity = ''; tabCreate.style.pointerEvents = ''; }
-        if (tabAuto) { tabAuto.style.opacity = ''; tabAuto.style.pointerEvents = ''; }
+        updateCreateSubtabsDisabled(false);
       }
     }
 
@@ -1496,18 +1516,19 @@
     // ============================================
     // Табы
     // ============================================
+    let currentCreateSubtab = 'oneshot';
+    let currentListSubtab = 'oneshot';
+
     function showTab(tab) {
       const tabs = {
         create: document.getElementById('createTab'),
         list: document.getElementById('listTab'),
-        auto: document.getElementById('autoTab'),
         settings: document.getElementById('settingsTab'),
         super: document.getElementById('superTab'),
       };
       const buttons = {
         create: document.getElementById('tabCreate'),
         list: document.getElementById('tabList'),
-        auto: document.getElementById('tabAuto'),
         settings: document.getElementById('tabSettings'),
         super: document.getElementById('tabSuper'),
       };
@@ -1532,10 +1553,96 @@
         }
       }
 
-      if (tab === 'list') loadBroadcasts();
-      if (tab === 'auto') loadAutoBroadcasts();
+      if (tab === 'create') showCreateSubtab(currentCreateSubtab, true);
+      if (tab === 'list') {
+        showListSubtab(currentListSubtab);
+        loadBroadcasts();
+        loadAutoBroadcasts();
+      }
       if (tab === 'settings') loadSettings();
       if (tab === 'super') loadSuperData();
+    }
+
+    function showCreateSubtab(type, skipInit) {
+      currentCreateSubtab = type;
+      const subtabOneshot = document.getElementById('subtabOneshot');
+      const subtabAuto = document.getElementById('subtabAuto');
+      const btnOneshot = document.getElementById('subtabBtnOneshot');
+      const btnChain = document.getElementById('subtabBtnChain');
+      const btnRecurring = document.getElementById('subtabBtnRecurring');
+
+      // Скрыть все подтабы
+      subtabOneshot.classList.add('hidden');
+      subtabAuto.classList.add('hidden');
+
+      // Сбросить стили кнопок
+      [btnOneshot, btnChain, btnRecurring].forEach(btn => {
+        btn.style.background = '';
+        btn.style.color = 'var(--text-secondary)';
+      });
+
+      if (type === 'oneshot') {
+        subtabOneshot.classList.remove('hidden');
+        btnOneshot.style.background = 'var(--accent)';
+        btnOneshot.style.color = '#fff';
+      } else {
+        subtabAuto.classList.remove('hidden');
+        if (type === 'chain') {
+          btnChain.style.background = 'var(--accent)';
+          btnChain.style.color = '#fff';
+        } else {
+          btnRecurring.style.background = 'var(--accent)';
+          btnRecurring.style.color = '#fff';
+        }
+        if (!skipInit) {
+          setAutoType(type);
+          showAutoCreate();
+        }
+      }
+
+      // Переключить на таб «Создать» если ещё не на нём
+      const createTab = document.getElementById('createTab');
+      if (createTab.classList.contains('hidden')) {
+        showTab('create');
+      }
+    }
+
+    function showListSubtab(type) {
+      currentListSubtab = type;
+      const subOneshot = document.getElementById('listSubOneshot');
+      const subAuto = document.getElementById('listSubAuto');
+      const btnOneshot = document.getElementById('listSubBtnOneshot');
+      const btnAuto = document.getElementById('listSubBtnAuto');
+
+      subOneshot.classList.add('hidden');
+      subAuto.classList.add('hidden');
+      [btnOneshot, btnAuto].forEach(btn => {
+        btn.style.background = '';
+        btn.style.color = 'var(--text-secondary)';
+      });
+
+      if (type === 'oneshot') {
+        subOneshot.classList.remove('hidden');
+        btnOneshot.style.background = 'var(--accent)';
+        btnOneshot.style.color = '#fff';
+      } else {
+        subAuto.classList.remove('hidden');
+        btnAuto.style.background = 'var(--accent)';
+        btnAuto.style.color = '#fff';
+      }
+    }
+
+    function updateCreateSubtabsDisabled(disabled) {
+      const btnChain = document.getElementById('subtabBtnChain');
+      const btnRecurring = document.getElementById('subtabBtnRecurring');
+      if (btnChain) {
+        btnChain.style.opacity = disabled ? '0.5' : '';
+        btnChain.style.pointerEvents = disabled ? 'none' : '';
+      }
+      if (btnRecurring) {
+        btnRecurring.style.opacity = disabled ? '0.5' : '';
+        btnRecurring.style.pointerEvents = disabled ? 'none' : '';
+      }
     }
 
     // ============================================
@@ -3254,7 +3361,6 @@
           // Восстановить табы при импersonации
           document.getElementById('tabCreate').style.display = '';
           document.getElementById('tabList').style.display = '';
-          document.getElementById('tabAuto').style.display = '';
           document.getElementById('tabSettings').style.display = '';
           await loadBots();
           renderMessagesList();
@@ -3428,10 +3534,7 @@
     }
 
     function showAutoCreate() {
-      document.getElementById('autoListView').classList.add('hidden');
-      document.getElementById('autoCreateView').classList.remove('hidden');
       // Сбрасываем состояние
-      autoType = 'chain';
       autoSteps = [{ messages: [{ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown' }], delay_value: 0, delay_unit: 'hours', message_delay: 0 }];
       autoSchedule = { days: [], time: '10:00' };
       autoFilterConditions = [];
@@ -3443,7 +3546,6 @@
       document.getElementById('autoName').value = '';
       document.getElementById('autoScheduleTime').value = '10:00';
       document.querySelectorAll('#autoDaysContainer input').forEach(cb => cb.checked = false);
-      setAutoType('chain');
       // Заполняем боты
       const select = document.getElementById('autoBotSelect');
       select.innerHTML = '';
@@ -3457,8 +3559,7 @@
     }
 
     function hideAutoCreate() {
-      document.getElementById('autoCreateView').classList.add('hidden');
-      document.getElementById('autoListView').classList.remove('hidden');
+      showCreateSubtab('oneshot');
     }
 
     function showAutoStep(step) {
@@ -3957,8 +4058,8 @@
         const data = await r.json();
         if (data.ok) {
           showAlert(autoType === 'chain' ? 'Цепочка создана и запущена!' : 'Расписание создано!');
-          hideAutoCreate();
-          loadAutoBroadcasts();
+          currentListSubtab = 'auto';
+          showTab('list');
         } else {
           showAlert(data.error || 'Ошибка сохранения');
         }
