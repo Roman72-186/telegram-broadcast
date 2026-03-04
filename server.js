@@ -1137,6 +1137,40 @@ app.get('/api/tenant/info', requireTenantAdmin, (req, res) => {
 });
 
 // ============================================
+// Запрос на продление подписки от тенанта
+// ============================================
+app.post('/api/subscription/request', requireTenantAdmin, async (req, res) => {
+  try {
+    const { period } = req.body;
+    const validPeriods = { '7d': '7 дней', '1m': '1 месяц', '3m': '3 месяца', '1y': '1 год' };
+    if (!period || !validPeriods[period]) {
+      return res.status(400).json({ error: 'Некорректный период' });
+    }
+
+    if (!SUPER_ADMIN_ID || !config.platformBotToken) {
+      return res.status(500).json({ error: 'Уведомления не настроены' });
+    }
+
+    const tenant = db.getTenantById(req.tenantId);
+    const tenantName = tenant?.name || 'Без имени';
+    const tgId = tenant?.telegram_id || '—';
+
+    const text = `💳 Запрос на продление подписки\n\nТенант: ${tenantName}\nTelegram ID: ${tgId}\nПериод: ${validPeriods[period]}`;
+
+    await fetch(`https://api.telegram.org/bot${config.platformBotToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: SUPER_ADMIN_ID, text }),
+    });
+
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('POST /api/subscription/request error:', e.message);
+    res.status(500).json({ error: 'Ошибка отправки заявки' });
+  }
+});
+
+// ============================================
 // SUPER ADMIN API
 // ============================================
 

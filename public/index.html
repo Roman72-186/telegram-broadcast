@@ -1278,13 +1278,13 @@
       if (subscriptionInfo.status === 'trial') {
         banner.style.background = 'var(--info-bg, #e0f2fe)';
         banner.style.color = 'var(--info-text, #0369a1)';
-        banner.innerHTML = `<strong>Пробный период:</strong> осталось ${subscriptionInfo.trialDaysLeft} дн. <a href="javascript:void(0)" onclick="showPaymentInfo()" style="text-decoration:underline;color:inherit">Оплатить</a>`;
+        banner.innerHTML = `<strong>Пробный период:</strong> осталось ${subscriptionInfo.trialDaysLeft} дн. <a href="javascript:void(0)" onclick="showPaymentModal()" style="text-decoration:underline;color:inherit">Оплатить</a>`;
         if (tabCreate) { tabCreate.style.opacity = ''; tabCreate.style.pointerEvents = ''; }
         if (tabAuto) { tabAuto.style.opacity = ''; tabAuto.style.pointerEvents = ''; }
       } else if (subscriptionInfo.status === 'trial_expired' || subscriptionInfo.status === 'no_subscription') {
         banner.style.background = 'var(--danger-bg, #fee2e2)';
         banner.style.color = 'var(--danger-text, #dc2626)';
-        banner.innerHTML = `<strong>Подписка истекла.</strong> Создание рассылок заблокировано. <a href="javascript:void(0)" onclick="showPaymentInfo()" style="text-decoration:underline;color:inherit">Оплатить</a>`;
+        banner.innerHTML = `<strong>Подписка истекла.</strong> Создание рассылок заблокировано. <a href="javascript:void(0)" onclick="showPaymentModal()" style="text-decoration:underline;color:inherit">Оплатить</a>`;
         if (tabCreate) { tabCreate.style.opacity = '0.5'; tabCreate.style.pointerEvents = 'none'; }
         if (tabAuto) { tabAuto.style.opacity = '0.5'; tabAuto.style.pointerEvents = 'none'; }
       } else {
@@ -1294,8 +1294,31 @@
       }
     }
 
-    function showPaymentInfo() {
-      alert('Для оплаты подписки свяжитесь с администратором платформы.');
+    function showPaymentModal() {
+      document.getElementById('paymentRequestModal').classList.remove('hidden');
+    }
+
+    function closePaymentModal() {
+      document.getElementById('paymentRequestModal').classList.add('hidden');
+    }
+
+    async function sendPaymentRequest(period) {
+      try {
+        const resp = await fetch('/api/subscription/request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+          body: JSON.stringify({ period }),
+        });
+        const data = await resp.json();
+        if (data.ok) {
+          closePaymentModal();
+          alert('Заявка отправлена! Администратор свяжется с вами.');
+        } else {
+          alert(data.error || 'Ошибка');
+        }
+      } catch (e) {
+        alert('Ошибка отправки заявки');
+      }
     }
 
     // ============================================
@@ -4021,6 +4044,25 @@
               <button onclick="applySubscriptionDate()" class="py-2 px-3 rounded-lg text-sm btn-primary">OK</button>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модал запроса на продление подписки -->
+  <div id="paymentRequestModal" class="recipients-overlay hidden">
+    <div class="recipients-modal" style="max-width:340px">
+      <div class="recipients-header">
+        <h3>Продление подписки</h3>
+        <span style="cursor:pointer;font-size:20px;color:var(--text-secondary);padding:4px 8px" onclick="closePaymentModal()">✕</span>
+      </div>
+      <div style="padding:16px">
+        <p style="font-size:13px;color:var(--text-secondary);margin:0 0 12px">Выберите период — заявка будет отправлена администратору:</p>
+        <div class="flex flex-col gap-2">
+          <button onclick="sendPaymentRequest('7d')" class="w-full py-2 rounded-lg text-sm btn-secondary">7 дней</button>
+          <button onclick="sendPaymentRequest('1m')" class="w-full py-2 rounded-lg text-sm btn-primary">1 месяц</button>
+          <button onclick="sendPaymentRequest('3m')" class="w-full py-2 rounded-lg text-sm btn-secondary">3 месяца</button>
+          <button onclick="sendPaymentRequest('1y')" class="w-full py-2 rounded-lg text-sm btn-secondary">1 год</button>
         </div>
       </div>
     </div>
