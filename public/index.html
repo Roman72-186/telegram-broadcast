@@ -1238,11 +1238,11 @@
           await loadSubscriptionInfo();
         } else if (userRole === 'super_admin') {
           // Суперадмин без тенанта — скрыть обычные табы, только панель управления
-          document.getElementById('tabCreate').classList.add('hidden');
-          document.getElementById('tabList').classList.add('hidden');
-          document.getElementById('tabAuto').classList.add('hidden');
-          document.getElementById('tabSettings').classList.add('hidden');
           showTab('super');
+          document.getElementById('tabCreate').style.display = 'none';
+          document.getElementById('tabList').style.display = 'none';
+          document.getElementById('tabAuto').style.display = 'none';
+          document.getElementById('tabSettings').style.display = 'none';
         }
       } catch (e) {
         console.error('Auth error:', e);
@@ -3209,6 +3209,11 @@
           authToken = data.token;
           userTenantId = tenantId;
           showAlert(`Вы вошли как тенант: ${data.tenant_name || tenantId}`);
+          // Восстановить табы при импersonации
+          document.getElementById('tabCreate').style.display = '';
+          document.getElementById('tabList').style.display = '';
+          document.getElementById('tabAuto').style.display = '';
+          document.getElementById('tabSettings').style.display = '';
           await loadBots();
           renderMessagesList();
           showTab('create');
