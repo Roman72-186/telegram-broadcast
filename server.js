@@ -128,7 +128,6 @@ app.post('/api/auth', rateLimit(req => req.ip, 5, 60000), (req, res) => {
 
     const telegramId = String(validation.user.id);
     const { role, tenantId } = getUserRole(telegramId, db);
-    console.log(`[auth] telegramId=${telegramId} role=${role} tenantId=${tenantId}`);
 
     if (role === 'none') {
       return res.json({
@@ -1154,15 +1153,21 @@ app.post('/api/subscription/request', requireTenantAdmin, async (req, res) => {
 
     const tenant = db.getTenantById(req.tenantId);
     const tenantName = tenant?.name || 'Без имени';
-    const tgId = tenant?.telegram_id || '—';
+    const tgId = tenant?.telegram_id || '';
 
-    const text = `💳 Запрос на продление подписки\n\nТенант: ${tenantName}\nTelegram ID: ${tgId}\nПериод: ${validPeriods[period]}\n\nНаписать: tg://user?id=${tgId}`;
+    let text = `💳 Запрос на продление подписки\n\nТенант: ${tenantName}\nTelegram ID: ${tgId || '—'}\nПериод: ${validPeriods[period]}`;
+    if (tgId) text += `\n\nНаписать: tg://user?id=${tgId}`;
 
-    await fetch(`https://api.telegram.org/bot${config.platformBotToken}/sendMessage`, {
+    const tgResp = await fetch(`https://api.telegram.org/bot${config.platformBotToken}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chat_id: SUPER_ADMIN_ID, text, disable_web_page_preview: true }),
     });
+    if (!tgResp.ok) {
+      const err = await tgResp.json().catch(() => ({}));
+      console.error('Telegram sendMessage error:', err);
+      return res.status(502).json({ error: 'Не удалось отправить заявку' });
+    }
 
     res.json({ ok: true });
   } catch (e) {

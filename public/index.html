@@ -1301,7 +1301,7 @@
         if (isPermanent) {
           banner.classList.add('hidden');
         } else {
-          const daysLeft = Math.ceil((paidDate - new Date()) / (24*60*60*1000));
+          const daysLeft = Math.max(0, Math.ceil((paidDate - new Date()) / (24*60*60*1000)));
           banner.style.background = daysLeft <= 3 ? 'var(--danger-bg, #fee2e2)' : 'var(--info-bg, #e0f2fe)';
           banner.style.color = daysLeft <= 3 ? 'var(--danger-text, #dc2626)' : 'var(--info-text, #0369a1)';
           banner.innerHTML = `<strong>Подписка до ${paidDate.toLocaleDateString('ru-RU')}</strong> (осталось ${daysLeft} дн.) <a href="javascript:void(0)" onclick="showPaymentModal()" style="text-decoration:underline;color:inherit">Продлить</a>`;
@@ -1324,6 +1324,8 @@
     }
 
     async function sendPaymentRequest(period) {
+      const buttons = document.querySelectorAll('#paymentRequestModal button');
+      buttons.forEach(b => b.disabled = true);
       try {
         const resp = await fetch('/api/subscription/request', {
           method: 'POST',
@@ -1333,12 +1335,14 @@
         const data = await resp.json();
         if (data.ok) {
           closePaymentModal();
-          alert('Заявка отправлена! Администратор свяжется с вами.');
+          showAlert('Заявка отправлена! Администратор свяжется с вами.');
         } else {
-          alert(data.error || 'Ошибка');
+          showAlert(data.error || 'Ошибка');
         }
       } catch (e) {
-        alert('Ошибка отправки заявки');
+        showAlert('Ошибка отправки заявки');
+      } finally {
+        buttons.forEach(b => b.disabled = false);
       }
     }
 
@@ -3254,6 +3258,7 @@
           document.getElementById('tabSettings').style.display = '';
           await loadBots();
           renderMessagesList();
+          await loadSubscriptionInfo();
           showTab('create');
         } else showAlert(data.error || 'Ошибка');
       } catch (e) { showAlert('Ошибка'); }
@@ -4072,7 +4077,7 @@
 
   <!-- Модал управления подпиской -->
   <div id="subscriptionModal" class="recipients-overlay hidden">
-    <div class="recipients-modal" style="max-width:340px">
+    <div class="recipients-modal" style="max-width:340px;height:auto;margin:auto">
       <div class="recipients-header">
         <h3 id="subModalTitle">Подписка</h3>
         <span style="cursor:pointer;font-size:20px;color:var(--text-secondary);padding:4px 8px" onclick="closeSubscriptionModal()">✕</span>
@@ -4098,7 +4103,7 @@
 
   <!-- Модал запроса на продление подписки -->
   <div id="paymentRequestModal" class="recipients-overlay hidden">
-    <div class="recipients-modal" style="max-width:340px">
+    <div class="recipients-modal" style="max-width:340px;height:auto;margin:auto">
       <div class="recipients-header">
         <h3>Продление подписки</h3>
         <span style="cursor:pointer;font-size:20px;color:var(--text-secondary);padding:4px 8px" onclick="closePaymentModal()">✕</span>
