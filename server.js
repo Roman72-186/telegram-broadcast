@@ -128,6 +128,7 @@ app.post('/api/auth', rateLimit(req => req.ip, 5, 60000), (req, res) => {
 
     const telegramId = String(validation.user.id);
     const { role, tenantId } = getUserRole(telegramId, db);
+    console.log(`[auth] telegramId=${telegramId} role=${role} tenantId=${tenantId}`);
 
     if (role === 'none') {
       return res.json({
