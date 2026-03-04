@@ -1295,6 +1295,19 @@
         banner.innerHTML = `<strong>Подписка истекла.</strong> Создание рассылок заблокировано. <a href="javascript:void(0)" onclick="showPaymentModal()" style="text-decoration:underline;color:inherit">Оплатить</a>`;
         if (tabCreate) { tabCreate.style.opacity = '0.5'; tabCreate.style.pointerEvents = 'none'; }
         if (tabAuto) { tabAuto.style.opacity = '0.5'; tabAuto.style.pointerEvents = 'none'; }
+      } else if (subscriptionInfo.status === 'paid' && subscriptionInfo.paidUntil) {
+        const paidDate = new Date(subscriptionInfo.paidUntil);
+        const isPermanent = paidDate.getFullYear() >= 2090;
+        if (isPermanent) {
+          banner.classList.add('hidden');
+        } else {
+          const daysLeft = Math.ceil((paidDate - new Date()) / (24*60*60*1000));
+          banner.style.background = daysLeft <= 3 ? 'var(--danger-bg, #fee2e2)' : 'var(--info-bg, #e0f2fe)';
+          banner.style.color = daysLeft <= 3 ? 'var(--danger-text, #dc2626)' : 'var(--info-text, #0369a1)';
+          banner.innerHTML = `<strong>Подписка до ${paidDate.toLocaleDateString('ru-RU')}</strong> (осталось ${daysLeft} дн.) <a href="javascript:void(0)" onclick="showPaymentModal()" style="text-decoration:underline;color:inherit">Продлить</a>`;
+        }
+        if (tabCreate) { tabCreate.style.opacity = ''; tabCreate.style.pointerEvents = ''; }
+        if (tabAuto) { tabAuto.style.opacity = ''; tabAuto.style.pointerEvents = ''; }
       } else {
         banner.classList.add('hidden');
         if (tabCreate) { tabCreate.style.opacity = ''; tabCreate.style.pointerEvents = ''; }
