@@ -1155,12 +1155,12 @@ app.post('/api/subscription/request', requireTenantAdmin, async (req, res) => {
     const tenantName = tenant?.name || 'Без имени';
     const tgId = tenant?.telegram_id || '—';
 
-    const text = `💳 Запрос на продление подписки\n\nТенант: ${tenantName}\nTelegram ID: ${tgId}\nПериод: ${validPeriods[period]}`;
+    const text = `💳 Запрос на продление подписки\n\nТенант: ${tenantName}\nTelegram ID: ${tgId}\nПериод: ${validPeriods[period]}\n\nНаписать: tg://user?id=${tgId}`;
 
     await fetch(`https://api.telegram.org/bot${config.platformBotToken}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: SUPER_ADMIN_ID, text }),
+      body: JSON.stringify({ chat_id: SUPER_ADMIN_ID, text, disable_web_page_preview: true }),
     });
 
     res.json({ ok: true });
