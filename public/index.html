@@ -1088,6 +1088,10 @@
           <h2 class="text-lg font-bold">Арендаторы</h2>
           <button onclick="showAddTenantForm()" class="btn-primary px-3 py-1.5 rounded-lg text-xs">+ Добавить</button>
         </div>
+        <div class="flex gap-2 mb-3">
+          <input id="tenantSearchInput" type="text" placeholder="Поиск по ID или имени" class="input-field flex-1 rounded-lg px-3 py-2 text-sm" oninput="filterTenants()" />
+          <button onclick="clearTenantSearch()" class="btn-secondary px-3 py-2 rounded-lg text-xs">Сброс</button>
+        </div>
         <div id="addTenantForm" class="hidden broadcast-card mb-3">
           <input id="newTenantTgId" type="text" placeholder="Telegram ID" class="input-field w-full rounded-lg px-3 py-2 text-sm mb-2" />
           <input id="newTenantName" type="text" placeholder="Имя / Название" class="input-field w-full rounded-lg px-3 py-2 text-sm mb-2" />
@@ -3049,6 +3053,26 @@
     // Суперадмин
     // ============================================
     let superTariffs = [];
+    let allSuperTenants = [];
+
+    function filterTenants() {
+      const q = document.getElementById('tenantSearchInput').value.trim().toLowerCase();
+      if (!q) {
+        renderSuperTenants(allSuperTenants);
+        return;
+      }
+      const filtered = allSuperTenants.filter(t =>
+        String(t.telegram_id).includes(q) ||
+        (t.name || '').toLowerCase().includes(q) ||
+        String(t.id).includes(q)
+      );
+      renderSuperTenants(filtered);
+    }
+
+    function clearTenantSearch() {
+      document.getElementById('tenantSearchInput').value = '';
+      renderSuperTenants(allSuperTenants);
+    }
 
     function showSuperSub(sub) {
       ['tenants', 'tariffs', 'stats'].forEach(s => {
@@ -3069,7 +3093,8 @@
       try {
         const r = await apiFetch('/api/super/tenants');
         const data = await r.json();
-        renderSuperTenants(data.tenants || []);
+        allSuperTenants = data.tenants || [];
+        renderSuperTenants(allSuperTenants);
       } catch (e) { console.error(e); }
     }
 
