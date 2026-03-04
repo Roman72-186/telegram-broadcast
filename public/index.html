@@ -3094,7 +3094,7 @@
               ? `<button onclick="toggleTenantStatus(${t.id},'blocked')" class="text-xs px-2 py-1 rounded btn-danger">Заблокировать</button>`
               : `<button onclick="toggleTenantStatus(${t.id},'active')" class="text-xs px-2 py-1 rounded btn-primary">Активировать</button>`
             }
-            <button onclick="activateSubscription(${t.id})" class="text-xs px-2 py-1 rounded btn-primary">Оплата +1 мес</button>
+            <button onclick="showSubscriptionModal(${t.id}, '${escapeAttr(t.name || 'Без имени')}')" class="text-xs px-2 py-1 rounded btn-primary">Подписка</button>
             <button onclick="impersonateTenant(${t.id})" class="text-xs px-2 py-1 rounded btn-secondary">Войти как тенант</button>
             <button onclick="confirmDeleteTenant(${t.id}, '${escapeAttr(t.name || 'Без имени')}')" class="text-xs px-2 py-1 rounded btn-danger">Удалить</button>
           </div>
@@ -3131,14 +3131,44 @@
       } catch (e) { showAlert('Ошибка удаления арендатора'); }
     }
 
-    async function activateSubscription(tenantId) {
-      const months = prompt('На сколько месяцев продлить подписку?', '1');
-      if (!months) return;
+    let subModalTenantId = null;
+
+    function showSubscriptionModal(tenantId, name) {
+      subModalTenantId = tenantId;
+      document.getElementById('subModalTitle').textContent = `Подписка: ${name}`;
+      document.getElementById('subModalDate').value = '';
+      document.getElementById('subscriptionModal').classList.remove('hidden');
+    }
+
+    function closeSubscriptionModal() {
+      document.getElementById('subscriptionModal').classList.add('hidden');
+      subModalTenantId = null;
+    }
+
+    async function applySubscription(type, value) {
+      if (!subModalTenantId) return;
+      const body = type === 'days' ? { days: value } : { months: value };
       try {
-        const r = await apiFetch(`/api/super/tenants/${tenantId}/activate`, { method: 'POST', body: { months: parseInt(months) || 1 } });
+        const r = await apiFetch(`/api/super/tenants/${subModalTenantId}/activate`, { method: 'POST', body });
         const data = await r.json();
         if (data.ok) {
           showAlert(`Подписка продлена до ${new Date(data.paid_until).toLocaleDateString('ru-RU')}`);
+          closeSubscriptionModal();
+          loadSuperTenants();
+        } else showAlert(data.error || 'Ошибка');
+      } catch (e) { showAlert('Ошибка активации подписки'); }
+    }
+
+    async function applySubscriptionDate() {
+      if (!subModalTenantId) return;
+      const dateVal = document.getElementById('subModalDate').value;
+      if (!dateVal) { showAlert('Выберите дату'); return; }
+      try {
+        const r = await apiFetch(`/api/super/tenants/${subModalTenantId}/activate`, { method: 'POST', body: { until: dateVal + 'T23:59:59' } });
+        const data = await r.json();
+        if (data.ok) {
+          showAlert(`Подписка установлена до ${new Date(data.paid_until).toLocaleDateString('ru-RU')}`);
+          closeSubscriptionModal();
           loadSuperTenants();
         } else showAlert(data.error || 'Ошибка');
       } catch (e) { showAlert('Ошибка активации подписки'); }
@@ -3969,6 +3999,32 @@
       setTimeout(() => toast.remove(), 2800);
     }
   </script>
+
+  <!-- Модал управления подпиской -->
+  <div id="subscriptionModal" class="recipients-overlay hidden">
+    <div class="recipients-modal" style="max-width:340px">
+      <div class="recipients-header">
+        <h3 id="subModalTitle">Подписка</h3>
+        <span style="cursor:pointer;font-size:20px;color:var(--text-secondary);padding:4px 8px" onclick="closeSubscriptionModal()">✕</span>
+      </div>
+      <div style="padding:16px">
+        <div class="flex flex-col gap-2">
+          <button onclick="applySubscription('days', 1)" class="w-full py-2 rounded-lg text-sm btn-secondary">+1 день</button>
+          <button onclick="applySubscription('days', 7)" class="w-full py-2 rounded-lg text-sm btn-secondary">+7 дней</button>
+          <button onclick="applySubscription('months', 1)" class="w-full py-2 rounded-lg text-sm btn-primary">+1 месяц</button>
+          <button onclick="applySubscription('months', 3)" class="w-full py-2 rounded-lg text-sm btn-secondary">+3 месяца</button>
+          <button onclick="applySubscription('months', 12)" class="w-full py-2 rounded-lg text-sm btn-secondary">+1 год</button>
+          <div class="mt-2">
+            <label class="text-xs" style="color:var(--text-muted)">До конкретной даты:</label>
+            <div class="flex gap-2 mt-1">
+              <input type="date" id="subModalDate" class="input-field rounded-lg px-3 py-2 text-sm flex-1">
+              <button onclick="applySubscriptionDate()" class="py-2 px-3 rounded-lg text-sm btn-primary">OK</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Модал превью получателей -->
   <div id="recipientsModal" class="recipients-overlay hidden">

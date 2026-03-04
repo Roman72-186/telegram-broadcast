@@ -1226,18 +1226,30 @@ app.post('/api/super/tenants/:id/delete', requireSuperAdmin, (req, res) => {
 app.post('/api/super/tenants/:id/activate', requireSuperAdmin, (req, res) => {
   try {
     const { id } = req.params;
-    const { months } = req.body;
-    const m = parseInt(months) || 1;
+    const { days, months, until } = req.body;
 
     const tenant = db.getTenantById(Number(id));
     if (!tenant) return res.status(404).json({ error: 'Тенант не найден' });
 
-    // Продлеваем от текущей даты или от paid_until (если ещё активна)
-    const now = new Date();
-    const currentPaidUntil = tenant.paid_until ? new Date(tenant.paid_until) : null;
-    const baseDate = (currentPaidUntil && currentPaidUntil > now) ? currentPaidUntil : now;
-    const newPaidUntil = new Date(baseDate);
-    newPaidUntil.setMonth(newPaidUntil.getMonth() + m);
+    let newPaidUntil;
+
+    if (until) {
+      // Конкретная дата
+      newPaidUntil = new Date(until);
+      if (isNaN(newPaidUntil.getTime())) return res.status(400).json({ error: 'Невалидная дата' });
+    } else {
+      // Продлеваем от текущей даты или от paid_until (если ещё активна)
+      const now = new Date();
+      const currentPaidUntil = tenant.paid_until ? new Date(tenant.paid_until) : null;
+      const baseDate = (currentPaidUntil && currentPaidUntil > now) ? currentPaidUntil : now;
+      newPaidUntil = new Date(baseDate);
+
+      if (days) {
+        newPaidUntil.setDate(newPaidUntil.getDate() + (parseInt(days) || 0));
+      } else {
+        newPaidUntil.setMonth(newPaidUntil.getMonth() + (parseInt(months) || 1));
+      }
+    }
 
     db.updateTenant(Number(id), { paid_until: newPaidUntil.toISOString() });
     res.json({ ok: true, paid_until: newPaidUntil.toISOString() });
