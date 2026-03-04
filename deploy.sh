@@ -2,7 +2,7 @@
 # deploy.sh — Пуш в Git + обновление на VPS одной командой
 # Использование: bash deploy.sh "описание изменений"
 
-VPS_HOST="root@5.42.107.133"
+VPS_HOST="root@72.56.77.253"
 APP_DIR="/opt/telegram-broadcast"
 PM2_NAME="broadcast"
 

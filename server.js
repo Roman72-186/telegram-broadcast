@@ -5,7 +5,7 @@ const path = require('path');
 const cron = require('node-cron');
 const { loadConfig } = require('./lib/config');
 const db = require('./lib/db');
-const { validateInitData, getUserRole, isSuperAdmin } = require('./lib/auth');
+const { validateInitData, getUserRole, isSuperAdmin, SUPER_ADMIN_ID } = require('./lib/auth');
 const { authMiddleware, requireSuperAdmin, requireTenantAdmin, requireTenantOwner } = require('./lib/middleware');
 const { fetchAllContacts, extractTags, fetchListSchemas, fetchListItems, extractTelegramIds } = require('./lib/leadteh');
 const ExcelJS = require('exceljs');
@@ -590,6 +590,14 @@ app.post('/api/broadcast/save', requireTenantAdmin, (req, res) => {
       return res.status(403).json({ error: limits.reason });
     }
 
+    // Проверка подписки (суперадмин — обход)
+    if (req.role !== 'super_admin') {
+      const sub = db.checkSubscription(req.tenantId);
+      if (!sub.canBroadcast) {
+        return res.status(403).json({ error: 'Подписка истекла. Обратитесь к администратору для продления.', subscription_expired: true });
+      }
+    }
+
     // Нормализация сообщений
     let normalizedMessages;
     if (Array.isArray(messages) && messages.length > 0) {
@@ -1106,6 +1114,8 @@ app.get('/api/tenant/info', requireTenantAdmin, (req, res) => {
     const limits = db.checkTariffLimits(req.tenantId);
     const plan = tenant?.tariff_plan_id ? db.getTariffPlan(tenant.tariff_plan_id) : null;
 
+    const subscription = db.checkSubscription(req.tenantId);
+
     res.json({
       tenant: {
         name: tenant?.name || '',
@@ -1118,6 +1128,7 @@ app.get('/api/tenant/info', requireTenantAdmin, (req, res) => {
         max_contacts: plan.max_contacts,
       } : null,
       usage: limits.limits || null,
+      subscription,
     });
   } catch (e) {
     console.error('GET /api/tenant/info error:', e.message);
@@ -1211,6 +1222,31 @@ app.post('/api/super/tenants/:id/delete', requireSuperAdmin, (req, res) => {
   }
 });
 
+// --- Активация подписки тенанта ---
+app.post('/api/super/tenants/:id/activate', requireSuperAdmin, (req, res) => {
+  try {
+    const { id } = req.params;
+    const { months } = req.body;
+    const m = parseInt(months) || 1;
+
+    const tenant = db.getTenantById(Number(id));
+    if (!tenant) return res.status(404).json({ error: 'Тенант не найден' });
+
+    // Продлеваем от текущей даты или от paid_until (если ещё активна)
+    const now = new Date();
+    const currentPaidUntil = tenant.paid_until ? new Date(tenant.paid_until) : null;
+    const baseDate = (currentPaidUntil && currentPaidUntil > now) ? currentPaidUntil : now;
+    const newPaidUntil = new Date(baseDate);
+    newPaidUntil.setMonth(newPaidUntil.getMonth() + m);
+
+    db.updateTenant(Number(id), { paid_until: newPaidUntil.toISOString() });
+    res.json({ ok: true, paid_until: newPaidUntil.toISOString() });
+  } catch (e) {
+    console.error('POST /api/super/tenants/:id/activate error:', e.message);
+    res.status(500).json({ error: 'Ошибка активации подписки' });
+  }
+});
+
 // --- Переключить работу под тенантом (суперадмин видит данные тенанта) ---
 app.post('/api/super/impersonate', requireSuperAdmin, (req, res) => {
   try {
@@ -1281,6 +1317,14 @@ app.post('/api/auto/save', requireTenantAdmin, (req, res) => {
     const bots = db.getBotsByTenant(req.tenantId);
     const bot = bots.find(b => b.id === Number(bot_id));
     if (!bot) return res.status(400).json({ error: 'Бот не найден' });
+
+    // Проверка подписки (суперадмин — обход)
+    if (req.role !== 'super_admin') {
+      const sub = db.checkSubscription(req.tenantId);
+      if (!sub.canBroadcast) {
+        return res.status(403).json({ error: 'Подписка истекла. Обратитесь к администратору для продления.', subscription_expired: true });
+      }
+    }
 
     // Валидация шагов
     if (!Array.isArray(steps) || steps.length === 0 || steps.length > 5) {
@@ -1510,10 +1554,37 @@ cron.schedule('* * * * *', async () => {
     await processRecurringBroadcasts();
     // Очистка просроченных сессий
     db.deleteExpiredSessions();
+    // Уведомления об истекающем trial (раз в час)
+    if (new Date().getMinutes() === 0) {
+      await notifyTrialExpiry();
+    }
   } catch (e) {
     console.error('[cron] Ошибка:', e.message);
   }
 });
+
+// ============================================
+// Уведомления суперадмину об истекающем trial
+// ============================================
+async function notifyTrialExpiry() {
+  if (!SUPER_ADMIN_ID || !config.platformBotToken) return;
+  try {
+    const expiring = db.getExpiringTrials();
+    if (expiring.length === 0) return;
+
+    const lines = expiring.map(t => `- ${t.name || 'Без имени'} (TG: ${t.telegram_id}, trial до ${t.trial_ends_at?.slice(0, 10)})`);
+    const text = `⏰ Trial истекает в ближайшие 24ч:\n${lines.join('\n')}`;
+
+    await fetch(`https://api.telegram.org/bot${config.platformBotToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: SUPER_ADMIN_ID, text }),
+    });
+    console.log(`[notify] Отправлено уведомление суперадмину: ${expiring.length} тенантов`);
+  } catch (e) {
+    console.error('[notify] Ошибка уведомления:', e.message);
+  }
+}
 
 // ============================================
 // Логика отправки (мультитенантная)
