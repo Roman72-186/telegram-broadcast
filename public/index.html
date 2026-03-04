@@ -3089,14 +3089,14 @@
               ${tariffOptions}
             </select>
           </div>
-          <div class="flex gap-2 flex-wrap">
+          <button onclick="impersonateTenant(${t.id})" class="w-full py-2 rounded-lg text-sm font-medium mb-2" style="background:var(--accent);color:#fff">Войти как тенант</button>
+          <div class="flex gap-2">
+            <button onclick="showSubscriptionModal(${t.id}, '${escapeAttr(t.name || 'Без имени')}')" class="flex-1 text-xs px-2 py-1.5 rounded btn-primary">Подписка</button>
             ${t.status === 'active'
-              ? `<button onclick="toggleTenantStatus(${t.id},'blocked')" class="text-xs px-2 py-1 rounded btn-danger">Заблокировать</button>`
-              : `<button onclick="toggleTenantStatus(${t.id},'active')" class="text-xs px-2 py-1 rounded btn-primary">Активировать</button>`
+              ? `<button onclick="toggleTenantStatus(${t.id},'blocked')" class="flex-1 text-xs px-2 py-1.5 rounded btn-danger">Заблокировать</button>`
+              : `<button onclick="toggleTenantStatus(${t.id},'active')" class="flex-1 text-xs px-2 py-1.5 rounded btn-primary">Активировать</button>`
             }
-            <button onclick="showSubscriptionModal(${t.id}, '${escapeAttr(t.name || 'Без имени')}')" class="text-xs px-2 py-1 rounded btn-primary">Подписка</button>
-            <button onclick="impersonateTenant(${t.id})" class="text-xs px-2 py-1 rounded btn-secondary">Войти как тенант</button>
-            <button onclick="confirmDeleteTenant(${t.id}, '${escapeAttr(t.name || 'Без имени')}')" class="text-xs px-2 py-1 rounded btn-danger">Удалить</button>
+            <button onclick="confirmDeleteTenant(${t.id}, '${escapeAttr(t.name || 'Без имени')}')" class="flex-1 text-xs px-2 py-1.5 rounded btn-danger">Удалить</button>
           </div>
         </div>`;
       }).join('');
