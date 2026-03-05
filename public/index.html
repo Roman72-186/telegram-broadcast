@@ -1015,6 +1015,12 @@
       <!-- Подтаб: Авторассылки -->
       <div id="listSubAuto" class="hidden">
         <div id="autoListView">
+          <div class="hint-box mb-4">
+            <strong>Что такое авторассылки?</strong><br>
+            Авторассылки работают автоматически — вам не нужно каждый раз создавать рассылку вручную. Есть два типа:<br><br>
+            <strong>Цепочка</strong> — персональная воронка сообщений. Когда новый контакт попадает под заданный фильтр (например, по тегу или списку), он автоматически получает первое сообщение. Через заданную задержку (минуты, часы или дни) — второе, затем третье и так далее. Каждый контакт проходит цепочку индивидуально, с момента своего попадания в воронку. Идеально для приветственных серий, онбординга или прогрева новых подписчиков.<br><br>
+            <strong>Расписание</strong> — повторяющаяся рассылка по графику. Вы выбираете дни недели и время, и система автоматически отправляет сообщения всем подходящим контактам. Подходит для регулярных дайджестов, напоминаний или еженедельных акций.
+          </div>
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-bold">Авторассылки</h2>
             <button onclick="showCreateSubtab('chain')" class="py-2 px-4 rounded-lg text-sm font-medium btn-primary">+ Создать</button>
@@ -1025,7 +1031,8 @@
           <div id="autoListContent"></div>
           <div id="autoEmpty" class="hidden text-center py-8">
             <div class="text-sm" style="color: var(--text-secondary)">Нет авторассылок</div>
-            <button onclick="showCreateSubtab('chain')" class="mt-3 py-2 px-4 rounded-lg text-sm font-medium btn-primary">Создать первую</button>
+            <p class="text-xs mt-2 mb-3" style="color: var(--text-muted)">Создайте цепочку для автоматического прогрева новых контактов или расписание для регулярных рассылок по графику</p>
+            <button onclick="showCreateSubtab('chain')" class="py-2 px-4 rounded-lg text-sm font-medium btn-primary">Создать первую</button>
           </div>
         </div>
       </div>
