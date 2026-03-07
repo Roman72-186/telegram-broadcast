@@ -115,6 +115,102 @@ app.get('/health', (req, res) => {
 });
 
 // ============================================
+// Webhook для ботов тенантов (обработка /start)
+// ============================================
+app.post('/webhook/bot/:token', async (req, res) => {
+  res.sendStatus(200); // Telegram ждёт быстрый ответ
+
+  try {
+    const update = req.body;
+    if (!update?.message?.text) return;
+
+    const text = update.message.text;
+    const chatId = update.message.chat.id;
+    const botToken = req.params.token;
+
+    // Обрабатываем только /start
+    if (!text.startsWith('/start')) return;
+
+    // Находим бота по токену
+    const allBots = db.getAllActiveBots();
+    const bot = allBots.find(b => b.token === botToken);
+    if (!bot) return;
+
+    const tenant = db.getTenantById(bot.tenant_id);
+    const tenantName = tenant?.name || 'нашу компанию';
+
+    const welcomeText = `Здравствуйте! Добро пожаловать в ${tenantName}.\n\nЗдесь вы сможете получать сообщения и общаться с нами.`;
+
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: 'Связаться с технической поддержкой', url: 'https://t.me/roman_chatbots' }],
+      ],
+    };
+
+    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: welcomeText,
+        reply_markup: keyboard,
+      }),
+    });
+  } catch (e) {
+    console.error('[webhook] error:', e.message);
+  }
+});
+
+// ============================================
+// Webhook для платформенного бота (команда /start)
+// ============================================
+app.post('/webhook/platform', async (req, res) => {
+  res.sendStatus(200);
+
+  try {
+    const update = req.body;
+    if (!update?.message?.text) return;
+
+    const text = update.message.text;
+    const chatId = update.message.chat.id;
+
+    if (!text.startsWith('/start')) return;
+
+    const caption =
+      `<b>LT Кабинет — платформа для Telegram-рассылок</b>\n\n` +
+      `Добро пожаловать! Этот бот — ваш личный кабинет для управления рассылками через Telegram.\n\n` +
+      `Здесь вы можете:\n` +
+      `• Создавать и планировать рассылки\n` +
+      `• Управлять контактами и списками\n` +
+      `• Отслеживать статистику отправок\n\n` +
+      `Нажмите кнопку ниже, чтобы открыть кабинет.`;
+
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: '📱 Открыть кабинет', web_app: { url: 'https://broadcast.leadtehsms.ru/' } }],
+        [{ text: '💬 Связаться с поддержкой', url: 'https://t.me/roman_chatbots' }],
+      ],
+    };
+
+    const photoUrl = 'https://broadcast.leadtehsms.ru/welcome.jpg';
+
+    await fetch(`https://api.telegram.org/bot${config.platformBotToken}/sendPhoto`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        photo: photoUrl,
+        caption,
+        parse_mode: 'HTML',
+        reply_markup: keyboard,
+      }),
+    });
+  } catch (e) {
+    console.error('[platform webhook] error:', e.message);
+  }
+});
+
+// ============================================
 // API: Авторизация через initData
 // ============================================
 app.post('/api/auth', rateLimit(req => req.ip, 5, 60000), (req, res) => {
@@ -966,6 +1062,10 @@ app.post('/api/settings/bot/add', requireTenantOwner, async (req, res) => {
     }
 
     const botId = db.createBot(req.tenantId, botName, token, leadteh_id || '', botUsername);
+
+    // Установить webhook для бота
+    setupBotWebhook(token).catch(e => console.error(`[webhook] Ошибка установки для ${botUsername}:`, e.message));
+
     res.json({ ok: true, bot_id: botId, bot_username: botUsername, bot_name: botName });
   } catch (e) {
     console.error('POST /api/settings/bot/add error:', e.message);
@@ -2517,6 +2617,36 @@ function maskToken(token) {
   return token.slice(0, 4) + '...' + token.slice(-3);
 }
 
+// ============================================
+// Webhook: установка для ботов
+// ============================================
+async function setupBotWebhook(botToken) {
+  const webhookUrl = `https://broadcast.leadtehsms.ru/webhook/bot/${botToken}`;
+  const r = await fetch(`https://api.telegram.org/bot${botToken}/setWebhook`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url: webhookUrl, allowed_updates: ['message'] }),
+  });
+  const data = await r.json();
+  if (data.ok) {
+    console.log(`[webhook] Установлен для бота`);
+  } else {
+    console.error(`[webhook] Ошибка:`, data.description);
+  }
+  return data;
+}
+
+async function setupAllWebhooks() {
+  const bots = db.getAllActiveBots();
+  for (const bot of bots) {
+    try {
+      await setupBotWebhook(bot.token);
+    } catch (e) {
+      console.error(`[webhook] Ошибка для bot_id=${bot.id}:`, e.message);
+    }
+  }
+}
+
 function generateId() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
     const r = (Math.random() * 16) | 0;
@@ -2528,6 +2658,26 @@ function generateId() {
 // ============================================
 // Запуск
 // ============================================
+async function setupPlatformWebhook() {
+  if (!config.platformBotToken) return;
+  const webhookUrl = 'https://broadcast.leadtehsms.ru/webhook/platform';
+  try {
+    const r = await fetch(`https://api.telegram.org/bot${config.platformBotToken}/setWebhook`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: webhookUrl, allowed_updates: ['message'] }),
+    });
+    const data = await r.json();
+    if (data.ok) {
+      console.log('[platform webhook] Установлен');
+    } else {
+      console.error('[platform webhook] Ошибка:', data.description);
+    }
+  } catch (e) {
+    console.error('[platform webhook] Ошибка:', e.message);
+  }
+}
+
 async function main() {
   await db.initDb();
   const PORT = config.port;
@@ -2536,6 +2686,7 @@ async function main() {
     console.log(`Платформенный бот: ${config.platformBotToken ? 'настроен' : 'НЕ НАСТРОЕН'}`);
     console.log('Cron: каждую минуту');
   });
+  await setupPlatformWebhook();
 }
 
 main().catch(e => {
