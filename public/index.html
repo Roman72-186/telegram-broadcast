@@ -1154,29 +1154,40 @@
 
     <!-- TAB: Диалог (чаты) -->
     <div id="chatTab" class="hidden">
-      <!-- Список чатов -->
-      <div id="chatListView">
-        <div class="flex items-center gap-2 mb-4">
-          <select id="chatBotSelect" class="input-field w-full rounded-lg px-3 py-2 text-sm" onchange="loadChatList()">
+      <!-- Верхняя панель: бот + подтабы -->
+      <div id="chatTopPanel">
+        <div class="mb-3">
+          <select id="chatBotSelect" class="input-field w-full rounded-lg px-3 py-2 text-sm" onchange="onChatBotChange()">
           </select>
-          <button onclick="showNewChatDialog()" class="py-2 px-4 rounded-lg text-sm font-medium btn-primary whitespace-nowrap">+ Чат</button>
         </div>
-        <div id="chatListContent" class="space-y-2"></div>
-        <div id="chatListEmpty" class="hidden text-center py-8">
-          <div class="text-sm" style="color: var(--text-secondary)">Нет диалогов</div>
-          <p class="text-xs mt-2" style="color: var(--text-muted)">Начните новый чат, нажав кнопку «+ Чат»</p>
+        <div class="flex gap-1 mb-4 p-1 rounded-lg" style="background: var(--bg-secondary)">
+          <button id="chatSubBtnContacts" onclick="showChatSubtab('contacts')"
+            class="flex-1 py-1.5 px-2 rounded-md text-xs font-medium transition-colors" style="background: var(--accent); color: #fff">Контакты</button>
+          <button id="chatSubBtnDialogs" onclick="showChatSubtab('dialogs')"
+            class="flex-1 py-1.5 px-2 rounded-md text-xs font-medium transition-colors" style="color: var(--text-secondary)">Диалоги</button>
         </div>
       </div>
 
-      <!-- Новый чат: поиск контакта -->
-      <div id="chatNewView" class="hidden">
-        <div class="flex items-center gap-2 mb-4">
-          <button onclick="closeChatNew()" class="py-2 px-3 rounded-lg text-sm btn-secondary">&larr;</button>
-          <h2 class="text-lg font-bold">Новый чат</h2>
+      <!-- Подтаб: Контакты (список из Leadteh) -->
+      <div id="chatContactsView">
+        <input id="chatContactsSearch" type="text" class="input-field w-full rounded-lg px-3 py-2 text-sm mb-3"
+          placeholder="Поиск по имени или Telegram ID..." oninput="filterChatContacts()">
+        <div id="chatContactsLoading" class="text-center py-8">
+          <div class="text-sm" style="color: var(--text-secondary)">Загрузка контактов...</div>
         </div>
-        <input id="chatSearchInput" type="text" class="input-field w-full rounded-lg px-3 py-2 text-sm mb-3"
-          placeholder="Telegram ID или имя..." oninput="debounceChatSearch()">
-        <div id="chatSearchResults" class="space-y-2"></div>
+        <div id="chatContactsList" class="space-y-1"></div>
+        <div id="chatContactsEmpty" class="hidden text-center py-8">
+          <div class="text-sm" style="color: var(--text-secondary)">Контакты не найдены</div>
+        </div>
+      </div>
+
+      <!-- Подтаб: Диалоги (существующие чаты) -->
+      <div id="chatDialogsView" class="hidden">
+        <div id="chatListContent" class="space-y-2"></div>
+        <div id="chatListEmpty" class="hidden text-center py-8">
+          <div class="text-sm" style="color: var(--text-secondary)">Нет диалогов</div>
+          <p class="text-xs mt-2" style="color: var(--text-muted)">Выберите контакт на вкладке «Контакты» чтобы начать</p>
+        </div>
       </div>
 
       <!-- Окно чата (переписка) -->
@@ -1763,7 +1774,7 @@
         loadBroadcasts();
         loadAutoBroadcasts();
       }
-      if (tab === 'chat') loadChatList();
+      if (tab === 'chat') loadChatTab();
       if (tab === 'settings') loadSettings();
       if (tab === 'super') loadSuperData();
     }
@@ -4398,20 +4409,167 @@
     let chatCurrentId = null;
     let chatPollingTimer = null;
     let chatLastMessageId = 0;
-    let chatSearchTimer = null;
-    let chatNewChatData = null; // {telegramId, contactName, botId} для нового чата
+    let chatNewChatData = null;
+    let chatCurrentSubtab = 'contacts';
+    let chatAllContacts = []; // кэш загруженных контактов
+    let chatContactsBotId = null; // для какого бота загружены
 
     // Чат пользователя (chat_user)
     let chatUserPollingTimer = null;
     let chatUserLastMessageId = 0;
     let chatUserChatId = null;
 
-    async function loadChatList() {
+    function showChatSubtab(type) {
+      chatCurrentSubtab = type;
+      const btnContacts = document.getElementById('chatSubBtnContacts');
+      const btnDialogs = document.getElementById('chatSubBtnDialogs');
+      const viewContacts = document.getElementById('chatContactsView');
+      const viewDialogs = document.getElementById('chatDialogsView');
+
+      [btnContacts, btnDialogs].forEach(b => { b.style.background = ''; b.style.color = 'var(--text-secondary)'; });
+      viewContacts.classList.add('hidden');
+      viewDialogs.classList.add('hidden');
+
+      if (type === 'contacts') {
+        btnContacts.style.background = 'var(--accent)';
+        btnContacts.style.color = '#fff';
+        viewContacts.classList.remove('hidden');
+        loadChatContacts();
+      } else {
+        btnDialogs.style.background = 'var(--accent)';
+        btnDialogs.style.color = '#fff';
+        viewDialogs.classList.remove('hidden');
+        loadChatDialogs();
+      }
+    }
+
+    function onChatBotChange() {
+      chatAllContacts = [];
+      chatContactsBotId = null;
+      if (chatCurrentSubtab === 'contacts') loadChatContacts();
+      else loadChatDialogs();
+    }
+
+    async function loadChatTab() {
       const sel = document.getElementById('chatBotSelect');
       if (sel.options.length === 0 && allBots.length > 0) {
         sel.innerHTML = allBots.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
       }
+      showChatSubtab(chatCurrentSubtab);
+    }
 
+    // --- Контакты Leadteh ---
+    async function loadChatContacts() {
+      const botId = document.getElementById('chatBotSelect').value;
+      if (!botId) return;
+
+      // Используем кэш если бот не сменился
+      if (chatContactsBotId === botId && chatAllContacts.length > 0) {
+        filterChatContacts();
+        return;
+      }
+
+      const loading = document.getElementById('chatContactsLoading');
+      const list = document.getElementById('chatContactsList');
+      const empty = document.getElementById('chatContactsEmpty');
+      loading.classList.remove('hidden');
+      list.innerHTML = '';
+      empty.classList.add('hidden');
+
+      try {
+        const r = await apiFetch(`/api/contacts?bot_id=${botId}`);
+        const data = await r.json();
+        chatAllContacts = data.contacts || [];
+        chatContactsBotId = botId;
+        loading.classList.add('hidden');
+        filterChatContacts();
+      } catch (e) {
+        loading.classList.add('hidden');
+        list.innerHTML = '<div class="text-center text-sm py-4" style="color:var(--danger)">Ошибка загрузки</div>';
+      }
+    }
+
+    function filterChatContacts() {
+      const q = (document.getElementById('chatContactsSearch').value || '').trim().toLowerCase();
+      const list = document.getElementById('chatContactsList');
+      const empty = document.getElementById('chatContactsEmpty');
+
+      let filtered = chatAllContacts;
+      if (q.length >= 1) {
+        filtered = chatAllContacts.filter(c =>
+          (c.name && c.name.toLowerCase().includes(q)) ||
+          String(c.telegram_id).includes(q)
+        );
+      }
+
+      if (filtered.length === 0) {
+        list.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+
+      empty.classList.add('hidden');
+      // Показываем до 100 контактов
+      const shown = filtered.slice(0, 100);
+      list.innerHTML = shown.map(c => {
+        const initials = (c.name || '?').charAt(0).toUpperCase();
+        const tagsStr = (c.tags || []).slice(0, 3).map(t => escapeHtml(t)).join(', ');
+        return `<div class="chat-list-item" data-tgid="${c.telegram_id}" data-name="${escapeHtml(c.name || '')}" onclick="onContactClick(this)">
+          <div class="chat-avatar">${initials}</div>
+          <div style="flex:1;min-width:0">
+            <div class="font-medium text-sm truncate">${escapeHtml(c.name || 'Без имени')}</div>
+            <div class="text-xs" style="color:var(--text-secondary)">ID: ${c.telegram_id}${tagsStr ? ' · ' + tagsStr : ''}</div>
+          </div>
+        </div>`;
+      }).join('');
+
+      if (filtered.length > 100) {
+        list.innerHTML += `<div class="text-center text-xs py-2" style="color:var(--text-muted)">Показаны первые 100 из ${filtered.length}. Уточните поиск.</div>`;
+      }
+    }
+
+    function onContactClick(el) {
+      startNewChat(el.dataset.tgid, el.dataset.name);
+    }
+
+    async function startNewChat(telegramId, contactName) {
+      const botId = document.getElementById('chatBotSelect').value;
+      if (!botId) { showAlert('Выберите бота'); return; }
+
+      try {
+        // Проверяем, есть ли уже чат с этим контактом
+        const r = await fetch('/api/chat/list', {
+          headers: { 'Authorization': 'Bearer ' + authToken },
+        });
+        const data = await r.json();
+        const existing = (data.chats || []).find(c =>
+          String(c.bot_id) === String(botId) && c.contact_telegram_id === telegramId
+        );
+
+        if (existing) {
+          openChat(existing.id, existing.contact_name || telegramId, telegramId);
+        } else {
+          // Новый чат — показываем окно переписки, чат создастся при первом сообщении
+          chatCurrentId = null;
+          chatNewChatData = { telegramId, contactName, botId };
+          document.getElementById('chatTopPanel').classList.add('hidden');
+          document.getElementById('chatContactsView').classList.add('hidden');
+          document.getElementById('chatDialogsView').classList.add('hidden');
+          document.getElementById('chatConversation').classList.remove('hidden');
+          document.getElementById('chatConvName').textContent = contactName || telegramId;
+          document.getElementById('chatConvInfo').textContent = 'ID: ' + telegramId;
+          document.getElementById('chatMessagesArea').innerHTML =
+            '<div class="text-center py-4 text-xs" style="color:var(--text-secondary)">Начните диалог — напишите первое сообщение</div>';
+          document.getElementById('chatInput').value = '';
+          document.getElementById('chatInput').focus();
+        }
+      } catch (e) {
+        showAlert('Ошибка');
+      }
+    }
+
+    // --- Диалоги (существующие чаты) ---
+    async function loadChatDialogs() {
       try {
         const r = await fetch('/api/chat/list', {
           headers: { 'Authorization': 'Bearer ' + authToken },
@@ -4422,7 +4580,7 @@
         const content = document.getElementById('chatListContent');
         const empty = document.getElementById('chatListEmpty');
 
-        const botId = sel.value;
+        const botId = document.getElementById('chatBotSelect').value;
         const filtered = botId ? chats.filter(c => String(c.bot_id) === String(botId)) : chats;
 
         if (filtered.length === 0) {
@@ -4456,7 +4614,7 @@
           </div>`;
         }).join('');
       } catch (e) {
-        console.error('loadChatList error:', e);
+        console.error('loadChatDialogs error:', e);
       }
     }
 
@@ -4479,12 +4637,14 @@
       } catch { return ''; }
     }
 
+    // --- Переписка ---
     async function openChat(chatId, name, telegramId) {
       chatCurrentId = chatId;
       chatLastMessageId = 0;
       chatNewChatData = null;
-      document.getElementById('chatListView').classList.add('hidden');
-      document.getElementById('chatNewView').classList.add('hidden');
+      document.getElementById('chatTopPanel').classList.add('hidden');
+      document.getElementById('chatContactsView').classList.add('hidden');
+      document.getElementById('chatDialogsView').classList.add('hidden');
       document.getElementById('chatConversation').classList.remove('hidden');
       document.getElementById('chatConvName').textContent = name;
       document.getElementById('chatConvInfo').textContent = 'ID: ' + telegramId;
@@ -4549,8 +4709,8 @@
       chatCurrentId = null;
       chatNewChatData = null;
       document.getElementById('chatConversation').classList.add('hidden');
-      document.getElementById('chatListView').classList.remove('hidden');
-      loadChatList();
+      document.getElementById('chatTopPanel').classList.remove('hidden');
+      showChatSubtab(chatCurrentSubtab);
     }
 
     async function sendChatMessage() {
@@ -4610,95 +4770,6 @@
         }
       } catch (e) {
         showAlert('Ошибка отправки');
-      }
-    }
-
-    // Новый чат
-    function showNewChatDialog() {
-      document.getElementById('chatListView').classList.add('hidden');
-      document.getElementById('chatNewView').classList.remove('hidden');
-      document.getElementById('chatSearchInput').value = '';
-      document.getElementById('chatSearchResults').innerHTML = '';
-      document.getElementById('chatSearchInput').focus();
-    }
-
-    function closeChatNew() {
-      document.getElementById('chatNewView').classList.add('hidden');
-      document.getElementById('chatListView').classList.remove('hidden');
-    }
-
-    function debounceChatSearch() {
-      if (chatSearchTimer) clearTimeout(chatSearchTimer);
-      chatSearchTimer = setTimeout(searchChatContacts, 400);
-    }
-
-    async function searchChatContacts() {
-      const q = document.getElementById('chatSearchInput').value.trim();
-      if (q.length < 2) {
-        document.getElementById('chatSearchResults').innerHTML = '';
-        return;
-      }
-      const botId = document.getElementById('chatBotSelect').value;
-      try {
-        const r = await fetch(`/api/chat/search?q=${encodeURIComponent(q)}&bot_id=${botId}`, {
-          headers: { 'Authorization': 'Bearer ' + authToken },
-        });
-        const data = await r.json();
-        const results = document.getElementById('chatSearchResults');
-        if (!data.contacts || data.contacts.length === 0) {
-          results.innerHTML = '<div class="text-sm text-center py-4" style="color:var(--text-secondary)">Ничего не найдено</div>';
-          return;
-        }
-        results.innerHTML = data.contacts.map(c => {
-          const initials = (c.name || '?').charAt(0).toUpperCase();
-          return `<div class="chat-list-item" data-tgid="${c.telegram_id}" data-name="${escapeHtml(c.name || '')}" onclick="onSearchResultClick(this)">
-            <div class="chat-avatar">${initials}</div>
-            <div>
-              <div class="font-medium text-sm">${escapeHtml(c.name || 'Без имени')}</div>
-              <div class="text-xs" style="color:var(--text-secondary)">ID: ${c.telegram_id}</div>
-            </div>
-          </div>`;
-        }).join('');
-      } catch (e) {
-        console.error('searchChatContacts error:', e);
-      }
-    }
-
-    function onSearchResultClick(el) {
-      startNewChat(el.dataset.tgid, el.dataset.name);
-    }
-
-    async function startNewChat(telegramId, contactName) {
-      const botId = document.getElementById('chatBotSelect').value;
-      if (!botId) { showAlert('Выберите бота'); return; }
-
-      try {
-        const r = await fetch('/api/chat/list', {
-          headers: { 'Authorization': 'Bearer ' + authToken },
-        });
-        const data = await r.json();
-        const existing = (data.chats || []).find(c =>
-          String(c.bot_id) === String(botId) && c.contact_telegram_id === telegramId
-        );
-
-        closeChatNew();
-
-        if (existing) {
-          openChat(existing.id, existing.contact_name || telegramId, telegramId);
-        } else {
-          chatCurrentId = null;
-          chatNewChatData = { telegramId, contactName, botId };
-          document.getElementById('chatListView').classList.add('hidden');
-          document.getElementById('chatConversation').classList.remove('hidden');
-          document.getElementById('chatConvName').textContent = contactName || telegramId;
-          document.getElementById('chatConvInfo').textContent = 'ID: ' + telegramId;
-          document.getElementById('chatMessagesArea').innerHTML =
-            '<div class="text-center py-4 text-xs" style="color:var(--text-secondary)">Начните диалог — напишите первое сообщение</div>';
-          document.getElementById('chatInput').value = '';
-          document.getElementById('chatInput').focus();
-        }
-      } catch (e) {
-        showAlert('Ошибка');
       }
     }
 
