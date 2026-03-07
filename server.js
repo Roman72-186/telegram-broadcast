@@ -640,7 +640,7 @@ app.post('/api/broadcast/save', requireTenantAdmin, (req, res) => {
           }
         }
       }
-      normalizedMessages = messages.map(msg => ({
+      normalizedMessages = messages.map((msg, idx) => ({
         photo_url: msg.photo_url?.trim() || '',
         text: msg.text.trim(),
         parse_mode: msg.parse_mode || parse_mode || null,
@@ -649,6 +649,7 @@ app.post('/api/broadcast/save', requireTenantAdmin, (req, res) => {
           if (b.style) nb.style = b.style;
           return nb;
         }) : [],
+        delay_before: idx === 0 ? 0 : Math.max(0, Math.min(300, parseInt(msg.delay_before) || 0)),
       }));
     } else {
       if (!text || !text.trim()) {
@@ -1866,29 +1867,30 @@ async function sendPreparedToContact(autoBroadcast, prepared, telegramId) {
 async function processRecurringBroadcasts() {
   const recurring = db.getRecurringDue();
   const now = new Date();
-  // МСК = UTC+3
-  const mskOffset = 3 * 60 * 60 * 1000;
-  const mskNow = new Date(now.getTime() + mskOffset);
-  const mskDay = mskNow.getUTCDay(); // 0=Вс, 1=Пн..6=Сб
-  const mskHour = mskNow.getUTCHours();
-  const mskMinute = mskNow.getUTCMinutes();
-  const mskTimeStr = String(mskHour).padStart(2, '0') + ':' + String(mskMinute).padStart(2, '0');
 
   for (const ab of recurring) {
     try {
       const schedule = JSON.parse(ab.schedule_json);
       if (!schedule.days || !schedule.time) continue;
 
+      // Часовой пояс из настроек (по умолчанию МСК UTC+3)
+      const tzOffset = (typeof schedule.tz_offset === 'number' ? schedule.tz_offset : 3) * 60 * 60 * 1000;
+      const localNow = new Date(now.getTime() + tzOffset);
+      const localDay = localNow.getUTCDay();
+      const localHour = localNow.getUTCHours();
+      const localMinute = localNow.getUTCMinutes();
+      const localTimeStr = String(localHour).padStart(2, '0') + ':' + String(localMinute).padStart(2, '0');
+
       // Проверяем день недели
-      if (!schedule.days.includes(mskDay)) continue;
+      if (!schedule.days.includes(localDay)) continue;
 
       // Проверяем время (минутная точность)
-      if (mskTimeStr !== schedule.time) continue;
+      if (localTimeStr !== schedule.time) continue;
 
       // Проверяем: уже отправляли сегодня?
       if (db.hasRunToday(ab.id)) continue;
 
-      console.log(`[auto-recurring] Запуск "${ab.name}" (${schedule.time}, день ${mskDay})`);
+      console.log(`[auto-recurring] Запуск "${ab.name}" (${schedule.time}, день ${localDay}, UTC+${typeof schedule.tz_offset === 'number' ? schedule.tz_offset : 3})`);
 
       const fullAb = db.getAutoBroadcast(ab.id);
       if (!fullAb || !fullAb.steps || fullAb.steps.length === 0) continue;
@@ -2026,6 +2028,7 @@ async function sendBroadcast(broadcast) {
     photoUrl: msg.photo_url || '',
     keyboard: buildKeyboard(msg.buttons || [], botUsername),
     parseMode: msg.parse_mode || broadcast.parse_mode || null,
+    delayBefore: msg.delay_before || 0,
   }));
 
   // Сохраняем общее количество
@@ -2066,7 +2069,8 @@ async function sendBroadcast(broadcast) {
       }
 
       if (i < prepared.length - 1) {
-        const delayMs = (broadcast.message_delay || 0) * 1000 || 500;
+        const nextDelay = prepared[i + 1]?.delayBefore || 0;
+        const delayMs = nextDelay > 0 ? nextDelay * 1000 : 500;
         await new Promise(r => setTimeout(r, delayMs));
       }
     }

@@ -622,18 +622,6 @@
           + Добавить сообщение
         </button>
 
-        <div id="messageDelayBlock" class="hidden mt-3">
-          <label class="text-xs mb-1 flex items-center" style="color: var(--text-secondary)">
-            Задержка между сообщениями
-            <span class="tooltip-trigger">?<span class="tooltip-text">Пауза (в секундах) перед отправкой следующего сообщения одному получателю. Делает рассылку естественнее</span></span>
-          </label>
-          <div class="flex items-center gap-3">
-            <input type="range" id="messageDelayRange" min="0" max="60" value="0" step="1"
-              class="flex-1" style="accent-color: var(--accent)"
-              oninput="onMessageDelayChange(this.value)" />
-            <span id="messageDelayValue" class="text-sm font-medium" style="color: var(--accent); min-width: 40px; text-align: right">0 сек</span>
-          </div>
-        </div>
       </div>
 
       <!-- Шаг 2: Редактор сообщения -->
@@ -797,7 +785,22 @@
                 class="input-field w-full rounded-lg px-3 py-2 text-sm" />
             </div>
           </div>
-          <p class="text-xs" style="color: var(--text-muted)">Часовой пояс: Москва (UTC+3)</p>
+          <div class="mt-2">
+            <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Часовой пояс</label>
+            <select id="scheduleTz" class="input-field w-full rounded-lg px-3 py-2 text-sm">
+              <option value="2">Калининград (UTC+2)</option>
+              <option value="3" selected>Москва (UTC+3)</option>
+              <option value="4">Самара (UTC+4)</option>
+              <option value="5">Екатеринбург (UTC+5)</option>
+              <option value="6">Омск (UTC+6)</option>
+              <option value="7">Красноярск (UTC+7)</option>
+              <option value="8">Иркутск (UTC+8)</option>
+              <option value="9">Якутск (UTC+9)</option>
+              <option value="10">Владивосток (UTC+10)</option>
+              <option value="11">Магадан (UTC+11)</option>
+              <option value="12">Камчатка (UTC+12)</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -878,8 +881,22 @@
                 <label class="flex items-center gap-1 text-sm px-2 py-1 rounded-lg" style="background:var(--bg-card)"><input type="checkbox" value="6" onchange="onAutoDayChange()"> Сб</label>
                 <label class="flex items-center gap-1 text-sm px-2 py-1 rounded-lg" style="background:var(--bg-card)"><input type="checkbox" value="0" onchange="onAutoDayChange()"> Вс</label>
               </div>
-              <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Время отправки (МСК, UTC+3)</label>
-              <input type="time" id="autoScheduleTime" value="10:00" class="input-field rounded-lg px-3 py-2 text-sm" />
+              <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Время отправки</label>
+              <input type="time" id="autoScheduleTime" value="10:00" class="input-field rounded-lg px-3 py-2 text-sm mb-2" />
+              <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Часовой пояс</label>
+              <select id="autoScheduleTz" class="input-field w-full rounded-lg px-3 py-2 text-sm">
+                <option value="2">Калининград (UTC+2)</option>
+                <option value="3" selected>Москва (UTC+3)</option>
+                <option value="4">Самара (UTC+4)</option>
+                <option value="5">Екатеринбург (UTC+5)</option>
+                <option value="6">Омск (UTC+6)</option>
+                <option value="7">Красноярск (UTC+7)</option>
+                <option value="8">Иркутск (UTC+8)</option>
+                <option value="9">Якутск (UTC+9)</option>
+                <option value="10">Владивосток (UTC+10)</option>
+                <option value="11">Магадан (UTC+11)</option>
+                <option value="12">Камчатка (UTC+12)</option>
+              </select>
             </div>
 
             <button onclick="autoNextStep(1)" class="w-full py-3 rounded-xl text-sm font-bold btn-primary mt-2">Далее</button>
@@ -1183,9 +1200,8 @@
     let filterConditions = [];
     let filterOperators = [];
 
-    let messages = [{ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown' }];
+    let messages = [{ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown', delay_before: 0 }];
     let currentMessageIndex = 0;
-    let messageDelay = 0;
 
     let allLists = [];
     let selectedListId = '';
@@ -1766,6 +1782,18 @@
       const container = document.getElementById('messagesList');
       container.innerHTML = '';
       messages.forEach((msg, i) => {
+        // Задержка перед сообщением (кроме первого)
+        if (i > 0) {
+          const delayEl = document.createElement('div');
+          delayEl.className = 'flex items-center gap-2 my-1 px-2';
+          delayEl.innerHTML = `
+            <span class="text-xs" style="color:var(--text-muted)">&#8987; Задержка:</span>
+            <input type="number" min="0" max="300" value="${msg.delay_before || 0}"
+              onchange="messages[${i}].delay_before=Math.max(0,Math.min(300,parseInt(this.value)||0));this.value=messages[${i}].delay_before"
+              class="input-field rounded px-2 py-0.5 text-xs" style="width:60px" />
+            <span class="text-xs" style="color:var(--text-muted)">сек</span>`;
+          container.appendChild(delayEl);
+        }
         const card = document.createElement('div');
         card.className = 'msg-card fade-in';
         const textPreview = msg.text
@@ -1794,17 +1822,11 @@
         container.appendChild(card);
       });
       document.getElementById('addMessageBtn').classList.toggle('hidden', messages.length >= 5);
-      document.getElementById('messageDelayBlock').classList.toggle('hidden', messages.length < 2);
-    }
-
-    function onMessageDelayChange(val) {
-      messageDelay = parseInt(val) || 0;
-      document.getElementById('messageDelayValue').textContent = messageDelay + ' сек';
     }
 
     function addMessage() {
       if (messages.length >= 5) { showAlert('Максимум 5 сообщений'); return; }
-      messages.push({ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown' });
+      messages.push({ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown', delay_before: 0 });
       renderMessagesList();
       editMessage(messages.length - 1);
     }
@@ -2426,10 +2448,10 @@
       const checked = document.getElementById('sendNow').checked;
       document.getElementById('scheduleFields').classList.toggle('hidden', checked);
       if (!checked) {
-        const now = new Date();
-        now.setHours(now.getHours() + 3);
+        const tzOff = parseInt(document.getElementById('scheduleTz').value) || 3;
+        const now = new Date(Date.now() + tzOff * 3600000);
         document.getElementById('scheduleDate').value = now.toISOString().split('T')[0];
-        document.getElementById('scheduleTime').value = now.toTimeString().slice(0, 5);
+        document.getElementById('scheduleTime').value = now.toISOString().slice(11, 16);
         document.getElementById('scheduleDate').min = new Date().toISOString().split('T')[0];
       }
     }
@@ -2462,11 +2484,17 @@
         container.appendChild(card);
       });
 
-      if (messages.length > 1 && messageDelay > 0) {
-        const delayCard = document.createElement('div');
-        delayCard.className = 'broadcast-card mb-3';
-        delayCard.innerHTML = `<div class="text-xs" style="color:var(--text-secondary)">Задержка между сообщениями: <b>${messageDelay} сек</b></div>`;
-        container.appendChild(delayCard);
+      if (messages.length > 1) {
+        const delays = messages.slice(1).filter(m => (m.delay_before || 0) > 0);
+        if (delays.length > 0) {
+          const delayCard = document.createElement('div');
+          delayCard.className = 'broadcast-card mb-3';
+          const delayLines = messages.slice(1).map((m, idx) =>
+            `Перед сообщением ${idx + 2}: <b>${m.delay_before || 0} сек</b>`
+          ).join('<br>');
+          delayCard.innerHTML = `<div class="text-xs" style="color:var(--text-secondary)"><div class="section-label">Задержки</div>${delayLines}</div>`;
+          container.appendChild(delayCard);
+        }
       }
 
       const filtersHtml = [];
@@ -2489,8 +2517,9 @@
       if (document.getElementById('sendNow').checked) {
         document.getElementById('confirmTime').textContent = 'Сейчас';
       } else {
+        const tzLabel = document.getElementById('scheduleTz').selectedOptions[0]?.text || 'Москва (UTC+3)';
         document.getElementById('confirmTime').textContent =
-          `${document.getElementById('scheduleDate').value} ${document.getElementById('scheduleTime').value} (МСК)`;
+          `${document.getElementById('scheduleDate').value} ${document.getElementById('scheduleTime').value} (${tzLabel})`;
       }
       updateConfirmRecipients();
     }
@@ -2644,18 +2673,21 @@
         } else {
           const date = document.getElementById('scheduleDate').value;
           const time = document.getElementById('scheduleTime').value;
-          scheduledAt = new Date(`${date}T${time}:00+03:00`).toISOString();
+          const tzOff = parseInt(document.getElementById('scheduleTz').value) || 3;
+          const tzSign = tzOff >= 0 ? '+' : '-';
+          const tzStr = tzSign + String(Math.abs(tzOff)).padStart(2, '0') + ':00';
+          scheduledAt = new Date(`${date}T${time}:00${tzStr}`).toISOString();
         }
 
         const r = await apiFetch('/api/broadcast/save', {
           method: 'POST',
           body: {
             name: document.getElementById('broadcastName').value.trim(),
-            message_delay: messageDelay || 0,
-            messages: messages.map(msg => ({
+            messages: messages.map((msg, idx) => ({
               photo_url: msg.photo_url || '',
               text: msg.text.trim(),
               parse_mode: msg.parse_mode || null,
+              delay_before: idx === 0 ? 0 : (msg.delay_before || 0),
               buttons: msg.buttons.map(btn => {
                 const b = { text: btn.text, type: btn.type, value: btn.value };
                 if (btn.style) b.style = btn.style;
@@ -2694,11 +2726,8 @@
     }
 
     function resetForm() {
-      messages = [{ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown' }];
+      messages = [{ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown', delay_before: 0 }];
       currentMessageIndex = 0;
-      messageDelay = 0;
-      document.getElementById('messageDelayRange').value = 0;
-      document.getElementById('messageDelayValue').textContent = '0 сек';
       filterConditions = [];
       filterOperators = [];
       selectedListId = '';
@@ -2706,6 +2735,7 @@
       document.getElementById('broadcastName').value = '';
       document.getElementById('sendNow').checked = true;
       document.getElementById('scheduleFields').classList.add('hidden');
+      document.getElementById('scheduleTz').value = '3';
       const listSelect = document.getElementById('listSelect');
       if (listSelect) listSelect.value = '';
       const listInfo = document.getElementById('listInfo');
@@ -2896,8 +2926,9 @@
         text: m.text || '',
         buttons: (m.buttons || []).map(b => ({ text: b.text, type: b.type, value: b.value, style: b.style || '' })),
         parse_mode: m.parse_mode || 'Markdown',
+        delay_before: m.delay_before || 0,
       }));
-      if (messages.length === 0) messages = [{ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown' }];
+      if (messages.length === 0) messages = [{ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown', delay_before: 0 }];
       currentMessageIndex = 0;
 
       // Заполняем фильтры
@@ -2907,19 +2938,12 @@
       selectedListId = f.list_schema_id || '';
       selectedListName = f.list_name || '';
 
-      // Бот и задержка
+      // Бот
       selectedBotId = data.bot_id ? String(data.bot_id) : '';
-      messageDelay = data.message_delay || 0;
 
       // Название
       const nameInput = document.getElementById('broadcastName');
       if (nameInput) nameInput.value = (data.name || '') + ' (повтор)';
-
-      // Задержка между сообщениями
-      const delayRange = document.getElementById('messageDelayRange');
-      if (delayRange) delayRange.value = messageDelay;
-      const delayLabel = document.getElementById('messageDelayValue');
-      if (delayLabel) delayLabel.textContent = messageDelay + ' сек';
 
       // Выбираем бота в селекте
       const botSelect = document.getElementById('step1BotSelect');
@@ -3567,6 +3591,7 @@
       currentAutoMsgIndex = 0;
       document.getElementById('autoName').value = '';
       document.getElementById('autoScheduleTime').value = '10:00';
+      document.getElementById('autoScheduleTz').value = '3';
       document.querySelectorAll('#autoDaysContainer input').forEach(cb => cb.checked = false);
       // Заполняем боты
       const select = document.getElementById('autoBotSelect');
@@ -4009,7 +4034,8 @@
       if (autoType === 'recurring') {
         const dayNames = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
         const days = autoSchedule.days.sort().map(d => dayNames[d]).join(', ');
-        html += `<div class="mb-2"><strong>Расписание:</strong> ${days} в ${autoSchedule.time} МСК</div>`;
+        const autoTzLabel = document.getElementById('autoScheduleTz')?.selectedOptions[0]?.text || 'Москва (UTC+3)';
+        html += `<div class="mb-2"><strong>Расписание:</strong> ${days} в ${autoSchedule.time} (${autoTzLabel})</div>`;
       }
 
       html += `<div class="mb-2"><strong>Шагов:</strong> ${autoSteps.length}</div>`;
@@ -4073,6 +4099,7 @@
           body.schedule = {
             days: autoSchedule.days,
             time: document.getElementById('autoScheduleTime').value,
+            tz_offset: parseInt(document.getElementById('autoScheduleTz').value) || 3,
           };
         }
 
