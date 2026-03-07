@@ -3537,7 +3537,7 @@
             <span class="status-badge status-${escapeAttr(t.status)}">${escapeHtml(t.status)}</span>
           </div>
           <div class="text-xs" style="color:var(--text-muted)">TG ID: ${escapeHtml(String(t.telegram_id))}</div>
-          <div class="text-xs mb-1" style="color:var(--text-muted)">Боты: ${escapeHtml(String(t.bots_count))} | Рассылки: ${escapeHtml(String(t.broadcasts_count))}</div>
+          <div class="text-xs mb-1" style="color:var(--text-muted)">Боты: ${escapeHtml(String(t.bots_count))} | Контакты/мес: ${t.unique_contacts || 0}${t.tariff_max_contacts ? '/' + t.tariff_max_contacts : ''}</div>
           <div class="text-xs mb-1">Подписка: ${subLabel}</div>
           <div class="flex items-center gap-2 mb-2">
             <span class="text-xs" style="color:var(--text-muted)">Тариф:</span>
