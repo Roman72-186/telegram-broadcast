@@ -6,7 +6,7 @@ const cron = require('node-cron');
 const { loadConfig } = require('./lib/config');
 const db = require('./lib/db');
 const { validateInitData, getUserRole, isSuperAdmin, SUPER_ADMIN_ID } = require('./lib/auth');
-const { authMiddleware, requireSuperAdmin, requireTenantAdmin, requireTenantOwner } = require('./lib/middleware');
+const { authMiddleware, requireSuperAdmin, requireTenantAdmin, requireTenantOwner, requireChatUser } = require('./lib/middleware');
 const { fetchAllContacts, extractTags, fetchListSchemas, fetchListItems, extractTelegramIds } = require('./lib/leadteh');
 const ExcelJS = require('exceljs');
 
@@ -67,7 +67,11 @@ app.use((req, res, next) => {
 // Cache-bust: редирект / без версии → /?v=timestamp (сбрасывает кэш Telegram WebApp)
 const APP_VERSION = Date.now().toString(36);
 app.get('/', (req, res, next) => {
-  if (!req.query.v) return res.redirect(`/?v=${APP_VERSION}`);
+  if (!req.query.v) {
+    const params = new URLSearchParams(req.query);
+    params.set('v', APP_VERSION);
+    return res.redirect(`/?${params.toString()}`);
+  }
   next();
 });
 
@@ -158,11 +162,54 @@ app.post('/api/auth', rateLimit(req => req.ip, 5, 60000), (req, res) => {
 });
 
 // ============================================
+// API: Авторизация пользователя чата (через бота тенанта)
+// ============================================
+app.post('/api/auth/chat', rateLimit(req => req.ip, 10, 60000), (req, res) => {
+  try {
+    const { initData, bot_id } = req.body;
+    if (!initData || !bot_id) {
+      return res.status(400).json({ error: 'initData и bot_id обязательны' });
+    }
+
+    const bot = db.getBotById(Number(bot_id));
+    if (!bot) {
+      return res.status(404).json({ error: 'Бот не найден' });
+    }
+
+    // Валидируем initData токеном бота тенанта
+    const validation = validateInitData(initData, bot.token);
+    if (!validation.valid) {
+      return res.status(401).json({ error: validation.error });
+    }
+
+    const telegramId = String(validation.user.id);
+    const contactName = [validation.user.first_name, validation.user.last_name].filter(Boolean).join(' ');
+
+    // Находим или создаём чат
+    const chat = db.findOrCreateChat(bot.tenant_id, bot.id, telegramId, contactName);
+
+    // Создаём сессию chat_user
+    const session = db.createSession(bot.tenant_id, telegramId, 'chat_user');
+
+    res.json({
+      authorized: true,
+      token: session.token,
+      role: 'chat_user',
+      chatId: chat.id,
+      botName: bot.name,
+    });
+  } catch (e) {
+    console.error('POST /api/auth/chat error:', e.message);
+    res.status(500).json({ error: 'Ошибка авторизации чата' });
+  }
+});
+
+// ============================================
 // Все последующие роуты требуют авторизации
 // ============================================
 app.use('/api', rateLimit(req => `api:${req.ip}`, 60, 60000), (req, res, next) => {
-  // /api/auth не требует Bearer
-  if (req.path === '/auth') return next();
+  // /api/auth и /api/auth/chat не требуют Bearer
+  if (req.path === '/auth' || req.path === '/auth/chat') return next();
   // /api/cron/send проверяется по cronSecret
   if (req.path === '/cron/send') return next();
   authMiddleware(req, res, next);
@@ -1575,6 +1622,176 @@ app.post('/api/auto/:id/start', requireTenantAdmin, (req, res) => {
   } catch (e) {
     console.error('POST /api/auto/:id/start error:', e.message);
     res.status(500).json({ error: 'Ошибка запуска' });
+  }
+});
+
+// ============================================
+// API: Диалог (чаты арендатор ↔ пользователь)
+// ============================================
+
+// Поиск контакта по Telegram ID или имени
+app.get('/api/chat/search', requireTenantAdmin, async (req, res) => {
+  try {
+    const { q, bot_id } = req.query;
+    if (!q || q.trim().length < 2) return res.json({ contacts: [] });
+
+    const botConfig = getBotConfigForLeadteh(req);
+    if (!botConfig) return res.status(400).json({ error: 'Нет настроенных ботов' });
+
+    const allContacts = await fetchAllContacts(botConfig);
+    const term = q.trim().toLowerCase();
+    const filtered = allContacts.filter(c => {
+      if (!c.telegram_id) return false;
+      if (String(c.telegram_id).includes(term)) return true;
+      if (c.name && c.name.toLowerCase().includes(term)) return true;
+      return false;
+    }).slice(0, 20);
+
+    res.json({
+      contacts: filtered.map(c => ({
+        telegram_id: String(c.telegram_id),
+        name: c.name || '',
+        tags: extractTags(c),
+      })),
+    });
+  } catch (e) {
+    console.error('GET /api/chat/search error:', e.message);
+    res.status(500).json({ error: 'Ошибка поиска' });
+  }
+});
+
+// Список чатов тенанта
+app.get('/api/chat/list', requireTenantAdmin, (req, res) => {
+  try {
+    const chats = db.getChatsByTenant(req.tenantId);
+    res.json({ chats });
+  } catch (e) {
+    console.error('GET /api/chat/list error:', e.message);
+    res.status(500).json({ error: 'Ошибка загрузки чатов' });
+  }
+});
+
+// Сообщения чата (для арендатора)
+app.get('/api/chat/messages/:chatId', requireTenantAdmin, (req, res) => {
+  try {
+    const chat = db.getChatById(Number(req.params.chatId));
+    if (!chat || chat.tenant_id !== req.tenantId) {
+      return res.status(404).json({ error: 'Чат не найден' });
+    }
+    const afterId = req.query.after ? Number(req.query.after) : null;
+    const messages = db.getChatMessages(chat.id, afterId);
+    res.json({ messages, chat });
+  } catch (e) {
+    console.error('GET /api/chat/messages error:', e.message);
+    res.status(500).json({ error: 'Ошибка загрузки сообщений' });
+  }
+});
+
+// Отправить сообщение пользователю (арендатор)
+app.post('/api/chat/send', requireTenantAdmin, async (req, res) => {
+  try {
+    const { chat_id, text, bot_id } = req.body;
+    if (!text || !text.trim()) return res.status(400).json({ error: 'Текст обязателен' });
+
+    let chat;
+    if (chat_id) {
+      chat = db.getChatById(Number(chat_id));
+      if (!chat || chat.tenant_id !== req.tenantId) {
+        return res.status(404).json({ error: 'Чат не найден' });
+      }
+    } else {
+      // Новый чат — требуется bot_id и telegram_id
+      const { telegram_id, contact_name } = req.body;
+      if (!bot_id || !telegram_id) {
+        return res.status(400).json({ error: 'bot_id и telegram_id обязательны для нового чата' });
+      }
+      const bot = db.getBotById(Number(bot_id));
+      if (!bot || bot.tenant_id !== req.tenantId) {
+        return res.status(400).json({ error: 'Бот не найден' });
+      }
+      chat = db.findOrCreateChat(req.tenantId, bot.id, String(telegram_id), contact_name || '');
+    }
+
+    // Сохраняем сообщение
+    const message = db.addChatMessage(chat.id, 'outgoing', text.trim());
+
+    // Отправляем через Telegram Bot API с кнопкой «Ответить»
+    const bot = db.getBotById(chat.bot_id);
+    if (bot) {
+      const replyButton = [[{
+        text: 'Ответить',
+        web_app: { url: `https://broadcast.leadtehsms.ru/?mode=chat&bot=${chat.bot_id}` }
+      }]];
+      const tgResp = await sendSingleMessage(bot.token, chat.contact_telegram_id, text.trim(), null, replyButton, null, chat.tenant_id);
+      if (!tgResp.ok) {
+        const err = await tgResp.json().catch(() => ({}));
+        console.error(`[chat] Ошибка отправки в Telegram:`, err.description || 'unknown');
+        // Сообщение сохранено, но отправка не удалась
+        message.tg_error = err.description || 'Ошибка отправки';
+      }
+    }
+
+    res.json({ ok: true, message, chat_id: chat.id });
+  } catch (e) {
+    console.error('POST /api/chat/send error:', e.message);
+    res.status(500).json({ error: 'Ошибка отправки' });
+  }
+});
+
+// Пометить чат прочитанным (арендатор)
+app.post('/api/chat/read/:chatId', requireTenantAdmin, (req, res) => {
+  try {
+    const chat = db.getChatById(Number(req.params.chatId));
+    if (!chat || chat.tenant_id !== req.tenantId) {
+      return res.status(404).json({ error: 'Чат не найден' });
+    }
+    db.markChatRead(chat.id);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('POST /api/chat/read error:', e.message);
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+// --- API для пользователя чата (chat_user) ---
+
+// Сообщения чата (для пользователя)
+app.get('/api/chat/user/messages', requireChatUser, (req, res) => {
+  try {
+    const chatId = Number(req.query.chat_id);
+    if (!chatId) return res.status(400).json({ error: 'chat_id обязателен' });
+
+    const chat = db.getChatById(chatId);
+    if (!chat || chat.contact_telegram_id !== req.telegramId) {
+      return res.status(403).json({ error: 'Нет доступа к этому чату' });
+    }
+
+    const afterId = req.query.after ? Number(req.query.after) : null;
+    const messages = db.getChatMessages(chat.id, afterId);
+    res.json({ messages, chat });
+  } catch (e) {
+    console.error('GET /api/chat/user/messages error:', e.message);
+    res.status(500).json({ error: 'Ошибка загрузки сообщений' });
+  }
+});
+
+// Ответ пользователя
+app.post('/api/chat/user/send', requireChatUser, (req, res) => {
+  try {
+    const { text, chat_id } = req.body;
+    if (!text || !text.trim()) return res.status(400).json({ error: 'Текст обязателен' });
+    if (!chat_id) return res.status(400).json({ error: 'chat_id обязателен' });
+
+    const chat = db.getChatById(Number(chat_id));
+    if (!chat || chat.contact_telegram_id !== req.telegramId) {
+      return res.status(403).json({ error: 'Нет доступа к этому чату' });
+    }
+
+    const message = db.addChatMessage(chat.id, 'incoming', text.trim());
+    res.json({ ok: true, message });
+  } catch (e) {
+    console.error('POST /api/chat/user/send error:', e.message);
+    res.status(500).json({ error: 'Ошибка отправки' });
   }
 });
 

@@ -491,6 +491,93 @@
       border-radius: 50%;
       margin-right: 4px;
     }
+
+    /* Чат: область сообщений */
+    .chat-messages-area {
+      height: 400px;
+      overflow-y: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: var(--bg-primary);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+    .chat-bubble {
+      max-width: 80%;
+      padding: 8px 12px;
+      border-radius: 12px;
+      font-size: 14px;
+      line-height: 1.4;
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
+    .chat-bubble.outgoing {
+      align-self: flex-end;
+      background: var(--accent);
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+    .chat-bubble.incoming {
+      align-self: flex-start;
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      border-bottom-left-radius: 4px;
+    }
+    .chat-bubble .chat-time {
+      font-size: 10px;
+      opacity: 0.6;
+      margin-top: 4px;
+      display: block;
+    }
+    .chat-input-area {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .chat-input-area input {
+      flex: 1;
+    }
+    .chat-list-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background 0.15s;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+    }
+    .chat-list-item:hover {
+      background: var(--bg-tertiary);
+    }
+    .chat-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--accent-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+    .chat-unread-badge {
+      background: var(--accent);
+      color: #fff;
+      font-size: 11px;
+      min-width: 20px;
+      height: 20px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
   </style>
 </head>
 <body class="pb-24">
@@ -571,6 +658,10 @@
       <button id="tabList" onclick="showTab('list')"
         class="flex-1 py-2 px-3 rounded-lg text-sm font-medium btn-secondary">
         Рассылки
+      </button>
+      <button id="tabChat" onclick="showTab('chat')"
+        class="flex-1 py-2 px-3 rounded-lg text-sm font-medium btn-secondary">
+        Диалог
       </button>
       <button id="tabSettings" onclick="showTab('settings')"
         class="py-2 px-3 rounded-lg text-sm font-medium btn-secondary" title="Настройки">
@@ -1061,6 +1152,53 @@
       </div>
     </div>
 
+    <!-- TAB: Диалог (чаты) -->
+    <div id="chatTab" class="hidden">
+      <!-- Список чатов -->
+      <div id="chatListView">
+        <div class="flex items-center gap-2 mb-4">
+          <select id="chatBotSelect" class="input-field w-full rounded-lg px-3 py-2 text-sm" onchange="loadChatList()">
+          </select>
+          <button onclick="showNewChatDialog()" class="py-2 px-4 rounded-lg text-sm font-medium btn-primary whitespace-nowrap">+ Чат</button>
+        </div>
+        <div id="chatListContent" class="space-y-2"></div>
+        <div id="chatListEmpty" class="hidden text-center py-8">
+          <div class="text-sm" style="color: var(--text-secondary)">Нет диалогов</div>
+          <p class="text-xs mt-2" style="color: var(--text-muted)">Начните новый чат, нажав кнопку «+ Чат»</p>
+        </div>
+      </div>
+
+      <!-- Новый чат: поиск контакта -->
+      <div id="chatNewView" class="hidden">
+        <div class="flex items-center gap-2 mb-4">
+          <button onclick="closeChatNew()" class="py-2 px-3 rounded-lg text-sm btn-secondary">&larr;</button>
+          <h2 class="text-lg font-bold">Новый чат</h2>
+        </div>
+        <input id="chatSearchInput" type="text" class="input-field w-full rounded-lg px-3 py-2 text-sm mb-3"
+          placeholder="Telegram ID или имя..." oninput="debounceChatSearch()">
+        <div id="chatSearchResults" class="space-y-2"></div>
+      </div>
+
+      <!-- Окно чата (переписка) -->
+      <div id="chatConversation" class="hidden">
+        <div class="flex items-center gap-2 mb-3">
+          <button onclick="closeChatConversation()" class="py-2 px-3 rounded-lg text-sm btn-secondary">&larr;</button>
+          <div>
+            <div id="chatConvName" class="font-bold text-sm"></div>
+            <div id="chatConvInfo" class="text-xs" style="color: var(--text-secondary)"></div>
+          </div>
+        </div>
+        <div id="chatMessagesArea" class="chat-messages-area"></div>
+        <div class="chat-input-area">
+          <input id="chatInput" type="text" class="input-field w-full rounded-lg px-3 py-2 text-sm"
+            placeholder="Написать сообщение..." onkeydown="if(event.key==='Enter')sendChatMessage()">
+          <button onclick="sendChatMessage()" class="py-2 px-4 rounded-lg text-sm font-medium btn-primary">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- TAB: Настройки -->
     <div id="settingsTab" class="hidden">
       <div id="settingsLoading" class="text-center py-8">
@@ -1184,6 +1322,25 @@
     </div>
   </div>
 
+  <!-- Экран чата для пользователя (chat_user) — вне #app -->
+  <div id="chatUserView" class="hidden max-w-lg mx-auto p-4">
+    <div class="flex items-center gap-3 mb-4">
+      <div class="chat-avatar" id="chatUserAvatar">B</div>
+      <div>
+        <div id="chatUserBotName" class="font-bold text-sm">Чат</div>
+        <div class="text-xs" style="color: var(--text-secondary)">Диалог с оператором</div>
+      </div>
+    </div>
+    <div id="chatUserMessagesArea" class="chat-messages-area"></div>
+    <div class="chat-input-area">
+      <input id="chatUserInput" type="text" class="input-field w-full rounded-lg px-3 py-2 text-sm"
+        placeholder="Написать ответ..." onkeydown="if(event.key==='Enter')sendChatUserMessage()">
+      <button onclick="sendChatUserMessage()" class="py-2 px-4 rounded-lg text-sm font-medium btn-primary">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+  </div>
+
   <script>
     // ============================================
     // Инициализация
@@ -1256,6 +1413,12 @@
     // Авторизация
     // ============================================
     async function init() {
+      // Проверяем mode=chat (пользователь пришёл через кнопку «Ответить»)
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('mode') === 'chat' && urlParams.get('bot')) {
+        return initChatUserMode(urlParams.get('bot'));
+      }
+
       const initData = tg?.initData;
 
       if (!initData) {
@@ -1305,6 +1468,7 @@
           showTab('super');
           document.getElementById('tabCreate').style.display = 'none';
           document.getElementById('tabList').style.display = 'none';
+          document.getElementById('tabChat').style.display = 'none';
           document.getElementById('tabSettings').style.display = 'none';
         }
       } catch (e) {
@@ -1561,12 +1725,14 @@
       const tabs = {
         create: document.getElementById('createTab'),
         list: document.getElementById('listTab'),
+        chat: document.getElementById('chatTab'),
         settings: document.getElementById('settingsTab'),
         super: document.getElementById('superTab'),
       };
       const buttons = {
         create: document.getElementById('tabCreate'),
         list: document.getElementById('tabList'),
+        chat: document.getElementById('tabChat'),
         settings: document.getElementById('tabSettings'),
         super: document.getElementById('tabSuper'),
       };
@@ -1597,6 +1763,7 @@
         loadBroadcasts();
         loadAutoBroadcasts();
       }
+      if (tab === 'chat') loadChatList();
       if (tab === 'settings') loadSettings();
       if (tab === 'super') loadSuperData();
     }
@@ -3407,6 +3574,7 @@
           // Восстановить табы при импersonации
           document.getElementById('tabCreate').style.display = '';
           document.getElementById('tabList').style.display = '';
+          document.getElementById('tabChat').style.display = '';
           document.getElementById('tabSettings').style.display = '';
           await loadBots();
           renderMessagesList();
@@ -4206,7 +4374,7 @@
     // Утилиты
     // ============================================
     function escapeHtml(str) {
-      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
     function escapeAttr(str) {
@@ -4222,6 +4390,424 @@
       document.body.appendChild(toast);
       setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; }, 2500);
       setTimeout(() => toast.remove(), 2800);
+    }
+
+    // ============================================
+    // Диалог (чаты)
+    // ============================================
+    let chatCurrentId = null;
+    let chatPollingTimer = null;
+    let chatLastMessageId = 0;
+    let chatSearchTimer = null;
+    let chatNewChatData = null; // {telegramId, contactName, botId} для нового чата
+
+    // Чат пользователя (chat_user)
+    let chatUserPollingTimer = null;
+    let chatUserLastMessageId = 0;
+    let chatUserChatId = null;
+
+    async function loadChatList() {
+      const sel = document.getElementById('chatBotSelect');
+      if (sel.options.length === 0 && allBots.length > 0) {
+        sel.innerHTML = allBots.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
+      }
+
+      try {
+        const r = await fetch('/api/chat/list', {
+          headers: { 'Authorization': 'Bearer ' + authToken },
+        });
+        const data = await r.json();
+        const chats = data.chats || [];
+
+        const content = document.getElementById('chatListContent');
+        const empty = document.getElementById('chatListEmpty');
+
+        const botId = sel.value;
+        const filtered = botId ? chats.filter(c => String(c.bot_id) === String(botId)) : chats;
+
+        if (filtered.length === 0) {
+          content.innerHTML = '';
+          empty.classList.remove('hidden');
+          return;
+        }
+
+        empty.classList.add('hidden');
+        content.innerHTML = filtered.map(c => {
+          const initials = (c.contact_name || '?').charAt(0).toUpperCase();
+          const lastMsg = c.last_message_text
+            ? (c.last_message_direction === 'outgoing' ? 'Вы: ' : '') + truncate(c.last_message_text, 40)
+            : 'Нет сообщений';
+          const time = c.last_message_at ? formatChatTime(c.last_message_at) : '';
+          const badge = c.unread_count > 0
+            ? `<div class="chat-unread-badge">${c.unread_count}</div>`
+            : '';
+          return `<div class="chat-list-item" data-chat-id="${c.id}" data-name="${escapeHtml(c.contact_name || c.contact_telegram_id)}" data-tgid="${c.contact_telegram_id}" onclick="onChatListClick(this)">
+            <div class="chat-avatar">${initials}</div>
+            <div style="flex:1;min-width:0">
+              <div class="flex items-center justify-between">
+                <div class="font-medium text-sm truncate">${escapeHtml(c.contact_name || c.contact_telegram_id)}</div>
+                <div class="text-xs flex-shrink-0" style="color:var(--text-muted)">${time}</div>
+              </div>
+              <div class="flex items-center justify-between mt-0.5">
+                <div class="text-xs truncate" style="color:var(--text-secondary)">${escapeHtml(lastMsg)}</div>
+                ${badge}
+              </div>
+            </div>
+          </div>`;
+        }).join('');
+      } catch (e) {
+        console.error('loadChatList error:', e);
+      }
+    }
+
+    function onChatListClick(el) {
+      openChat(Number(el.dataset.chatId), el.dataset.name, el.dataset.tgid);
+    }
+
+    function truncate(str, len) {
+      return str.length > len ? str.slice(0, len) + '...' : str;
+    }
+
+    function formatChatTime(isoStr) {
+      try {
+        const d = new Date(isoStr + (isoStr.endsWith('Z') ? '' : 'Z'));
+        const now = new Date();
+        if (d.toDateString() === now.toDateString()) {
+          return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+        }
+        return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+      } catch { return ''; }
+    }
+
+    async function openChat(chatId, name, telegramId) {
+      chatCurrentId = chatId;
+      chatLastMessageId = 0;
+      chatNewChatData = null;
+      document.getElementById('chatListView').classList.add('hidden');
+      document.getElementById('chatNewView').classList.add('hidden');
+      document.getElementById('chatConversation').classList.remove('hidden');
+      document.getElementById('chatConvName').textContent = name;
+      document.getElementById('chatConvInfo').textContent = 'ID: ' + telegramId;
+      document.getElementById('chatMessagesArea').innerHTML = '';
+      document.getElementById('chatInput').value = '';
+
+      fetch('/api/chat/read/' + chatId, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + authToken },
+      }).catch(() => {});
+
+      await loadChatMessages();
+      startChatPolling();
+    }
+
+    async function loadChatMessages() {
+      try {
+        let url = '/api/chat/messages/' + chatCurrentId;
+        if (chatLastMessageId > 0) url += '?after=' + chatLastMessageId;
+        const r = await fetch(url, {
+          headers: { 'Authorization': 'Bearer ' + authToken },
+        });
+        const data = await r.json();
+        const msgs = data.messages || [];
+        if (msgs.length === 0 && chatLastMessageId > 0) return;
+
+        const area = document.getElementById('chatMessagesArea');
+        const isAtBottom = area.scrollTop + area.clientHeight >= area.scrollHeight - 30;
+
+        if (chatLastMessageId === 0) area.innerHTML = '';
+
+        msgs.forEach(m => {
+          if (m.id > chatLastMessageId) chatLastMessageId = m.id;
+          const div = document.createElement('div');
+          div.className = 'chat-bubble ' + m.direction;
+          const time = formatChatTime(m.created_at);
+          div.innerHTML = escapeHtml(m.text) + `<span class="chat-time">${time}</span>`;
+          area.appendChild(div);
+        });
+
+        if (isAtBottom || chatLastMessageId === 0) {
+          area.scrollTop = area.scrollHeight;
+        }
+      } catch (e) {
+        console.error('loadChatMessages error:', e);
+      }
+    }
+
+    function startChatPolling() {
+      stopChatPolling();
+      chatPollingTimer = setInterval(() => {
+        if (chatCurrentId) loadChatMessages();
+      }, 5000);
+    }
+
+    function stopChatPolling() {
+      if (chatPollingTimer) { clearInterval(chatPollingTimer); chatPollingTimer = null; }
+    }
+
+    function closeChatConversation() {
+      stopChatPolling();
+      chatCurrentId = null;
+      chatNewChatData = null;
+      document.getElementById('chatConversation').classList.add('hidden');
+      document.getElementById('chatListView').classList.remove('hidden');
+      loadChatList();
+    }
+
+    async function sendChatMessage() {
+      const input = document.getElementById('chatInput');
+      const text = input.value.trim();
+      if (!text) return;
+      input.value = '';
+
+      // Новый чат — ещё нет chatCurrentId
+      if (!chatCurrentId && chatNewChatData) {
+        try {
+          const r = await fetch('/api/chat/send', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + authToken,
+            },
+            body: JSON.stringify({
+              text,
+              bot_id: chatNewChatData.botId,
+              telegram_id: chatNewChatData.telegramId,
+              contact_name: chatNewChatData.contactName,
+            }),
+          });
+          const data = await r.json();
+          if (data.ok && data.chat_id) {
+            chatNewChatData = null;
+            chatCurrentId = data.chat_id;
+            chatLastMessageId = 0;
+            await loadChatMessages();
+            startChatPolling();
+          } else {
+            showAlert(data.error || 'Ошибка отправки');
+          }
+        } catch (e) {
+          showAlert('Ошибка отправки');
+        }
+        return;
+      }
+
+      if (!chatCurrentId) return;
+
+      try {
+        const r = await fetch('/api/chat/send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + authToken,
+          },
+          body: JSON.stringify({ chat_id: chatCurrentId, text }),
+        });
+        const data = await r.json();
+        if (data.ok) {
+          await loadChatMessages();
+        } else {
+          showAlert(data.error || 'Ошибка отправки');
+        }
+      } catch (e) {
+        showAlert('Ошибка отправки');
+      }
+    }
+
+    // Новый чат
+    function showNewChatDialog() {
+      document.getElementById('chatListView').classList.add('hidden');
+      document.getElementById('chatNewView').classList.remove('hidden');
+      document.getElementById('chatSearchInput').value = '';
+      document.getElementById('chatSearchResults').innerHTML = '';
+      document.getElementById('chatSearchInput').focus();
+    }
+
+    function closeChatNew() {
+      document.getElementById('chatNewView').classList.add('hidden');
+      document.getElementById('chatListView').classList.remove('hidden');
+    }
+
+    function debounceChatSearch() {
+      if (chatSearchTimer) clearTimeout(chatSearchTimer);
+      chatSearchTimer = setTimeout(searchChatContacts, 400);
+    }
+
+    async function searchChatContacts() {
+      const q = document.getElementById('chatSearchInput').value.trim();
+      if (q.length < 2) {
+        document.getElementById('chatSearchResults').innerHTML = '';
+        return;
+      }
+      const botId = document.getElementById('chatBotSelect').value;
+      try {
+        const r = await fetch(`/api/chat/search?q=${encodeURIComponent(q)}&bot_id=${botId}`, {
+          headers: { 'Authorization': 'Bearer ' + authToken },
+        });
+        const data = await r.json();
+        const results = document.getElementById('chatSearchResults');
+        if (!data.contacts || data.contacts.length === 0) {
+          results.innerHTML = '<div class="text-sm text-center py-4" style="color:var(--text-secondary)">Ничего не найдено</div>';
+          return;
+        }
+        results.innerHTML = data.contacts.map(c => {
+          const initials = (c.name || '?').charAt(0).toUpperCase();
+          return `<div class="chat-list-item" data-tgid="${c.telegram_id}" data-name="${escapeHtml(c.name || '')}" onclick="onSearchResultClick(this)">
+            <div class="chat-avatar">${initials}</div>
+            <div>
+              <div class="font-medium text-sm">${escapeHtml(c.name || 'Без имени')}</div>
+              <div class="text-xs" style="color:var(--text-secondary)">ID: ${c.telegram_id}</div>
+            </div>
+          </div>`;
+        }).join('');
+      } catch (e) {
+        console.error('searchChatContacts error:', e);
+      }
+    }
+
+    function onSearchResultClick(el) {
+      startNewChat(el.dataset.tgid, el.dataset.name);
+    }
+
+    async function startNewChat(telegramId, contactName) {
+      const botId = document.getElementById('chatBotSelect').value;
+      if (!botId) { showAlert('Выберите бота'); return; }
+
+      try {
+        const r = await fetch('/api/chat/list', {
+          headers: { 'Authorization': 'Bearer ' + authToken },
+        });
+        const data = await r.json();
+        const existing = (data.chats || []).find(c =>
+          String(c.bot_id) === String(botId) && c.contact_telegram_id === telegramId
+        );
+
+        closeChatNew();
+
+        if (existing) {
+          openChat(existing.id, existing.contact_name || telegramId, telegramId);
+        } else {
+          chatCurrentId = null;
+          chatNewChatData = { telegramId, contactName, botId };
+          document.getElementById('chatListView').classList.add('hidden');
+          document.getElementById('chatConversation').classList.remove('hidden');
+          document.getElementById('chatConvName').textContent = contactName || telegramId;
+          document.getElementById('chatConvInfo').textContent = 'ID: ' + telegramId;
+          document.getElementById('chatMessagesArea').innerHTML =
+            '<div class="text-center py-4 text-xs" style="color:var(--text-secondary)">Начните диалог — напишите первое сообщение</div>';
+          document.getElementById('chatInput').value = '';
+          document.getElementById('chatInput').focus();
+        }
+      } catch (e) {
+        showAlert('Ошибка');
+      }
+    }
+
+    // ============================================
+    // Чат для пользователя (mode=chat)
+    // ============================================
+    async function initChatUserMode(botId) {
+      const initData = tg?.initData;
+      if (!initData) {
+        showAccessDenied();
+        return;
+      }
+
+      try {
+        const r = await fetch('/api/auth/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ initData, bot_id: botId }),
+        });
+        const data = await r.json();
+        if (!data.authorized) {
+          showAccessDenied();
+          return;
+        }
+
+        authToken = data.token;
+        userRole = data.role;
+        chatUserChatId = data.chatId;
+
+        document.getElementById('loadingScreen').classList.add('hidden');
+        document.getElementById('app').classList.add('hidden');
+        document.getElementById('chatUserView').classList.remove('hidden');
+
+        const botName = data.botName || 'Чат';
+        document.getElementById('chatUserBotName').textContent = botName;
+        document.getElementById('chatUserAvatar').textContent = botName.charAt(0).toUpperCase();
+
+        await loadChatUserMessages();
+        startChatUserPolling();
+      } catch (e) {
+        console.error('initChatUserMode error:', e);
+        showAccessDenied();
+      }
+    }
+
+    async function loadChatUserMessages() {
+      try {
+        let url = '/api/chat/user/messages?chat_id=' + chatUserChatId;
+        if (chatUserLastMessageId > 0) url += '&after=' + chatUserLastMessageId;
+        const r = await fetch(url, {
+          headers: { 'Authorization': 'Bearer ' + authToken },
+        });
+        const data = await r.json();
+        const msgs = data.messages || [];
+        if (msgs.length === 0 && chatUserLastMessageId > 0) return;
+
+        const area = document.getElementById('chatUserMessagesArea');
+        const isAtBottom = area.scrollTop + area.clientHeight >= area.scrollHeight - 30;
+
+        if (chatUserLastMessageId === 0) area.innerHTML = '';
+
+        msgs.forEach(m => {
+          if (m.id > chatUserLastMessageId) chatUserLastMessageId = m.id;
+          const div = document.createElement('div');
+          // В базе: outgoing = от арендатора, incoming = от пользователя
+          // Для пользователя: outgoing (от оператора) слева, incoming (свои) справа
+          div.className = 'chat-bubble ' + (m.direction === 'incoming' ? 'outgoing' : 'incoming');
+          const time = formatChatTime(m.created_at);
+          div.innerHTML = escapeHtml(m.text) + `<span class="chat-time">${time}</span>`;
+          area.appendChild(div);
+        });
+
+        if (isAtBottom || chatUserLastMessageId === 0) {
+          area.scrollTop = area.scrollHeight;
+        }
+      } catch (e) {
+        console.error('loadChatUserMessages error:', e);
+      }
+    }
+
+    function startChatUserPolling() {
+      if (chatUserPollingTimer) clearInterval(chatUserPollingTimer);
+      chatUserPollingTimer = setInterval(loadChatUserMessages, 5000);
+    }
+
+    async function sendChatUserMessage() {
+      const input = document.getElementById('chatUserInput');
+      const text = input.value.trim();
+      if (!text) return;
+      input.value = '';
+
+      try {
+        const r = await fetch('/api/chat/user/send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + authToken,
+          },
+          body: JSON.stringify({ text, chat_id: chatUserChatId }),
+        });
+        const data = await r.json();
+        if (data.ok) {
+          await loadChatUserMessages();
+        } else {
+          showAlert(data.error || 'Ошибка');
+        }
+      } catch (e) {
+        showAlert('Ошибка отправки');
+      }
     }
   </script>
 
