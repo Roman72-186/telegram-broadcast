@@ -1329,9 +1329,12 @@
             <input id="newTariffBroadcasts" type="number" placeholder="Макс.рассылок/мес" class="input-field rounded-lg px-3 py-2 text-sm" />
             <input id="newTariffContacts" type="number" placeholder="Макс.контактов" class="input-field rounded-lg px-3 py-2 text-sm" />
           </div>
-          <label class="flex items-center gap-2 mb-2 text-sm" style="color:var(--text-secondary)">
-            <input id="newTariffDialogs" type="checkbox" /> Диалоги включены
-          </label>
+          <div class="flex gap-2 mb-2">
+            <input id="newTariffPrice" type="number" placeholder="Цена ₽/мес" class="input-field flex-1 rounded-lg px-3 py-2 text-sm" />
+            <label class="flex items-center gap-2 text-sm" style="color:var(--text-secondary)">
+              <input id="newTariffDialogs" type="checkbox" /> Диалоги
+            </label>
+          </div>
           <button onclick="createTariff()" class="btn-primary px-3 py-1.5 rounded-lg text-xs">Создать</button>
         </div>
         <div id="tariffsListContainer" class="space-y-2"></div>
@@ -1452,7 +1455,10 @@
         }
         container.innerHTML = tariffs.map(t => `
           <div class="broadcast-card" style="padding: 12px;">
-            <div class="text-sm font-bold mb-1">${escapeHtml(t.name)}</div>
+            <div class="flex justify-between items-start mb-1">
+              <div class="text-sm font-bold">${escapeHtml(t.name)}</div>
+              <div class="text-sm font-bold" style="color:var(--accent)">${t.price ? t.price + ' ₽/мес' : 'Бесплатно'}</div>
+            </div>
             <div class="flex flex-wrap gap-2 text-xs" style="color:var(--text-secondary)">
               <span>${t.max_bots} ${t.max_bots === 1 ? 'бот' : 'ботов'}</span>
               <span>•</span>
@@ -3705,11 +3711,12 @@
       container.innerHTML = tariffs.map(t => `
         <div class="broadcast-card">
           <div class="text-sm font-medium mb-1">${escapeHtml(t.name)} ${t.is_default ? '<span class="text-xs" style="color:var(--accent)">(по умолч.)</span>' : ''}</div>
-          <div class="grid grid-cols-4 gap-2 text-center text-xs" style="color:var(--text-secondary)">
+          <div class="grid grid-cols-5 gap-2 text-center text-xs" style="color:var(--text-secondary)">
             <div>${t.max_bots} ботов</div>
             <div>${t.max_broadcasts_per_month} рассыл./мес</div>
-            <div>${t.max_contacts} контактов</div>
-            <div>${t.has_dialogs ? 'Диалоги' : 'Без диалогов'}</div>
+            <div>${t.max_contacts} конт.</div>
+            <div>${t.has_dialogs ? 'Диалоги' : '—'}</div>
+            <div style="color:var(--accent);font-weight:600">${t.price ? t.price + ' ₽' : '0 ₽'}</div>
           </div>
         </div>`).join('');
     }
@@ -3724,13 +3731,14 @@
       const maxBroadcasts = parseInt(document.getElementById('newTariffBroadcasts').value) || 100;
       const maxContacts = parseInt(document.getElementById('newTariffContacts').value) || 5000;
       const hasDialogs = document.getElementById('newTariffDialogs').checked ? 1 : 0;
+      const price = parseInt(document.getElementById('newTariffPrice').value) || 0;
 
       if (!name) { showAlert('Введите название'); return; }
 
       try {
         const r = await apiFetch('/api/super/tariffs', {
           method: 'POST',
-          body: { name, max_bots: maxBots, max_broadcasts_per_month: maxBroadcasts, max_contacts: maxContacts, has_dialogs: hasDialogs },
+          body: { name, max_bots: maxBots, max_broadcasts_per_month: maxBroadcasts, max_contacts: maxContacts, has_dialogs: hasDialogs, price },
         });
         const data = await r.json();
         if (data.ok) {

@@ -122,6 +122,7 @@ app.get('/api/public/tariffs', (req, res) => {
     max_broadcasts_per_month: t.max_broadcasts_per_month,
     max_contacts: t.max_contacts,
     has_dialogs: t.has_dialogs,
+    price: t.price || 0,
   }));
   res.json({ tariffs });
 });
@@ -1292,6 +1293,7 @@ app.get('/api/tenant/info', requireTenantAdmin, (req, res) => {
         max_broadcasts_per_month: plan.max_broadcasts_per_month,
         max_contacts: plan.max_contacts,
         has_dialogs: plan.has_dialogs || 0,
+        price: plan.price || 0,
       } : null,
       usage: limits.limits || null,
       subscription,
@@ -1490,9 +1492,9 @@ app.get('/api/super/tariffs', requireSuperAdmin, (req, res) => {
 
 app.post('/api/super/tariffs', requireSuperAdmin, (req, res) => {
   try {
-    const { name, max_bots, max_broadcasts_per_month, max_contacts, has_dialogs } = req.body;
+    const { name, max_bots, max_broadcasts_per_month, max_contacts, has_dialogs, price } = req.body;
     if (!name) return res.status(400).json({ error: 'name обязателен' });
-    const id = db.createTariffPlan(name, max_bots || 3, max_broadcasts_per_month || 100, max_contacts || 5000, has_dialogs);
+    const id = db.createTariffPlan(name, max_bots || 3, max_broadcasts_per_month || 100, max_contacts || 5000, has_dialogs, price);
     res.json({ ok: true, id });
   } catch (e) {
     console.error('POST /api/super/tariffs error:', e.message);
