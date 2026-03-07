@@ -587,13 +587,21 @@
   </div>
 
   <!-- Экран «Доступ запрещён» -->
-  <div id="accessDenied" class="hidden flex flex-col items-center justify-center min-h-screen p-6 text-center">
-    <div class="text-5xl mb-4">&#128274;</div>
+  <div id="accessDenied" class="hidden flex flex-col items-center min-h-screen p-6 text-center">
+    <div class="text-5xl mb-4 mt-8">&#128274;</div>
     <h1 class="text-xl font-bold mb-2">Доступ запрещён</h1>
-    <p class="text-sm" style="color: var(--text-secondary)">Нет доступа. Обратитесь к <a href="https://t.me/roman_chatbots" target="_blank" style="color: var(--accent); text-decoration: underline;">администратору</a> платформы.</p>
-    <div id="accessDeniedTgId" class="hidden mt-4 px-4 py-2 rounded-lg text-xs" style="background: var(--card-bg); color: var(--text-secondary); border: 1px solid var(--border-color);">
+    <p class="text-sm mb-4" style="color: var(--text-secondary)">Нет доступа. Обратитесь к <a href="https://t.me/roman_chatbots" target="_blank" style="color: var(--accent); text-decoration: underline;">администратору</a> платформы.</p>
+    <div id="accessDeniedTgId" class="hidden mb-4 px-4 py-2 rounded-lg text-xs" style="background: var(--card-bg); color: var(--text-secondary); border: 1px solid var(--border-color);">
       Ваш Telegram ID: <span id="accessDeniedTgIdValue" class="font-mono font-bold" style="color: var(--text-primary); user-select: all;"></span>
       <div class="mt-1" style="color: var(--text-muted)">Сообщите этот ID администратору для открытия доступа</div>
+    </div>
+
+    <!-- Тарифные планы -->
+    <div class="w-full max-w-md mt-2">
+      <h2 class="text-base font-bold mb-3">Доступные тарифы</h2>
+      <div id="publicTariffsContainer" class="space-y-2 text-left">
+        <div class="text-xs" style="color:var(--text-muted)">Загрузка...</div>
+      </div>
     </div>
   </div>
 
@@ -1420,6 +1428,34 @@
       if (tgId) {
         document.getElementById('accessDeniedTgIdValue').textContent = tgId;
         document.getElementById('accessDeniedTgId').classList.remove('hidden');
+      }
+      loadPublicTariffs();
+    }
+
+    async function loadPublicTariffs() {
+      try {
+        const r = await fetch('/api/public/tariffs');
+        const data = await r.json();
+        const tariffs = data.tariffs || [];
+        const container = document.getElementById('publicTariffsContainer');
+        if (tariffs.length === 0) {
+          container.innerHTML = '<div class="text-xs" style="color:var(--text-muted)">Тарифы не настроены</div>';
+          return;
+        }
+        container.innerHTML = tariffs.map(t => `
+          <div class="broadcast-card" style="padding: 12px;">
+            <div class="text-sm font-bold mb-1">${escapeHtml(t.name)}</div>
+            <div class="flex flex-wrap gap-2 text-xs" style="color:var(--text-secondary)">
+              <span>${t.max_bots} ${t.max_bots === 1 ? 'бот' : 'ботов'}</span>
+              <span>•</span>
+              <span>${t.max_broadcasts_per_month} рассыл./мес</span>
+              <span>•</span>
+              <span>${t.max_contacts} контактов</span>
+              ${t.has_dialogs ? '<span>•</span><span style="color:var(--accent)">Диалоги</span>' : ''}
+            </div>
+          </div>`).join('');
+      } catch (e) {
+        console.error('loadPublicTariffs error:', e);
       }
     }
 

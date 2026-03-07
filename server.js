@@ -114,6 +114,18 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', uptime: process.uptime() });
 });
 
+// Публичный список тарифов (для экрана «Нет доступа»)
+app.get('/api/public/tariffs', (req, res) => {
+  const tariffs = db.getTariffPlans().map(t => ({
+    name: t.name,
+    max_bots: t.max_bots,
+    max_broadcasts_per_month: t.max_broadcasts_per_month,
+    max_contacts: t.max_contacts,
+    has_dialogs: t.has_dialogs,
+  }));
+  res.json({ tariffs });
+});
+
 // ============================================
 // Webhook для ботов тенантов (обработка /start)
 // ============================================
