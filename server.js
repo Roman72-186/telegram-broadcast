@@ -1275,6 +1275,7 @@ app.get('/api/tenant/info', requireTenantAdmin, (req, res) => {
         max_bots: plan.max_bots,
         max_broadcasts_per_month: plan.max_broadcasts_per_month,
         max_contacts: plan.max_contacts,
+        has_dialogs: plan.has_dialogs || 0,
       } : null,
       usage: limits.limits || null,
       subscription,
@@ -1473,9 +1474,9 @@ app.get('/api/super/tariffs', requireSuperAdmin, (req, res) => {
 
 app.post('/api/super/tariffs', requireSuperAdmin, (req, res) => {
   try {
-    const { name, max_bots, max_broadcasts_per_month, max_contacts } = req.body;
+    const { name, max_bots, max_broadcasts_per_month, max_contacts, has_dialogs } = req.body;
     if (!name) return res.status(400).json({ error: 'name обязателен' });
-    const id = db.createTariffPlan(name, max_bots || 3, max_broadcasts_per_month || 100, max_contacts || 5000);
+    const id = db.createTariffPlan(name, max_bots || 3, max_broadcasts_per_month || 100, max_contacts || 5000, has_dialogs);
     res.json({ ok: true, id });
   } catch (e) {
     console.error('POST /api/super/tariffs error:', e.message);
@@ -1730,8 +1731,16 @@ app.post('/api/auto/:id/start', requireTenantAdmin, (req, res) => {
 // API: Диалог (чаты арендатор ↔ пользователь)
 // ============================================
 
+// Middleware: проверка доступа к диалогам по тарифу
+function requireDialogsAccess(req, res, next) {
+  if (!db.hasDialogsAccess(req.tenantId)) {
+    return res.status(403).json({ error: 'Диалоги недоступны на вашем тарифе' });
+  }
+  next();
+}
+
 // Поиск контакта по Telegram ID или имени
-app.get('/api/chat/search', requireTenantAdmin, async (req, res) => {
+app.get('/api/chat/search', requireTenantAdmin, requireDialogsAccess, async (req, res) => {
   try {
     const { q, bot_id } = req.query;
     if (!q || q.trim().length < 2) return res.json({ contacts: [] });
@@ -1762,7 +1771,7 @@ app.get('/api/chat/search', requireTenantAdmin, async (req, res) => {
 });
 
 // Список чатов тенанта
-app.get('/api/chat/list', requireTenantAdmin, (req, res) => {
+app.get('/api/chat/list', requireTenantAdmin, requireDialogsAccess, (req, res) => {
   try {
     const chats = db.getChatsByTenant(req.tenantId);
     res.json({ chats });
@@ -1773,7 +1782,7 @@ app.get('/api/chat/list', requireTenantAdmin, (req, res) => {
 });
 
 // Сообщения чата (для арендатора)
-app.get('/api/chat/messages/:chatId', requireTenantAdmin, (req, res) => {
+app.get('/api/chat/messages/:chatId', requireTenantAdmin, requireDialogsAccess, (req, res) => {
   try {
     const chat = db.getChatById(Number(req.params.chatId));
     if (!chat || chat.tenant_id !== req.tenantId) {
@@ -1789,7 +1798,7 @@ app.get('/api/chat/messages/:chatId', requireTenantAdmin, (req, res) => {
 });
 
 // Отправить сообщение пользователю (арендатор)
-app.post('/api/chat/send', requireTenantAdmin, async (req, res) => {
+app.post('/api/chat/send', requireTenantAdmin, requireDialogsAccess, async (req, res) => {
   try {
     const { chat_id, text, bot_id } = req.body;
     if (!text || !text.trim()) return res.status(400).json({ error: 'Текст обязателен' });
@@ -1840,7 +1849,7 @@ app.post('/api/chat/send', requireTenantAdmin, async (req, res) => {
 });
 
 // Пометить чат прочитанным (арендатор)
-app.post('/api/chat/read/:chatId', requireTenantAdmin, (req, res) => {
+app.post('/api/chat/read/:chatId', requireTenantAdmin, requireDialogsAccess, (req, res) => {
   try {
     const chat = db.getChatById(Number(req.params.chatId));
     if (!chat || chat.tenant_id !== req.tenantId) {

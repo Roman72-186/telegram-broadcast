@@ -1320,6 +1320,9 @@
             <input id="newTariffBroadcasts" type="number" placeholder="Макс.рассылок/мес" class="input-field rounded-lg px-3 py-2 text-sm" />
             <input id="newTariffContacts" type="number" placeholder="Макс.контактов" class="input-field rounded-lg px-3 py-2 text-sm" />
           </div>
+          <label class="flex items-center gap-2 mb-2 text-sm" style="color:var(--text-secondary)">
+            <input id="newTariffDialogs" type="checkbox" /> Диалоги включены
+          </label>
           <button onclick="createTariff()" class="btn-primary px-3 py-1.5 rounded-lg text-xs">Создать</button>
         </div>
         <div id="tariffsListContainer" class="space-y-2"></div>
@@ -1500,6 +1503,13 @@
         const data = await r.json();
         subscriptionInfo = data.subscription || null;
         renderSubscriptionBanner();
+
+        // Доступ к диалогам по тарифу
+        const hasDialogs = data.tariff?.has_dialogs === 1;
+        const tabChat = document.getElementById('tabChat');
+        if (tabChat) {
+          tabChat.style.display = hasDialogs ? '' : 'none';
+        }
       } catch (e) {
         console.error('loadSubscriptionInfo error:', e);
       }
@@ -3582,10 +3592,9 @@
           authToken = data.token;
           userTenantId = tenantId;
           showAlert(`Вы вошли как тенант: ${data.tenant_name || tenantId}`);
-          // Восстановить табы при импersonации
+          // Восстановить табы при импersonации (Диалог управляется через loadSubscriptionInfo)
           document.getElementById('tabCreate').style.display = '';
           document.getElementById('tabList').style.display = '';
-          document.getElementById('tabChat').style.display = '';
           document.getElementById('tabSettings').style.display = '';
           await loadBots();
           renderMessagesList();
@@ -3651,10 +3660,11 @@
       container.innerHTML = tariffs.map(t => `
         <div class="broadcast-card">
           <div class="text-sm font-medium mb-1">${escapeHtml(t.name)} ${t.is_default ? '<span class="text-xs" style="color:var(--accent)">(по умолч.)</span>' : ''}</div>
-          <div class="grid grid-cols-3 gap-2 text-center text-xs" style="color:var(--text-secondary)">
+          <div class="grid grid-cols-4 gap-2 text-center text-xs" style="color:var(--text-secondary)">
             <div>${t.max_bots} ботов</div>
             <div>${t.max_broadcasts_per_month} рассыл./мес</div>
             <div>${t.max_contacts} контактов</div>
+            <div>${t.has_dialogs ? 'Диалоги' : 'Без диалогов'}</div>
           </div>
         </div>`).join('');
     }
@@ -3668,13 +3678,14 @@
       const maxBots = parseInt(document.getElementById('newTariffBots').value) || 3;
       const maxBroadcasts = parseInt(document.getElementById('newTariffBroadcasts').value) || 100;
       const maxContacts = parseInt(document.getElementById('newTariffContacts').value) || 5000;
+      const hasDialogs = document.getElementById('newTariffDialogs').checked ? 1 : 0;
 
       if (!name) { showAlert('Введите название'); return; }
 
       try {
         const r = await apiFetch('/api/super/tariffs', {
           method: 'POST',
-          body: { name, max_bots: maxBots, max_broadcasts_per_month: maxBroadcasts, max_contacts: maxContacts },
+          body: { name, max_bots: maxBots, max_broadcasts_per_month: maxBroadcasts, max_contacts: maxContacts, has_dialogs: hasDialogs },
         });
         const data = await r.json();
         if (data.ok) {
