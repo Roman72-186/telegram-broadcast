@@ -520,6 +520,7 @@
         <label class="text-sm font-medium mb-1 flex items-center">Leadteh API токен<span class="tooltip-trigger">?<span class="tooltip-text">Токен из Leadteh: Настройки → API. Общий для всех ботов</span></span></label>
         <input id="onboardLeadtehToken" type="text" placeholder="Токен из Leadteh: Настройки → API"
           class="input-field w-full rounded-lg px-3 py-2 text-sm" />
+        <div class="text-xs mt-1" style="color: var(--text-muted)">&#128274; Токен шифруется AES-256 и не хранится в открытом виде</div>
       </div>
 
       <div>
@@ -533,6 +534,7 @@
         <input id="onboardBotToken" type="text" placeholder="Например: 123456:ABC-DEF..."
           class="input-field w-full rounded-lg px-3 py-2 text-sm"
           onblur="validateOnboardingBot()" />
+        <div class="text-xs mt-1" style="color: var(--text-muted)">&#128274; Токен шифруется AES-256 и не хранится в открытом виде</div>
         <div id="onboardBotStatus" class="text-xs mt-1 hidden"></div>
       </div>
 
@@ -1056,7 +1058,8 @@
         <div class="p-3 rounded-lg mb-6" style="background: var(--bg-secondary); border: 1px dashed var(--border);">
           <div class="text-sm font-medium mb-2" style="color: var(--text-secondary)">Добавить бота</div>
           <label class="text-xs mb-1 flex items-center" style="color: var(--text-secondary)">Токен бота<span class="tooltip-trigger">?<span class="tooltip-text">Получите у @BotFather командой /newbot или /mybots</span></span></label>
-          <input id="newBotToken" type="text" placeholder="Токен бота" class="input-field w-full rounded-lg px-3 py-2 text-sm mb-2" />
+          <input id="newBotToken" type="text" placeholder="Токен бота" class="input-field w-full rounded-lg px-3 py-2 text-sm" />
+          <div class="text-xs mt-1 mb-2" style="color: var(--text-muted)">&#128274; Токен шифруется AES-256 и не хранится в открытом виде</div>
           <div class="flex gap-2 mb-2">
             <div class="flex-1">
               <label class="text-xs mb-1 flex items-center" style="color: var(--text-secondary)">Имя бота<span class="tooltip-trigger">?<span class="tooltip-text">Отображаемое имя в интерфейсе. Автозаполняется при проверке токена</span></span></label>
@@ -1123,7 +1126,8 @@
         <div id="addTenantForm" class="hidden broadcast-card mb-3">
           <input id="newTenantTgId" type="text" placeholder="Telegram ID" class="input-field w-full rounded-lg px-3 py-2 text-sm mb-2" />
           <input id="newTenantName" type="text" placeholder="Имя / Название" class="input-field w-full rounded-lg px-3 py-2 text-sm mb-2" />
-          <input id="newTenantLeadteh" type="text" placeholder="Leadteh API токен (необяз.)" class="input-field w-full rounded-lg px-3 py-2 text-sm mb-2" />
+          <input id="newTenantLeadteh" type="text" placeholder="Leadteh API токен (необяз.)" class="input-field w-full rounded-lg px-3 py-2 text-sm" />
+          <div class="text-xs mt-1 mb-2" style="color: var(--text-muted)">&#128274; Токен шифруется AES-256 и не хранится в открытом виде</div>
           <select id="newTenantTariff" class="input-field w-full rounded-lg px-3 py-2 text-sm mb-2"></select>
           <div class="flex gap-2">
             <button onclick="createTenant()" class="btn-primary px-3 py-1.5 rounded-lg text-xs">Создать</button>
