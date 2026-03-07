@@ -1,4 +1,4 @@
-// server.js — Express-сервер для мультитенантных рассылок (SaaS)
+// server.js — Express-сервер LT Кабинет (SaaS)
 const express = require('express');
 const fs = require('fs');
 const path = require('path');

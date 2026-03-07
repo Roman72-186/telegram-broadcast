@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Рассылки</title>
+  <title>LT Кабинет</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -504,6 +504,10 @@
     <div class="text-5xl mb-4">&#128274;</div>
     <h1 class="text-xl font-bold mb-2">Доступ запрещён</h1>
     <p class="text-sm" style="color: var(--text-secondary)">Нет доступа. Обратитесь к <a href="https://t.me/roman_chatbots" target="_blank" style="color: var(--accent); text-decoration: underline;">администратору</a> платформы.</p>
+    <div id="accessDeniedTgId" class="hidden mt-4 px-4 py-2 rounded-lg text-xs" style="background: var(--card-bg); color: var(--text-secondary); border: 1px solid var(--border-color);">
+      Ваш Telegram ID: <span id="accessDeniedTgIdValue" class="font-mono font-bold" style="color: var(--text-primary); user-select: all;"></span>
+      <div class="mt-1" style="color: var(--text-muted)">Сообщите этот ID администратору для открытия доступа</div>
+    </div>
   </div>
 
   <!-- Экран онбординга (первый вход без ботов) -->
@@ -511,7 +515,7 @@
     <div class="text-center mb-6 mt-4">
       <div class="text-4xl mb-3">&#128640;</div>
       <h1 class="text-xl font-bold mb-1">Добро пожаловать!</h1>
-      <p class="text-sm" style="color: var(--text-secondary)">Настройте бота для начала работы с рассылками</p>
+      <p class="text-sm" style="color: var(--text-secondary)">Настройте бота для начала работы с LT Кабинет</p>
     </div>
 
     <div class="space-y-4">
@@ -1222,6 +1226,16 @@
       return r;
     }
 
+    function showAccessDenied() {
+      document.getElementById('loadingScreen').classList.add('hidden');
+      document.getElementById('accessDenied').classList.remove('hidden');
+      const tgId = tg?.initDataUnsafe?.user?.id;
+      if (tgId) {
+        document.getElementById('accessDeniedTgIdValue').textContent = tgId;
+        document.getElementById('accessDeniedTgId').classList.remove('hidden');
+      }
+    }
+
     // ============================================
     // Авторизация
     // ============================================
@@ -1229,8 +1243,7 @@
       const initData = tg?.initData;
 
       if (!initData) {
-        document.getElementById('loadingScreen').classList.add('hidden');
-        document.getElementById('accessDenied').classList.remove('hidden');
+        showAccessDenied();
         return;
       }
 
@@ -1243,8 +1256,7 @@
         const data = await r.json();
 
         if (!data.authorized) {
-          document.getElementById('loadingScreen').classList.add('hidden');
-          document.getElementById('accessDenied').classList.remove('hidden');
+          showAccessDenied();
           return;
         }
 
@@ -1281,8 +1293,7 @@
         }
       } catch (e) {
         console.error('Auth error:', e);
-        document.getElementById('loadingScreen').classList.add('hidden');
-        document.getElementById('accessDenied').classList.remove('hidden');
+        showAccessDenied();
       }
     }
 

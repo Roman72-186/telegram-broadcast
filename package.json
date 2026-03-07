@@ -1,7 +1,7 @@
 {
   "name": "telegram-broadcast",
   "version": "1.0.0",
-  "description": "Telegram Mini App для отложенных авторассылок через Leadteh и Telegram Bot API",
+  "description": "LT Кабинет — мини-кабинет Leadteh для Telegram Mini App",
   "private": true,
   "main": "server.js",
   "scripts": {
