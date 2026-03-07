@@ -503,7 +503,7 @@
   <div id="accessDenied" class="hidden flex flex-col items-center justify-center min-h-screen p-6 text-center">
     <div class="text-5xl mb-4">&#128274;</div>
     <h1 class="text-xl font-bold mb-2">Доступ запрещён</h1>
-    <p class="text-sm" style="color: var(--text-secondary)">Нет доступа. Обратитесь к администратору платформы.</p>
+    <p class="text-sm" style="color: var(--text-secondary)">Нет доступа. Обратитесь к <a href="https://t.me/roman_chatbots" target="_blank" style="color: var(--accent); text-decoration: underline;">администратору</a> платформы.</p>
   </div>
 
   <!-- Экран онбординга (первый вход без ботов) -->
@@ -2620,7 +2620,7 @@
     // ============================================
     async function saveBroadcast() {
       if (subscriptionInfo && !subscriptionInfo.canBroadcast) {
-        showAlert('Подписка истекла. Обратитесь к администратору для продления.');
+        showAlert('Подписка истекла. Обратитесь к администратору для продления: t.me/roman_chatbots');
         return;
       }
       const nextBtn = document.getElementById('nextBtn');
@@ -4026,7 +4026,7 @@
     // --- Сохранение авторассылки ---
     async function saveAutoBroadcast() {
       if (subscriptionInfo && !subscriptionInfo.canBroadcast) {
-        showAlert('Подписка истекла. Обратитесь к администратору для продления.');
+        showAlert('Подписка истекла. Обратитесь к администратору для продления: t.me/roman_chatbots');
         return;
       }
       const btn = document.getElementById('autoSaveBtn');
