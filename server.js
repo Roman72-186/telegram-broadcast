@@ -738,7 +738,7 @@ app.post('/api/broadcast/delete', requireTenantAdmin, (req, res) => {
 
     const result = db.deleteBroadcast(id, req.tenantId);
     if (result.changes === 0) {
-      return res.status(404).json({ error: 'Рассылка не найдена или уже отправлена' });
+      return res.status(404).json({ error: 'Рассылка не найдена или сейчас отправляется' });
     }
     res.json({ ok: true });
   } catch (e) {

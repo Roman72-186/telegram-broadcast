@@ -1025,7 +1025,7 @@
 
       <!-- Подтаб: Разовые рассылки -->
       <div id="listSubOneshot">
-        <div class="hint-box">Здесь все ваши рассылки. Статусы: ожидает — ещё не отправлена, отправляется — в процессе, завершена — доставлена. Можно удалить ожидающую или повторить завершённую с редактированием.</div>
+        <div class="hint-box">Здесь все ваши рассылки. Статусы: ожидает — ещё не отправлена, отправляется — в процессе, завершена — доставлена. Можно удалить любую рассылку (кроме отправляемой) или повторить завершённую с редактированием.</div>
         <div id="listLoading" class="text-center py-8">
           <div class="text-sm" style="color: var(--text-secondary)">Загрузка...</div>
         </div>
@@ -2859,7 +2859,7 @@
           }
 
           if (b.status === 'error' && b.error) details += `<div class="text-xs mt-1" style="color:var(--danger)">${escapeHtml(b.error)}</div>`;
-          if (b.status === 'pending') details += `<button onclick="event.stopPropagation();deleteBroadcast('${b.id}')" class="text-xs mt-2" style="color:var(--danger)">Отменить рассылку</button>`;
+          if (b.status !== 'sending') details += `<button onclick="event.stopPropagation();deleteBroadcast('${b.id}')" class="text-xs mt-2" style="color:var(--danger)">${b.status === 'pending' ? 'Отменить рассылку' : 'Удалить'}</button>`;
           details += `</div>`;
 
           card.innerHTML = `
@@ -2956,7 +2956,7 @@
     }
 
     async function deleteBroadcast(id) {
-      if (!confirm('Отменить эту рассылку?')) return;
+      if (!confirm('Удалить эту рассылку?')) return;
       try {
         const r = await apiFetch('/api/broadcast/delete', { method: 'POST', body: { id } });
         const data = await r.json();
