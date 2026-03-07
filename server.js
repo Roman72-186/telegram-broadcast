@@ -188,6 +188,10 @@ app.post('/webhook/platform', async (req, res) => {
 
     if (!text.startsWith('/start')) return;
 
+    // Сохраняем пользователя
+    const from = update.message.from || {};
+    db.savePlatformBotUser(from.id, from.first_name, from.last_name, from.username);
+
     const caption =
       `<b>LT Кабинет — платформа для Telegram-рассылок</b>\n\n` +
       `Добро пожаловать! Этот бот — ваш личный кабинет для управления рассылками через Telegram.\n\n` +
@@ -1502,6 +1506,16 @@ app.post('/api/super/tariffs/:id/update', requireSuperAdmin, (req, res) => {
     res.json({ ok: true });
   } catch (e) {
     console.error('POST /api/super/tariffs/:id/update error:', e.message);
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+// --- Пользователи платформенного бота ---
+app.get('/api/super/bot-users', requireSuperAdmin, (req, res) => {
+  try {
+    res.json({ users: db.getPlatformBotUsers() });
+  } catch (e) {
+    console.error('GET /api/super/bot-users error:', e.message);
     res.status(500).json({ error: 'Ошибка' });
   }
 });

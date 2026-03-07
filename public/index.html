@@ -1288,6 +1288,7 @@
       <div class="flex gap-2 mb-4">
         <button onclick="showSuperSub('tenants')" id="superSubTenants" class="flex-1 py-1.5 px-2 rounded-lg text-xs font-medium btn-primary">Тенанты</button>
         <button onclick="showSuperSub('tariffs')" id="superSubTariffs" class="flex-1 py-1.5 px-2 rounded-lg text-xs font-medium btn-secondary">Тарифы</button>
+        <button onclick="showSuperSub('botUsers')" id="superSubBotUsers" class="flex-1 py-1.5 px-2 rounded-lg text-xs font-medium btn-secondary">Пользователи</button>
         <button onclick="showSuperSub('stats')" id="superSubStats" class="flex-1 py-1.5 px-2 rounded-lg text-xs font-medium btn-secondary">Статистика</button>
       </div>
 
@@ -1334,6 +1335,13 @@
           <button onclick="createTariff()" class="btn-primary px-3 py-1.5 rounded-lg text-xs">Создать</button>
         </div>
         <div id="tariffsListContainer" class="space-y-2"></div>
+      </div>
+
+      <!-- Пользователи бота -->
+      <div id="superBotUsers" class="hidden">
+        <h2 class="text-lg font-bold mb-3">Пользователи бота</h2>
+        <p class="text-xs mb-3" style="color:var(--text-muted)">Все, кто нажал /start в платформенном боте</p>
+        <div id="botUsersContainer" class="space-y-2"></div>
       </div>
 
       <!-- Статистика -->
@@ -3469,12 +3477,13 @@
     }
 
     function showSuperSub(sub) {
-      ['tenants', 'tariffs', 'stats'].forEach(s => {
+      ['tenants', 'tariffs', 'botUsers', 'stats'].forEach(s => {
         const el = document.getElementById(`super${s.charAt(0).toUpperCase() + s.slice(1)}`);
         const btn = document.getElementById(`superSub${s.charAt(0).toUpperCase() + s.slice(1)}`);
         if (el) el.classList.toggle('hidden', s !== sub);
         if (btn) btn.className = `flex-1 py-1.5 px-2 rounded-lg text-xs font-medium ${s === sub ? 'btn-primary' : 'btn-secondary'}`;
       });
+      if (sub === 'botUsers') loadBotUsers();
     }
 
     async function loadSuperData() {
@@ -3745,6 +3754,35 @@
           <div class="stat-card"><div class="stat-value">${data.sent_broadcasts}</div><div class="stat-label">Отправлено</div></div>
           <div class="stat-card"><div class="stat-value">${data.month_broadcasts}</div><div class="stat-label">Рассылок за ${data.month}</div></div>`;
       } catch (e) { console.error(e); }
+    }
+
+    async function loadBotUsers() {
+      const container = document.getElementById('botUsersContainer');
+      container.innerHTML = '<div class="text-xs" style="color:var(--text-muted)">Загрузка...</div>';
+      try {
+        const r = await apiFetch('/api/super/bot-users');
+        const data = await r.json();
+        const users = data.users || [];
+        if (users.length === 0) {
+          container.innerHTML = '<div class="text-xs" style="color:var(--text-muted)">Пока никто не нажал /start</div>';
+          return;
+        }
+        container.innerHTML = `
+          <div class="text-xs mb-2" style="color:var(--text-secondary)">Всего: ${users.length}</div>
+          ${users.map(u => `
+            <div class="broadcast-card" style="padding: 10px;">
+              <div class="flex justify-between items-start">
+                <div>
+                  <div class="text-sm font-medium">${escapeHtml(u.first_name || '')} ${escapeHtml(u.last_name || '')}</div>
+                  <div class="text-xs" style="color:var(--text-muted)">${u.username ? '@' + escapeHtml(u.username) : ''} · ID: ${u.telegram_id}</div>
+                </div>
+                <div class="text-xs" style="color:var(--text-muted)">${new Date(u.started_at + 'Z').toLocaleDateString('ru-RU')}</div>
+              </div>
+            </div>`).join('')}`;
+      } catch (e) {
+        container.innerHTML = '<div class="text-xs" style="color:var(--text-muted)">Ошибка загрузки</div>';
+        console.error(e);
+      }
     }
 
     // ============================================
