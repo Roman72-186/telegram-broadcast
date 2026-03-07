@@ -119,7 +119,6 @@ app.get('/api/public/tariffs', (req, res) => {
   const tariffs = db.getTariffPlans().map(t => ({
     name: t.name,
     max_bots: t.max_bots,
-    max_broadcasts_per_month: t.max_broadcasts_per_month,
     max_contacts: t.max_contacts,
     has_dialogs: t.has_dialogs,
     price: t.price || 0,
@@ -1290,7 +1289,6 @@ app.get('/api/tenant/info', requireTenantAdmin, (req, res) => {
       tariff: plan ? {
         name: plan.name,
         max_bots: plan.max_bots,
-        max_broadcasts_per_month: plan.max_broadcasts_per_month,
         max_contacts: plan.max_contacts,
         has_dialogs: plan.has_dialogs || 0,
         price: plan.price || 0,
@@ -1492,9 +1490,9 @@ app.get('/api/super/tariffs', requireSuperAdmin, (req, res) => {
 
 app.post('/api/super/tariffs', requireSuperAdmin, (req, res) => {
   try {
-    const { name, max_bots, max_broadcasts_per_month, max_contacts, has_dialogs, price } = req.body;
+    const { name, max_bots, max_contacts, has_dialogs, price } = req.body;
     if (!name) return res.status(400).json({ error: 'name обязателен' });
-    const id = db.createTariffPlan(name, max_bots || 3, max_broadcasts_per_month || 100, max_contacts || 5000, has_dialogs, price);
+    const id = db.createTariffPlan(name, max_bots || 3, 0, max_contacts || 5000, has_dialogs, price);
     res.json({ ok: true, id });
   } catch (e) {
     console.error('POST /api/super/tariffs error:', e.message);
@@ -2053,6 +2051,7 @@ async function processChainRuns() {
         try {
           const ok = await sendPreparedToContact(ab, prepared, contact.telegram_id);
           if (ok) {
+            db.logContactSend(ab.tenant_id, contact.telegram_id, 'auto_chain', ab.id);
             // Вычисляем время следующего шага
             let nextStepAt = null;
             if (ab.steps.length > 1) {
@@ -2099,6 +2098,7 @@ async function processChainRuns() {
       const ok = await sendPreparedToContact(ab, prepared, enrollment.contact_telegram_id);
 
       if (ok) {
+        db.logContactSend(ab.tenant_id, enrollment.contact_telegram_id, 'auto_chain', ab.id);
         const afterNextIdx = nextStepIdx + 1;
         if (afterNextIdx >= steps.length) {
           db.updateEnrollment(enrollment.id, { current_step: nextStepIdx, status: 'completed', next_step_at: null });
@@ -2275,8 +2275,12 @@ async function sendStepMessages(autoBroadcast, step) {
 
   for (const contact of recipients) {
     const ok = await sendPreparedToContact(autoBroadcast, prepared, contact.telegram_id);
-    if (ok) sent++;
-    else failed++;
+    if (ok) {
+      sent++;
+      db.logContactSend(autoBroadcast.tenant_id, contact.telegram_id, 'auto_recurring', autoBroadcast.id);
+    } else {
+      failed++;
+    }
     await new Promise(r => setTimeout(r, 35));
   }
 
@@ -2448,6 +2452,7 @@ async function sendBroadcast(broadcast) {
         status: 'sent',
         sent_at: new Date().toISOString(),
       });
+      db.logContactSend(broadcast.tenant_id, contact.telegram_id, 'broadcast', broadcast.id);
     }
 
     await new Promise(r => setTimeout(r, 35));
