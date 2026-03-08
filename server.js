@@ -114,7 +114,7 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', uptime: process.uptime() });
 });
 
-// Публичный список тарифов (для экрана «Нет доступа»)
+// Публичный список тарифов (legacy, для обратной совместимости)
 app.get('/api/public/tariffs', (req, res) => {
   const tariffs = db.getTariffPlans().map(t => {
     const price = t.price || 0;
@@ -129,6 +129,19 @@ app.get('/api/public/tariffs', (req, res) => {
     };
   });
   res.json({ tariffs });
+});
+
+// Публичное ценообразование (конфигуратор)
+app.get('/api/public/pricing', (req, res) => {
+  const cfg = db.getPricingConfig();
+  res.json({
+    free_bots: cfg.free_bots,
+    price_per_bot: cfg.price_per_bot,
+    free_contacts: cfg.free_contacts,
+    price_per_100_contacts: cfg.price_per_100_contacts,
+    max_bots: cfg.max_bots,
+    max_contacts: cfg.max_contacts,
+  });
 });
 
 // ============================================
@@ -328,6 +341,8 @@ app.post('/api/auth/chat', rateLimit(req => req.ip, 10, 60000), (req, res) => {
 app.use('/api', rateLimit(req => `api:${req.ip}`, 60, 60000), (req, res, next) => {
   // /api/auth и /api/auth/chat не требуют Bearer
   if (req.path === '/auth' || req.path === '/auth/chat') return next();
+  // Публичные эндпоинты
+  if (req.path.startsWith('/public/')) return next();
   // /api/cron/send проверяется по cronSecret
   if (req.path === '/cron/send') return next();
   authMiddleware(req, res, next);
@@ -1282,30 +1297,108 @@ app.get('/api/tenant/info', requireTenantAdmin, (req, res) => {
   try {
     const tenant = db.getTenantById(req.tenantId);
     const limits = db.checkTariffLimits(req.tenantId);
-    const plan = tenant?.tariff_plan_id ? db.getTariffPlan(tenant.tariff_plan_id) : null;
-
     const subscription = db.checkSubscription(req.tenantId);
+
+    const maxBots = tenant?.custom_max_bots != null ? tenant.custom_max_bots : 1;
+    const maxContacts = tenant?.custom_max_contacts != null ? tenant.custom_max_contacts : 100;
+    const price = tenant?.custom_price != null ? tenant.custom_price : 0;
 
     res.json({
       tenant: {
         name: tenant?.name || '',
         status: tenant?.status || 'unknown',
       },
-      tariff: plan ? {
-        name: plan.name,
-        max_bots: plan.max_bots,
-        max_contacts: plan.max_contacts,
-        has_dialogs: plan.has_dialogs || 0,
-        price: plan.price || 0,
-        price_6m: plan.price > 0 ? Math.round(plan.price * 6 * 0.85) : 0,
-        price_12m: plan.price > 0 ? Math.round(plan.price * 12 * 0.80) : 0,
-      } : null,
+      tariff: {
+        max_bots: maxBots,
+        max_contacts: maxContacts,
+        price,
+        price_6m: price > 0 ? Math.round(price * 6 * 0.85) : 0,
+        price_12m: price > 0 ? Math.round(price * 12 * 0.80) : 0,
+      },
       usage: limits.limits || null,
       subscription,
     });
   } catch (e) {
     console.error('GET /api/tenant/info error:', e.message);
     res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+// ============================================
+// API: Тарифный конфигуратор
+// ============================================
+app.post('/api/tariff/calculate', requireTenantAdmin, (req, res) => {
+  try {
+    const { bots, contacts } = req.body;
+    const cfg = db.getPricingConfig();
+    const b = Math.max(1, Math.min(cfg.max_bots, parseInt(bots) || 1));
+    const c = Math.max(100, Math.min(cfg.max_contacts, Math.ceil((parseInt(contacts) || 100) / 100) * 100));
+    const result = db.calculatePrice(b, c);
+    res.json(result);
+  } catch (e) {
+    console.error('POST /api/tariff/calculate error:', e.message);
+    res.status(500).json({ error: 'Ошибка расчёта' });
+  }
+});
+
+app.post('/api/tariff/apply', requireTenantAdmin, async (req, res) => {
+  try {
+    const { bots, contacts, period } = req.body;
+    const validPeriods = ['1m', '6m', '12m'];
+    if (!period || !validPeriods.includes(period)) {
+      return res.status(400).json({ error: 'Некорректный период' });
+    }
+
+    const cfg = db.getPricingConfig();
+    const b = Math.max(1, Math.min(cfg.max_bots, parseInt(bots) || 1));
+    const c = Math.max(100, Math.min(cfg.max_contacts, Math.ceil((parseInt(contacts) || 100) / 100) * 100));
+    const { price } = db.calculatePrice(b, c);
+
+    // Расчёт суммы с учётом скидок за период
+    let amount;
+    if (period === '1m') amount = price;
+    else if (period === '6m') amount = Math.round(price * 6 * 0.85);
+    else if (period === '12m') amount = Math.round(price * 12 * 0.80);
+
+    // Создать платёж
+    const paymentId = db.createPayment(req.tenantId, amount, period, b, c);
+
+    // Пока ЮMoney не подключён — отправляем заявку суперадмину
+    if (SUPER_ADMIN_ID && config.platformBotToken) {
+      const tenant = db.getTenantById(req.tenantId);
+      const tenantName = tenant?.name || 'Без имени';
+      const tgId = tenant?.telegram_id || '';
+      const periodNames = { '1m': '1 месяц', '6m': '6 месяцев', '12m': '12 месяцев' };
+
+      let text = `💳 Заявка на тариф\n\nТенант: ${tenantName}\nTelegram ID: ${tgId}`;
+      text += `\nТариф: ${b} ботов, ${c} конт./мес`;
+      text += `\nЦена: ${price} ₽/мес`;
+      text += `\nПериод: ${periodNames[period]}`;
+      text += `\nИтого: ${amount} ₽`;
+      text += `\nPayment ID: ${paymentId}`;
+      if (tgId) text += `\n\nНаписать: tg://user?id=${tgId}`;
+
+      await fetch(`https://api.telegram.org/bot${config.platformBotToken}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: SUPER_ADMIN_ID, text, disable_web_page_preview: true }),
+      });
+    }
+
+    res.json({ ok: true, payment_id: paymentId, amount, period });
+  } catch (e) {
+    console.error('POST /api/tariff/apply error:', e.message);
+    res.status(500).json({ error: 'Ошибка оформления тарифа' });
+  }
+});
+
+app.get('/api/tariff/payments', requireTenantAdmin, (req, res) => {
+  try {
+    const payments = db.getPayments(req.tenantId);
+    res.json({ payments });
+  } catch (e) {
+    console.error('GET /api/tariff/payments error:', e.message);
+    res.status(500).json({ error: 'Ошибка загрузки платежей' });
   }
 });
 
@@ -1327,8 +1420,9 @@ app.post('/api/subscription/request', requireTenantAdmin, async (req, res) => {
     const tenant = db.getTenantById(req.tenantId);
     const tenantName = tenant?.name || 'Без имени';
     const tgId = tenant?.telegram_id || '';
-    const plan = tenant?.tariff_plan_id ? db.getTariffPlan(tenant.tariff_plan_id) : null;
-    const price = plan?.price || 0;
+    const price = tenant?.custom_price || 0;
+    const maxBots = tenant?.custom_max_bots != null ? tenant.custom_max_bots : 1;
+    const maxContacts = tenant?.custom_max_contacts != null ? tenant.custom_max_contacts : 100;
 
     // Расчёт суммы с учётом скидок
     let amount = 0;
@@ -1341,7 +1435,7 @@ app.post('/api/subscription/request', requireTenantAdmin, async (req, res) => {
     }
 
     let text = `💳 Запрос на продление подписки\n\nТенант: ${tenantName}\nTelegram ID: ${tgId || '—'}`;
-    if (plan) text += `\nТариф: ${plan.name} (${price} ₽/мес)`;
+    text += `\nТариф: ${maxBots} ботов, ${maxContacts} конт./мес (${price} ₽/мес)`;
     text += `\nПериод: ${validPeriods[period]}`;
     if (amount > 0) text += `\nСумма: ${amount} ₽`;
     if (tgId) text += `\n\nНаписать: tg://user?id=${tgId}`;
@@ -1382,7 +1476,7 @@ app.get('/api/super/tenants', requireSuperAdmin, (req, res) => {
 // --- Создать тенанта ---
 app.post('/api/super/tenants', requireSuperAdmin, (req, res) => {
   try {
-    const { telegram_id, name, leadteh_api_token, tariff_plan_id } = req.body;
+    const { telegram_id, name, leadteh_api_token, custom_max_bots, custom_max_contacts, custom_price } = req.body;
     if (!telegram_id) return res.status(400).json({ error: 'telegram_id обязателен' });
 
     // Проверяем нет ли уже
@@ -1399,8 +1493,13 @@ app.post('/api/super/tenants', requireSuperAdmin, (req, res) => {
 
     const tenantId = db.createTenant(String(telegram_id), name || '', leadteh_api_token || '');
 
-    if (tariff_plan_id) {
-      db.updateTenant(tenantId, { tariff_plan_id });
+    // Применить кастомные лимиты если указаны
+    if (custom_max_bots !== undefined || custom_max_contacts !== undefined || custom_price !== undefined) {
+      const customFields = {};
+      if (custom_max_bots !== undefined) customFields.custom_max_bots = custom_max_bots;
+      if (custom_max_contacts !== undefined) customFields.custom_max_contacts = custom_max_contacts;
+      if (custom_price !== undefined) customFields.custom_price = custom_price;
+      db.updateTenant(tenantId, customFields);
     }
 
     res.json({ ok: true, tenant_id: tenantId });
@@ -1414,11 +1513,13 @@ app.post('/api/super/tenants', requireSuperAdmin, (req, res) => {
 app.post('/api/super/tenants/:id/update', requireSuperAdmin, (req, res) => {
   try {
     const { id } = req.params;
-    const { name, status, tariff_plan_id } = req.body;
+    const { name, status, custom_max_bots, custom_max_contacts, custom_price } = req.body;
     const fields = {};
     if (name !== undefined) fields.name = name;
     if (status !== undefined) fields.status = status;
-    if (tariff_plan_id !== undefined) fields.tariff_plan_id = tariff_plan_id;
+    if (custom_max_bots !== undefined) fields.custom_max_bots = custom_max_bots;
+    if (custom_max_contacts !== undefined) fields.custom_max_contacts = custom_max_contacts;
+    if (custom_price !== undefined) fields.custom_price = custom_price;
 
     db.updateTenant(Number(id), fields);
     res.json({ ok: true });
@@ -1505,7 +1606,43 @@ app.post('/api/super/impersonate', requireSuperAdmin, (req, res) => {
   }
 });
 
-// --- Тарифные планы ---
+// --- Ценообразование ---
+app.get('/api/super/pricing', requireSuperAdmin, (req, res) => {
+  res.json(db.getPricingConfig());
+});
+
+app.post('/api/super/pricing', requireSuperAdmin, (req, res) => {
+  try {
+    db.updatePricingConfig(req.body);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('POST /api/super/pricing error:', e.message);
+    res.status(500).json({ error: 'Ошибка обновления ставок' });
+  }
+});
+
+// --- Платежи ---
+app.get('/api/super/payments', requireSuperAdmin, (req, res) => {
+  try {
+    res.json({ payments: db.getAllPayments() });
+  } catch (e) {
+    console.error('GET /api/super/payments error:', e.message);
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+app.post('/api/super/payments/:id/confirm', requireSuperAdmin, (req, res) => {
+  try {
+    const result = db.confirmPayment(Number(req.params.id));
+    if (!result) return res.status(404).json({ error: 'Платёж не найден или уже обработан' });
+    res.json({ ok: true, paid_until: result.paid_until });
+  } catch (e) {
+    console.error('POST /api/super/payments/:id/confirm error:', e.message);
+    res.status(500).json({ error: 'Ошибка подтверждения платежа' });
+  }
+});
+
+// --- Тарифные планы (legacy) ---
 app.get('/api/super/tariffs', requireSuperAdmin, (req, res) => {
   res.json({ tariffs: db.getTariffPlans() });
 });

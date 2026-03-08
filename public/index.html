@@ -596,11 +596,39 @@
       <div class="mt-1" style="color: var(--text-muted)">Сообщите этот ID администратору для открытия доступа</div>
     </div>
 
-    <!-- Тарифные планы -->
+    <!-- Ценообразование -->
     <div class="w-full max-w-md mt-2">
-      <h2 class="text-base font-bold mb-3">Доступные тарифы</h2>
-      <div id="publicTariffsContainer" class="space-y-2 text-left">
-        <div class="text-xs" style="color:var(--text-muted)">Загрузка...</div>
+      <div class="broadcast-card text-left" style="padding: 14px;">
+        <div class="text-sm font-bold mb-2" style="color:var(--accent)">Бесплатно для всех</div>
+        <div class="text-xs mb-3" style="color:var(--text-secondary)">1 бот + 100 контактов/мес — без оплаты</div>
+        <div class="text-xs mb-1" style="color:var(--text-muted)">Нужно больше?</div>
+        <div class="text-xs" style="color:var(--text-secondary)">
+          Доп. боты: <span style="color:var(--accent)">200 ₽/бот</span> (первый бесплатен)<br>
+          Доп. контакты: <span style="color:var(--accent)">50 ₽/100 контактов</span> (первые 100 бесплатны)
+        </div>
+      </div>
+      <div id="publicPricingCalculator" class="broadcast-card text-left mt-2" style="padding: 14px;">
+        <div class="section-label">Калькулятор</div>
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-xs" style="color:var(--text-secondary)">Ботов:</span>
+          <div class="flex items-center gap-2">
+            <button onclick="publicCalcBots(-1)" class="btn-secondary px-2 py-0.5 rounded text-xs">−</button>
+            <span id="publicCalcBotsVal" class="text-sm font-bold" style="min-width:24px;text-align:center">1</span>
+            <button onclick="publicCalcBots(1)" class="btn-secondary px-2 py-0.5 rounded text-xs">+</button>
+          </div>
+        </div>
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-xs" style="color:var(--text-secondary)">Контактов/мес:</span>
+          <div class="flex items-center gap-2">
+            <button onclick="publicCalcContacts(-100)" class="btn-secondary px-2 py-0.5 rounded text-xs">−100</button>
+            <span id="publicCalcContactsVal" class="text-sm font-bold" style="min-width:40px;text-align:center">100</span>
+            <button onclick="publicCalcContacts(100)" class="btn-secondary px-2 py-0.5 rounded text-xs">+100</button>
+          </div>
+        </div>
+        <div class="rounded-lg p-3 text-center" style="background:var(--accent-subtle);border:1px solid var(--border)">
+          <div id="publicCalcPrice" class="text-lg font-bold" style="color:var(--accent)">Бесплатно</div>
+          <div id="publicCalcBreakdown" class="text-xs mt-1" style="color:var(--text-muted)"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -1287,7 +1315,7 @@
       <!-- Подтабы суперадмина -->
       <div class="flex gap-2 mb-4">
         <button onclick="showSuperSub('tenants')" id="superSubTenants" class="flex-1 py-1.5 px-2 rounded-lg text-xs font-medium btn-primary">Тенанты</button>
-        <button onclick="showSuperSub('tariffs')" id="superSubTariffs" class="flex-1 py-1.5 px-2 rounded-lg text-xs font-medium btn-secondary">Тарифы</button>
+        <button onclick="showSuperSub('tariffs')" id="superSubTariffs" class="flex-1 py-1.5 px-2 rounded-lg text-xs font-medium btn-secondary">Цены</button>
         <button onclick="showSuperSub('botUsers')" id="superSubBotUsers" class="flex-1 py-1.5 px-2 rounded-lg text-xs font-medium btn-secondary">Пользователи</button>
         <button onclick="showSuperSub('stats')" id="superSubStats" class="flex-1 py-1.5 px-2 rounded-lg text-xs font-medium btn-secondary">Статистика</button>
       </div>
@@ -1307,7 +1335,7 @@
           <input id="newTenantName" type="text" placeholder="Имя / Название" class="input-field w-full rounded-lg px-3 py-2 text-sm mb-2" />
           <input id="newTenantLeadteh" type="text" placeholder="Leadteh API токен (необяз.)" class="input-field w-full rounded-lg px-3 py-2 text-sm" />
           <div class="text-xs mt-1 mb-2" style="color: var(--text-muted)">&#128274; Токен шифруется AES-256 и не хранится в открытом виде</div>
-          <select id="newTenantTariff" class="input-field w-full rounded-lg px-3 py-2 text-sm mb-2"></select>
+          <div class="text-xs mb-1" style="color:var(--text-muted)">Тариф: бесплатный (1 бот, 100 конт./мес). Тенант сможет расширить через конфигуратор.</div>
           <div class="flex gap-2">
             <button onclick="createTenant()" class="btn-primary px-3 py-1.5 rounded-lg text-xs">Создать</button>
             <button onclick="document.getElementById('addTenantForm').classList.add('hidden')" class="btn-secondary px-3 py-1.5 rounded-lg text-xs">Отмена</button>
@@ -1316,24 +1344,16 @@
         <div id="tenantsListContainer" class="space-y-2"></div>
       </div>
 
-      <!-- Тарифы -->
+      <!-- Ценообразование -->
       <div id="superTariffs" class="hidden">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="text-lg font-bold">Тарифные планы</h2>
-          <button onclick="showAddTariffForm()" class="btn-primary px-3 py-1.5 rounded-lg text-xs">+ Добавить</button>
+        <h2 class="text-lg font-bold mb-3">Ценообразование</h2>
+        <div id="pricingConfigContainer" class="broadcast-card mb-3">
+          <div class="text-xs mb-3" style="color:var(--text-muted)">Загрузка...</div>
         </div>
-        <div id="addTariffForm" class="hidden broadcast-card mb-3">
-          <input id="newTariffName" type="text" placeholder="Название" class="input-field w-full rounded-lg px-3 py-2 text-sm mb-2" />
-          <div class="grid grid-cols-2 gap-2 mb-2">
-            <input id="newTariffBots" type="number" placeholder="Макс.ботов" class="input-field rounded-lg px-3 py-2 text-sm" />
-            <input id="newTariffContacts" type="number" placeholder="Макс.контактов/мес" class="input-field rounded-lg px-3 py-2 text-sm" />
-          </div>
-          <div class="flex gap-2 mb-2">
-            <input id="newTariffPrice" type="number" placeholder="Цена ₽/мес" class="input-field flex-1 rounded-lg px-3 py-2 text-sm" />
-          </div>
-          <button onclick="createTariff()" class="btn-primary px-3 py-1.5 rounded-lg text-xs">Создать</button>
+        <h3 class="text-sm font-bold mb-2 mt-4">Заявки на оплату</h3>
+        <div id="paymentsListContainer" class="space-y-2">
+          <div class="text-xs" style="color:var(--text-muted)">Загрузка...</div>
         </div>
-        <div id="tariffsListContainer" class="space-y-2"></div>
       </div>
 
       <!-- Пользователи бота -->
@@ -1429,6 +1449,10 @@
       return r;
     }
 
+    let publicPricingConfig = null;
+    let publicCalcBotsValue = 1;
+    let publicCalcContactsValue = 100;
+
     function showAccessDenied() {
       document.getElementById('loadingScreen').classList.add('hidden');
       document.getElementById('accessDenied').classList.remove('hidden');
@@ -1437,39 +1461,52 @@
         document.getElementById('accessDeniedTgIdValue').textContent = tgId;
         document.getElementById('accessDeniedTgId').classList.remove('hidden');
       }
-      loadPublicTariffs();
+      loadPublicPricing();
     }
 
-    async function loadPublicTariffs() {
+    async function loadPublicPricing() {
       try {
-        const r = await fetch('/api/public/tariffs');
-        const data = await r.json();
-        const tariffs = data.tariffs || [];
-        const container = document.getElementById('publicTariffsContainer');
-        if (tariffs.length === 0) {
-          container.innerHTML = '<div class="text-xs" style="color:var(--text-muted)">Тарифы не настроены</div>';
-          return;
-        }
-        container.innerHTML = tariffs.map(t => `
-          <div class="broadcast-card" style="padding: 12px;">
-            <div class="flex justify-between items-start mb-1">
-              <div class="text-sm font-bold">${escapeHtml(t.name)}</div>
-              <div class="text-sm font-bold" style="color:var(--accent)">${t.price ? t.price + ' ₽/мес' : 'Бесплатно'}</div>
-            </div>
-            <div class="flex flex-wrap gap-2 text-xs mb-1" style="color:var(--text-secondary)">
-              <span>${t.max_bots} ${t.max_bots === 1 ? 'бот' : 'ботов'}</span>
-              <span>•</span>
-              <span>${t.max_contacts.toLocaleString('ru-RU')} контактов/мес</span>
-              <span>•</span>
-              <span>Рассылки + Диалоги</span>
-            </div>
-            ${t.price > 0 ? `<div class="flex flex-wrap gap-3 text-xs" style="color:var(--text-muted)">
-              <span>6 мес: <span style="color:var(--accent)">${t.price_6m.toLocaleString('ru-RU')} ₽</span> <span style="text-decoration:line-through">${(t.price*6).toLocaleString('ru-RU')}</span> -15%</span>
-              <span>12 мес: <span style="color:var(--accent)">${t.price_12m.toLocaleString('ru-RU')} ₽</span> <span style="text-decoration:line-through">${(t.price*12).toLocaleString('ru-RU')}</span> -20%</span>
-            </div>` : ''}
-          </div>`).join('');
+        const r = await fetch('/api/public/pricing');
+        publicPricingConfig = await r.json();
       } catch (e) {
-        console.error('loadPublicTariffs error:', e);
+        console.error('loadPublicPricing error:', e);
+      }
+    }
+
+    function publicCalcBots(delta) {
+      const cfg = publicPricingConfig || { max_bots: 10 };
+      publicCalcBotsValue = Math.max(1, Math.min(cfg.max_bots, publicCalcBotsValue + delta));
+      document.getElementById('publicCalcBotsVal').textContent = publicCalcBotsValue;
+      updatePublicCalc();
+    }
+
+    function publicCalcContacts(delta) {
+      const cfg = publicPricingConfig || { max_contacts: 50000 };
+      publicCalcContactsValue = Math.max(100, Math.min(cfg.max_contacts, publicCalcContactsValue + delta));
+      document.getElementById('publicCalcContactsVal').textContent = publicCalcContactsValue.toLocaleString('ru-RU');
+      updatePublicCalc();
+    }
+
+    function updatePublicCalc() {
+      const cfg = publicPricingConfig || { free_bots: 1, price_per_bot: 200, free_contacts: 100, price_per_100_contacts: 50 };
+      const extraBots = Math.max(0, publicCalcBotsValue - cfg.free_bots);
+      const extraContactBlocks = Math.max(0, Math.ceil((publicCalcContactsValue - cfg.free_contacts) / 100));
+      const botsCost = extraBots * cfg.price_per_bot;
+      const contactsCost = extraContactBlocks * cfg.price_per_100_contacts;
+      const total = botsCost + contactsCost;
+
+      const priceEl = document.getElementById('publicCalcPrice');
+      const breakdownEl = document.getElementById('publicCalcBreakdown');
+
+      if (total === 0) {
+        priceEl.textContent = 'Бесплатно';
+        breakdownEl.textContent = '';
+      } else {
+        priceEl.textContent = total.toLocaleString('ru-RU') + ' ₽/мес';
+        const parts = [];
+        if (botsCost > 0) parts.push(`Боты: ${extraBots}×${cfg.price_per_bot} = ${botsCost} ₽`);
+        if (contactsCost > 0) parts.push(`Контакты: ${extraContactBlocks}×${cfg.price_per_100_contacts} = ${contactsCost} ₽`);
+        breakdownEl.textContent = parts.join(' | ');
       }
     }
 
@@ -1580,19 +1617,21 @@
         // Бесплатный тариф — показываем предложение апгрейда
         banner.style.background = 'var(--info-bg, #e0f2fe)';
         banner.style.color = 'var(--info-text, #0369a1)';
-        banner.innerHTML = `<strong>Бесплатный тариф</strong> (${currentTariff?.max_contacts || 200} контактов/мес). <a href="javascript:void(0)" onclick="showPaymentModal()" style="text-decoration:underline;color:inherit">Перейти на платный</a>`;
+        const maxC = currentTariff?.max_contacts || 100;
+        const maxB = currentTariff?.max_bots || 1;
+        banner.innerHTML = `<strong>Бесплатный тариф</strong> (${maxB} бот, ${maxC} конт./мес). <a href="javascript:void(0)" onclick="showTariffConfigurator()" style="text-decoration:underline;color:inherit">Расширить</a>`;
         if (tabCreate) { tabCreate.style.opacity = ''; tabCreate.style.pointerEvents = ''; }
         updateCreateSubtabsDisabled(false);
       } else if (subscriptionInfo.status === 'trial') {
         banner.style.background = 'var(--info-bg, #e0f2fe)';
         banner.style.color = 'var(--info-text, #0369a1)';
-        banner.innerHTML = `<strong>Пробный период:</strong> осталось ${subscriptionInfo.trialDaysLeft} дн. <a href="javascript:void(0)" onclick="showPaymentModal()" style="text-decoration:underline;color:inherit">Оплатить</a>`;
+        banner.innerHTML = `<strong>Пробный период:</strong> осталось ${subscriptionInfo.trialDaysLeft} дн. <a href="javascript:void(0)" onclick="showTariffConfigurator()" style="text-decoration:underline;color:inherit">Оплатить</a>`;
         if (tabCreate) { tabCreate.style.opacity = ''; tabCreate.style.pointerEvents = ''; }
         updateCreateSubtabsDisabled(false);
       } else if (isExpired) {
         banner.style.background = 'var(--danger-bg, #fee2e2)';
         banner.style.color = 'var(--danger-text, #dc2626)';
-        banner.innerHTML = `<strong>Подписка истекла.</strong> Создание рассылок заблокировано. <a href="javascript:void(0)" onclick="showPaymentModal()" style="text-decoration:underline;color:inherit">Оплатить</a>`;
+        banner.innerHTML = `<strong>Подписка истекла.</strong> Создание рассылок заблокировано. <a href="javascript:void(0)" onclick="showTariffConfigurator()" style="text-decoration:underline;color:inherit">Продлить</a>`;
         if (tabCreate) { tabCreate.style.opacity = '0.5'; tabCreate.style.pointerEvents = 'none'; }
         updateCreateSubtabsDisabled(true);
       } else if (subscriptionInfo.status === 'paid' && subscriptionInfo.paidUntil) {
@@ -1604,7 +1643,7 @@
           const daysLeft = Math.max(0, Math.ceil((paidDate - new Date()) / (24*60*60*1000)));
           banner.style.background = daysLeft <= 3 ? 'var(--danger-bg, #fee2e2)' : 'var(--info-bg, #e0f2fe)';
           banner.style.color = daysLeft <= 3 ? 'var(--danger-text, #dc2626)' : 'var(--info-text, #0369a1)';
-          banner.innerHTML = `<strong>Подписка до ${paidDate.toLocaleDateString('ru-RU')}</strong> (осталось ${daysLeft} дн.) <a href="javascript:void(0)" onclick="showPaymentModal()" style="text-decoration:underline;color:inherit">Продлить</a>`;
+          banner.innerHTML = `<strong>Подписка до ${paidDate.toLocaleDateString('ru-RU')}</strong> (осталось ${daysLeft} дн.) <a href="javascript:void(0)" onclick="showTariffConfigurator()" style="text-decoration:underline;color:inherit">Изменить/Продлить</a>`;
         }
         if (tabCreate) { tabCreate.style.opacity = ''; tabCreate.style.pointerEvents = ''; }
         updateCreateSubtabsDisabled(false);
@@ -1615,46 +1654,122 @@
       }
     }
 
-    function showPaymentModal() {
-      const info = document.getElementById('paymentTariffInfo');
-      if (currentTariff && currentTariff.price > 0) {
-        const p = currentTariff.price;
-        info.innerHTML = `<strong>${escapeHtml(currentTariff.name)}</strong> — ${p} ₽/мес<br>` +
-          `<span class="text-xs">6 мес: ${Math.round(p*6*0.85).toLocaleString('ru-RU')} ₽ (-15%) | 12 мес: ${Math.round(p*12*0.80).toLocaleString('ru-RU')} ₽ (-20%)</span>`;
-      } else if (subscriptionInfo?.status === 'free') {
-        info.innerHTML = '<strong>Бесплатный тариф.</strong> Для перехода на платный свяжитесь с администратором.';
-      } else {
-        info.innerHTML = '';
+    // Тарифный конфигуратор
+    let configuratorPricing = null;
+    let cfgBots = 1;
+    let cfgContacts = 100;
+
+    async function showTariffConfigurator() {
+      // Загрузить текущие ставки
+      if (!configuratorPricing) {
+        try {
+          const r = await apiFetch('/api/public/pricing');
+          configuratorPricing = await r.json();
+        } catch (e) {
+          showAlert('Ошибка загрузки ставок');
+          return;
+        }
       }
-      document.getElementById('paymentRequestModal').classList.remove('hidden');
+
+      // Предзаполнить текущими лимитами
+      if (currentTariff) {
+        cfgBots = currentTariff.max_bots || 1;
+        cfgContacts = currentTariff.max_contacts || 100;
+      } else {
+        cfgBots = 1;
+        cfgContacts = 100;
+      }
+
+      updateConfiguratorUI();
+      document.getElementById('tariffConfiguratorModal').classList.remove('hidden');
     }
 
-    function closePaymentModal() {
-      document.getElementById('paymentRequestModal').classList.add('hidden');
+    function closeConfigurator() {
+      document.getElementById('tariffConfiguratorModal').classList.add('hidden');
     }
 
-    async function sendPaymentRequest(period) {
-      const buttons = document.querySelectorAll('#paymentRequestModal button');
+    function cfgChangeBots(delta) {
+      const cfg = configuratorPricing || { max_bots: 10 };
+      cfgBots = Math.max(1, Math.min(cfg.max_bots, cfgBots + delta));
+      updateConfiguratorUI();
+    }
+
+    function cfgChangeContacts(delta) {
+      const cfg = configuratorPricing || { max_contacts: 50000 };
+      cfgContacts = Math.max(100, Math.min(cfg.max_contacts, cfgContacts + delta));
+      updateConfiguratorUI();
+    }
+
+    function cfgSetContacts() {
+      const val = parseInt(document.getElementById('cfgContactsInput').value);
+      if (isNaN(val) || val < 100) { showAlert('Минимум 100 контактов'); return; }
+      const cfg = configuratorPricing || { max_contacts: 50000 };
+      cfgContacts = Math.min(cfg.max_contacts, Math.ceil(val / 100) * 100);
+      document.getElementById('cfgContactsInput').value = '';
+      updateConfiguratorUI();
+    }
+
+    function updateConfiguratorUI() {
+      const cfg = configuratorPricing || { free_bots: 1, price_per_bot: 200, free_contacts: 100, price_per_100_contacts: 50 };
+      const extraBots = Math.max(0, cfgBots - cfg.free_bots);
+      const extraContactBlocks = Math.max(0, Math.ceil((cfgContacts - cfg.free_contacts) / 100));
+      const botsCost = extraBots * cfg.price_per_bot;
+      const contactsCost = extraContactBlocks * cfg.price_per_100_contacts;
+      const price = botsCost + contactsCost;
+
+      document.getElementById('cfgBotsVal').textContent = cfgBots;
+      document.getElementById('cfgContactsVal').textContent = cfgContacts.toLocaleString('ru-RU');
+
+      const priceEl = document.getElementById('cfgPrice');
+      const breakdownEl = document.getElementById('cfgBreakdown');
+      const periodsEl = document.getElementById('cfgPeriods');
+
+      if (price === 0) {
+        priceEl.textContent = 'Бесплатно';
+        breakdownEl.textContent = '';
+        periodsEl.classList.add('hidden');
+      } else {
+        priceEl.textContent = price.toLocaleString('ru-RU') + ' ₽/мес';
+        const parts = [];
+        if (botsCost > 0) parts.push(`Боты: ${extraBots}×${cfg.price_per_bot} = ${botsCost} ₽`);
+        if (contactsCost > 0) parts.push(`Конт: ${extraContactBlocks}×${cfg.price_per_100_contacts} = ${contactsCost} ₽`);
+        breakdownEl.textContent = parts.join(' | ');
+        periodsEl.classList.remove('hidden');
+
+        const p6 = Math.round(price * 6 * 0.85);
+        const p12 = Math.round(price * 12 * 0.80);
+        document.getElementById('cfgPrice1m').textContent = `Оплатить (1 мес) — ${price.toLocaleString('ru-RU')} ₽`;
+        document.getElementById('cfgPrice6m').textContent = `6 мес: ${p6.toLocaleString('ru-RU')} ₽ (-15%)`;
+        document.getElementById('cfgPrice12m').textContent = `12 мес: ${p12.toLocaleString('ru-RU')} ₽ (-20%)`;
+      }
+    }
+
+    async function applyTariff(period) {
+      const buttons = document.querySelectorAll('#cfgPeriods button');
       buttons.forEach(b => b.disabled = true);
       try {
-        const resp = await fetch('/api/subscription/request', {
+        const r = await apiFetch('/api/tariff/apply', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-          body: JSON.stringify({ period }),
+          body: { bots: cfgBots, contacts: cfgContacts, period },
         });
-        const data = await resp.json();
+        const data = await r.json();
         if (data.ok) {
-          closePaymentModal();
-          showAlert('Заявка отправлена! Администратор свяжется с вами.');
+          closeConfigurator();
+          showAlert('Заявка отправлена! Администратор свяжется с вами для оплаты.');
+          await loadSubscriptionInfo();
         } else {
           showAlert(data.error || 'Ошибка');
         }
       } catch (e) {
-        showAlert('Ошибка отправки заявки');
+        showAlert('Ошибка оформления тарифа');
       } finally {
         buttons.forEach(b => b.disabled = false);
       }
     }
+
+    // legacy
+    function showPaymentModal() { showTariffConfigurator(); }
+    function closePaymentModal() { closeConfigurator(); }
 
     // ============================================
     // Онбординг
@@ -3264,11 +3379,17 @@
         el.innerHTML = `<div class="text-sm" style="color:var(--text-muted)">Тариф не назначен</div>`;
         return;
       }
+      const price = currentTariff?.price || 0;
+      const priceLabel = price > 0 ? `${price.toLocaleString('ru-RU')} ₽/мес` : 'Бесплатно';
       el.innerHTML = `
         <div class="section-label">Тариф и использование</div>
-        <div class="grid grid-cols-2 gap-3 text-center">
+        <div class="grid grid-cols-2 gap-3 text-center mb-2">
           <div><div class="text-sm font-bold">${limits.current_bots}/${limits.max_bots}</div><div class="text-xs" style="color:var(--text-muted)">Ботов</div></div>
-          <div><div class="text-sm font-bold">${limits.current_contacts || 0}/${limits.max_contacts}</div><div class="text-xs" style="color:var(--text-muted)">Контактов/мес</div></div>
+          <div><div class="text-sm font-bold">${(limits.current_contacts || 0).toLocaleString('ru-RU')}/${limits.max_contacts.toLocaleString('ru-RU')}</div><div class="text-xs" style="color:var(--text-muted)">Контактов/мес</div></div>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-xs" style="color:var(--text-secondary)">Стоимость: <span style="color:var(--accent);font-weight:600">${priceLabel}</span></span>
+          <button onclick="showTariffConfigurator()" class="btn-secondary px-3 py-1 rounded-lg text-xs">Изменить тариф</button>
         </div>`;
     }
 
@@ -3530,9 +3651,6 @@
         return;
       }
       container.innerHTML = tenants.map(t => {
-        const tariffOptions = superTariffs.map(tp =>
-          `<option value="${tp.id}" ${tp.id === t.tariff_plan_id ? 'selected' : ''}>${escapeHtml(tp.name)}</option>`
-        ).join('');
         // Статус подписки
         let subLabel = '';
         const now = new Date();
@@ -3550,6 +3668,12 @@
         } else {
           subLabel = '<span class="text-xs" style="color:var(--danger)">Истёк</span>';
         }
+
+        const maxB = t.effective_max_bots || 1;
+        const maxC = t.effective_max_contacts || 100;
+        const price = t.effective_price || 0;
+        const tariffLabel = price > 0 ? `${maxB} бот, ${maxC.toLocaleString('ru-RU')} конт. — ${price} ₽/мес` : `${maxB} бот, ${maxC} конт. — Бесплатно`;
+
         return `
         <div class="broadcast-card">
           <div class="flex items-center justify-between mb-1">
@@ -3557,15 +3681,9 @@
             <span class="status-badge status-${escapeAttr(t.status)}">${escapeHtml(t.status)}</span>
           </div>
           <div class="text-xs" style="color:var(--text-muted)">TG ID: ${escapeHtml(String(t.telegram_id))}</div>
-          <div class="text-xs mb-1" style="color:var(--text-muted)">Боты: ${escapeHtml(String(t.bots_count))} | Контакты/мес: ${t.unique_contacts || 0}${t.tariff_max_contacts ? '/' + t.tariff_max_contacts : ''}</div>
+          <div class="text-xs mb-1" style="color:var(--text-muted)">Боты: ${t.bots_count}/${maxB} | Контакты/мес: ${t.unique_contacts || 0}/${maxC.toLocaleString('ru-RU')}</div>
+          <div class="text-xs mb-1" style="color:var(--text-secondary)">Тариф: <span style="color:var(--accent)">${tariffLabel}</span></div>
           <div class="text-xs mb-1">Подписка: ${subLabel}</div>
-          <div class="flex items-center gap-2 mb-2">
-            <span class="text-xs" style="color:var(--text-muted)">Тариф:</span>
-            <select onchange="changeTenantTariff(${t.id}, this.value)" class="input-field rounded-lg px-2 py-1 text-xs flex-1">
-              <option value="">Не назначен</option>
-              ${tariffOptions}
-            </select>
-          </div>
           <button onclick="impersonateTenant(${t.id})" class="w-full py-2 rounded-lg text-sm font-medium mb-2" style="background:var(--accent);color:#fff">Войти как тенант</button>
           <div class="flex gap-2">
             <button onclick="showSubscriptionModal(${t.id}, '${escapeAttr(t.name || 'Без имени')}')" class="flex-1 text-xs px-2 py-1.5 rounded btn-primary">Подписка</button>
@@ -3586,15 +3704,7 @@
       } catch (e) { showAlert('Ошибка'); }
     }
 
-    async function changeTenantTariff(tenantId, tariffPlanId) {
-      try {
-        await apiFetch(`/api/super/tenants/${tenantId}/update`, {
-          method: 'POST',
-          body: { tariff_plan_id: tariffPlanId ? Number(tariffPlanId) : null },
-        });
-        showAlert('Тариф обновлён');
-      } catch (e) { showAlert('Ошибка смены тарифа'); }
-    }
+    // changeTenantTariff removed — tariffs are now configured per-tenant via custom_* fields
 
     async function confirmDeleteTenant(tenantId, name) {
       if (!confirm(`Удалить арендатора "${name}"? Все данные (боты, рассылки, файлы) будут удалены безвозвратно.`)) return;
@@ -3673,33 +3783,23 @@
 
     function showAddTenantForm() {
       document.getElementById('addTenantForm').classList.remove('hidden');
-      // Загрузить тарифы для выбора
-      const select = document.getElementById('newTenantTariff');
-      select.innerHTML = '<option value="">Тариф по умолчанию</option>';
-      superTariffs.forEach(t => {
-        const opt = document.createElement('option');
-        opt.value = t.id;
-        opt.textContent = `${t.name} (${t.max_bots} ботов, ${t.max_contacts} конт./мес)`;
-        select.appendChild(opt);
-      });
     }
 
     async function createTenant() {
       const tgId = document.getElementById('newTenantTgId').value.trim();
       const name = document.getElementById('newTenantName').value.trim();
       const leadteh = document.getElementById('newTenantLeadteh').value.trim();
-      const tariffId = document.getElementById('newTenantTariff').value;
 
       if (!tgId) { showAlert('Введите Telegram ID'); return; }
 
       try {
         const r = await apiFetch('/api/super/tenants', {
           method: 'POST',
-          body: { telegram_id: tgId, name, leadteh_api_token: leadteh, tariff_plan_id: tariffId ? Number(tariffId) : undefined },
+          body: { telegram_id: tgId, name, leadteh_api_token: leadteh },
         });
         const data = await r.json();
         if (data.ok) {
-          showAlert('Тенант создан');
+          showAlert('Тенант создан (бесплатный тариф)');
           document.getElementById('addTenantForm').classList.add('hidden');
           document.getElementById('newTenantTgId').value = '';
           document.getElementById('newTenantName').value = '';
@@ -3711,61 +3811,110 @@
 
     async function loadSuperTariffs() {
       try {
-        const r = await apiFetch('/api/super/tariffs');
+        const r = await apiFetch('/api/super/pricing');
         const data = await r.json();
-        superTariffs = data.tariffs || [];
-        renderSuperTariffs(superTariffs);
+        superTariffs = []; // legacy, now empty
+        renderPricingConfig(data);
+        loadSuperPayments();
       } catch (e) { console.error(e); }
     }
 
-    function renderSuperTariffs(tariffs) {
-      const container = document.getElementById('tariffsListContainer');
-      if (tariffs.length === 0) {
-        container.innerHTML = '<div class="text-sm" style="color:var(--text-muted)">Нет тарифов</div>';
-        return;
-      }
-      container.innerHTML = tariffs.map(t => {
-        const p = t.price || 0;
-        const p6 = p > 0 ? Math.round(p * 6 * 0.85) : 0;
-        const p12 = p > 0 ? Math.round(p * 12 * 0.80) : 0;
-        return `
-        <div class="broadcast-card">
-          <div class="text-sm font-medium mb-1">${escapeHtml(t.name)} ${t.is_default ? '<span class="text-xs" style="color:var(--accent)">(по умолч.)</span>' : ''}</div>
-          <div class="grid grid-cols-3 gap-2 text-center text-xs" style="color:var(--text-secondary)">
-            <div>${t.max_bots} ботов</div>
-            <div>${t.max_contacts.toLocaleString('ru-RU')} конт./мес</div>
-            <div style="color:var(--accent);font-weight:600">${p ? p + ' ₽/мес' : 'Бесплатно'}</div>
+    function renderPricingConfig(cfg) {
+      const container = document.getElementById('pricingConfigContainer');
+      container.innerHTML = `
+        <div class="section-label">Ставки конфигуратора</div>
+        <div class="grid grid-cols-2 gap-2 mb-3">
+          <div>
+            <label class="text-xs" style="color:var(--text-muted)">Бесплатных ботов</label>
+            <input id="pcFreeBots" type="number" value="${cfg.free_bots}" class="input-field w-full rounded-lg px-3 py-2 text-sm" />
           </div>
-          ${p > 0 ? `<div class="text-xs text-center mt-1" style="color:var(--text-muted)">6 мес: ${p6.toLocaleString('ru-RU')} ₽ (-15%) | 12 мес: ${p12.toLocaleString('ru-RU')} ₽ (-20%)</div>` : ''}
-        </div>`;
-      }).join('');
+          <div>
+            <label class="text-xs" style="color:var(--text-muted)">Цена за доп. бота, ₽</label>
+            <input id="pcPriceBot" type="number" value="${cfg.price_per_bot}" class="input-field w-full rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label class="text-xs" style="color:var(--text-muted)">Бесплатных контактов</label>
+            <input id="pcFreeContacts" type="number" value="${cfg.free_contacts}" class="input-field w-full rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label class="text-xs" style="color:var(--text-muted)">Цена за 100 конт., ₽</label>
+            <input id="pcPriceContacts" type="number" value="${cfg.price_per_100_contacts}" class="input-field w-full rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label class="text-xs" style="color:var(--text-muted)">Макс. ботов</label>
+            <input id="pcMaxBots" type="number" value="${cfg.max_bots}" class="input-field w-full rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label class="text-xs" style="color:var(--text-muted)">Макс. контактов</label>
+            <input id="pcMaxContacts" type="number" value="${cfg.max_contacts}" class="input-field w-full rounded-lg px-3 py-2 text-sm" />
+          </div>
+        </div>
+        <div class="text-xs mb-2" style="color:var(--text-muted)">Формула: (боты - ${cfg.free_bots}) × ${cfg.price_per_bot} + ((контакты - ${cfg.free_contacts}) / 100) × ${cfg.price_per_100_contacts}</div>
+        <button onclick="savePricingConfig()" class="btn-primary w-full py-2 rounded-lg text-sm">Сохранить ставки</button>
+      `;
     }
 
-    function showAddTariffForm() {
-      document.getElementById('addTariffForm').classList.remove('hidden');
-    }
-
-    async function createTariff() {
-      const name = document.getElementById('newTariffName').value.trim();
-      const maxBots = parseInt(document.getElementById('newTariffBots').value) || 3;
-      const maxContacts = parseInt(document.getElementById('newTariffContacts').value) || 5000;
-      const price = parseInt(document.getElementById('newTariffPrice').value) || 0;
-
-      if (!name) { showAlert('Введите название'); return; }
-
+    async function savePricingConfig() {
       try {
-        const r = await apiFetch('/api/super/tariffs', {
-          method: 'POST',
-          body: { name, max_bots: maxBots, max_contacts: maxContacts, has_dialogs: 1, price },
-        });
+        const body = {
+          free_bots: parseInt(document.getElementById('pcFreeBots').value) || 1,
+          price_per_bot: parseInt(document.getElementById('pcPriceBot').value) || 200,
+          free_contacts: parseInt(document.getElementById('pcFreeContacts').value) || 100,
+          price_per_100_contacts: parseInt(document.getElementById('pcPriceContacts').value) || 50,
+          max_bots: parseInt(document.getElementById('pcMaxBots').value) || 10,
+          max_contacts: parseInt(document.getElementById('pcMaxContacts').value) || 50000,
+        };
+        const r = await apiFetch('/api/super/pricing', { method: 'POST', body });
         const data = await r.json();
         if (data.ok) {
-          showAlert('Тариф создан');
-          document.getElementById('addTariffForm').classList.add('hidden');
-          document.getElementById('newTariffName').value = '';
+          showAlert('Ставки сохранены');
+          configuratorPricing = null; // сбросить кэш конфигуратора
           loadSuperTariffs();
         } else showAlert(data.error || 'Ошибка');
-      } catch (e) { showAlert('Ошибка'); }
+      } catch (e) { showAlert('Ошибка сохранения'); }
+    }
+
+    async function loadSuperPayments() {
+      const container = document.getElementById('paymentsListContainer');
+      try {
+        const r = await apiFetch('/api/super/payments');
+        const data = await r.json();
+        const payments = data.payments || [];
+        if (payments.length === 0) {
+          container.innerHTML = '<div class="text-xs" style="color:var(--text-muted)">Нет заявок</div>';
+          return;
+        }
+        const periodNames = { '1m': '1 мес', '6m': '6 мес', '12m': '12 мес' };
+        container.innerHTML = payments.map(p => {
+          const statusColor = p.status === 'paid' ? 'var(--success)' : 'var(--warning)';
+          const statusText = p.status === 'paid' ? 'Оплачено' : 'Ожидает';
+          const date = new Date(p.created_at + 'Z').toLocaleDateString('ru-RU');
+          return `
+          <div class="broadcast-card" style="padding:10px">
+            <div class="flex justify-between items-start mb-1">
+              <div class="text-sm font-medium">${escapeHtml(p.tenant_name || 'Без имени')}</div>
+              <span class="text-xs font-bold" style="color:${statusColor}">${statusText}</span>
+            </div>
+            <div class="text-xs" style="color:var(--text-muted)">${p.bots} бот, ${p.contacts.toLocaleString('ru-RU')} конт. | ${periodNames[p.period] || p.period} | ${p.amount.toLocaleString('ru-RU')} ₽ | ${date}</div>
+            ${p.status === 'pending' ? `<button onclick="confirmPayment(${p.id})" class="btn-primary px-3 py-1 rounded-lg text-xs mt-2">Подтвердить оплату</button>` : ''}
+          </div>`;
+        }).join('');
+      } catch (e) {
+        container.innerHTML = '<div class="text-xs" style="color:var(--danger)">Ошибка загрузки</div>';
+      }
+    }
+
+    async function confirmPayment(paymentId) {
+      if (!confirm('Подтвердить оплату? Тариф будет применён к тенанту.')) return;
+      try {
+        const r = await apiFetch(`/api/super/payments/${paymentId}/confirm`, { method: 'POST' });
+        const data = await r.json();
+        if (data.ok) {
+          showAlert('Оплата подтверждена, тариф применён');
+          loadSuperTariffs();
+          loadSuperTenants();
+        } else showAlert(data.error || 'Ошибка');
+      } catch (e) { showAlert('Ошибка подтверждения'); }
     }
 
     async function loadSuperStats() {
@@ -5019,25 +5168,69 @@
     </div>
   </div>
 
-  <!-- Модал запроса на продление подписки -->
-  <div id="paymentRequestModal" class="recipients-overlay hidden">
+  <!-- Модал конфигуратора тарифа -->
+  <div id="tariffConfiguratorModal" class="recipients-overlay hidden">
     <div class="recipients-modal" style="max-width:380px;height:auto;margin:auto">
       <div class="recipients-header">
-        <h3>Продление подписки</h3>
-        <span style="cursor:pointer;font-size:20px;color:var(--text-secondary);padding:4px 8px" onclick="closePaymentModal()">✕</span>
+        <h3>Настройка тарифа</h3>
+        <span style="cursor:pointer;font-size:20px;color:var(--text-secondary);padding:4px 8px" onclick="closeConfigurator()">✕</span>
       </div>
       <div style="padding:16px">
-        <div id="paymentTariffInfo" style="font-size:13px;color:var(--text-secondary);margin:0 0 12px"></div>
-        <p style="font-size:13px;color:var(--text-secondary);margin:0 0 12px">Выберите период — заявка будет отправлена администратору:</p>
-        <div class="flex flex-col gap-2" id="paymentButtons">
-          <button onclick="sendPaymentRequest('1m')" class="w-full py-2 rounded-lg text-sm btn-primary">1 месяц</button>
-          <button onclick="sendPaymentRequest('3m')" class="w-full py-2 rounded-lg text-sm btn-secondary">3 месяца</button>
-          <button onclick="sendPaymentRequest('6m')" class="w-full py-2 rounded-lg text-sm btn-secondary">6 месяцев <span style="color:var(--accent);font-weight:600">-15%</span></button>
-          <button onclick="sendPaymentRequest('1y')" class="w-full py-2 rounded-lg text-sm btn-secondary">1 год <span style="color:var(--accent);font-weight:600">-20%</span></button>
+        <!-- Боты -->
+        <div class="mb-4">
+          <div class="text-sm font-medium mb-2">Количество ботов</div>
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <button onclick="cfgChangeBots(-1)" class="btn-secondary px-3 py-1.5 rounded-lg text-sm font-bold">−</button>
+              <span id="cfgBotsVal" class="text-xl font-bold" style="min-width:32px;text-align:center">1</span>
+              <button onclick="cfgChangeBots(1)" class="btn-secondary px-3 py-1.5 rounded-lg text-sm font-bold">+</button>
+            </div>
+          </div>
+          <div class="text-xs mt-1" style="color:var(--text-muted)">1 бесплатно, доп. 200 ₽/бот</div>
+        </div>
+
+        <!-- Контакты -->
+        <div class="mb-4">
+          <div class="text-sm font-medium mb-2">Контакты в месяц</div>
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-3">
+              <button onclick="cfgChangeContacts(-100)" class="btn-secondary px-3 py-1.5 rounded-lg text-xs">−100</button>
+              <span id="cfgContactsVal" class="text-xl font-bold" style="min-width:48px;text-align:center">100</span>
+              <button onclick="cfgChangeContacts(100)" class="btn-secondary px-3 py-1.5 rounded-lg text-xs">+100</button>
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <input id="cfgContactsInput" type="number" placeholder="Ввести число" class="input-field flex-1 rounded-lg px-3 py-1.5 text-sm" min="100" step="100" />
+            <button onclick="cfgSetContacts()" class="btn-secondary px-3 py-1.5 rounded-lg text-xs">OK</button>
+          </div>
+          <div class="text-xs mt-1" style="color:var(--text-muted)">100 бесплатно, +50 ₽/100 контактов</div>
+        </div>
+
+        <!-- Итого -->
+        <div class="rounded-xl p-4 mb-4 text-center" style="background:var(--accent-subtle);border:1px solid var(--border)">
+          <div id="cfgPrice" class="text-2xl font-bold" style="color:var(--accent)">Бесплатно</div>
+          <div id="cfgBreakdown" class="text-xs mt-1" style="color:var(--text-muted)"></div>
+        </div>
+
+        <!-- Кнопки оплаты -->
+        <div id="cfgPeriods" class="hidden flex flex-col gap-2">
+          <button onclick="applyTariff('1m')" class="w-full py-2.5 rounded-lg text-sm font-medium btn-primary">
+            <span id="cfgPrice1m">Оплатить (1 мес)</span>
+          </button>
+          <button onclick="applyTariff('6m')" class="w-full py-2 rounded-lg text-sm btn-secondary">
+            <span id="cfgPrice6m">6 мес (-15%)</span>
+          </button>
+          <button onclick="applyTariff('12m')" class="w-full py-2 rounded-lg text-sm btn-secondary">
+            <span id="cfgPrice12m">12 мес (-20%)</span>
+          </button>
+          <div class="text-xs text-center mt-1" style="color:var(--text-muted)">Заявка будет отправлена администратору</div>
         </div>
       </div>
     </div>
   </div>
+
+  <!-- Legacy: paymentRequestModal (hidden, replaced by configurator) -->
+  <div id="paymentRequestModal" class="hidden"></div>
 
   <!-- Модал превью получателей -->
   <div id="recipientsModal" class="recipients-overlay hidden">
