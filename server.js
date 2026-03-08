@@ -116,13 +116,18 @@ app.get('/health', (req, res) => {
 
 // Публичный список тарифов (для экрана «Нет доступа»)
 app.get('/api/public/tariffs', (req, res) => {
-  const tariffs = db.getTariffPlans().map(t => ({
-    name: t.name,
-    max_bots: t.max_bots,
-    max_contacts: t.max_contacts,
-    has_dialogs: t.has_dialogs,
-    price: t.price || 0,
-  }));
+  const tariffs = db.getTariffPlans().map(t => {
+    const price = t.price || 0;
+    return {
+      name: t.name,
+      max_bots: t.max_bots,
+      max_contacts: t.max_contacts,
+      has_dialogs: t.has_dialogs,
+      price,
+      price_6m: price > 0 ? Math.round(price * 6 * 0.85) : 0,
+      price_12m: price > 0 ? Math.round(price * 12 * 0.80) : 0,
+    };
+  });
   res.json({ tariffs });
 });
 
@@ -1292,6 +1297,8 @@ app.get('/api/tenant/info', requireTenantAdmin, (req, res) => {
         max_contacts: plan.max_contacts,
         has_dialogs: plan.has_dialogs || 0,
         price: plan.price || 0,
+        price_6m: plan.price > 0 ? Math.round(plan.price * 6 * 0.85) : 0,
+        price_12m: plan.price > 0 ? Math.round(plan.price * 12 * 0.80) : 0,
       } : null,
       usage: limits.limits || null,
       subscription,
@@ -1308,7 +1315,7 @@ app.get('/api/tenant/info', requireTenantAdmin, (req, res) => {
 app.post('/api/subscription/request', requireTenantAdmin, async (req, res) => {
   try {
     const { period } = req.body;
-    const validPeriods = { '7d': '7 дней', '1m': '1 месяц', '3m': '3 месяца', '1y': '1 год' };
+    const validPeriods = { '7d': '7 дней', '1m': '1 месяц', '3m': '3 месяца', '6m': '6 месяцев', '1y': '1 год' };
     if (!period || !validPeriods[period]) {
       return res.status(400).json({ error: 'Некорректный период' });
     }
@@ -1320,8 +1327,23 @@ app.post('/api/subscription/request', requireTenantAdmin, async (req, res) => {
     const tenant = db.getTenantById(req.tenantId);
     const tenantName = tenant?.name || 'Без имени';
     const tgId = tenant?.telegram_id || '';
+    const plan = tenant?.tariff_plan_id ? db.getTariffPlan(tenant.tariff_plan_id) : null;
+    const price = plan?.price || 0;
 
-    let text = `💳 Запрос на продление подписки\n\nТенант: ${tenantName}\nTelegram ID: ${tgId || '—'}\nПериод: ${validPeriods[period]}`;
+    // Расчёт суммы с учётом скидок
+    let amount = 0;
+    if (price > 0) {
+      if (period === '7d') amount = Math.round(price / 4);
+      else if (period === '1m') amount = price;
+      else if (period === '3m') amount = price * 3;
+      else if (period === '6m') amount = Math.round(price * 6 * 0.85);
+      else if (period === '1y') amount = Math.round(price * 12 * 0.80);
+    }
+
+    let text = `💳 Запрос на продление подписки\n\nТенант: ${tenantName}\nTelegram ID: ${tgId || '—'}`;
+    if (plan) text += `\nТариф: ${plan.name} (${price} ₽/мес)`;
+    text += `\nПериод: ${validPeriods[period]}`;
+    if (amount > 0) text += `\nСумма: ${amount} ₽`;
     if (tgId) text += `\n\nНаписать: tg://user?id=${tgId}`;
 
     const tgResp = await fetch(`https://api.telegram.org/bot${config.platformBotToken}/sendMessage`, {
@@ -1492,7 +1514,7 @@ app.post('/api/super/tariffs', requireSuperAdmin, (req, res) => {
   try {
     const { name, max_bots, max_contacts, has_dialogs, price } = req.body;
     if (!name) return res.status(400).json({ error: 'name обязателен' });
-    const id = db.createTariffPlan(name, max_bots || 3, 0, max_contacts || 5000, has_dialogs, price);
+    const id = db.createTariffPlan(name, max_bots || 3, 0, max_contacts || 5000, has_dialogs !== undefined ? has_dialogs : 1, price);
     res.json({ ok: true, id });
   } catch (e) {
     console.error('POST /api/super/tariffs error:', e.message);

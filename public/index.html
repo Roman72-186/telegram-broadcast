@@ -1330,9 +1330,6 @@
           </div>
           <div class="flex gap-2 mb-2">
             <input id="newTariffPrice" type="number" placeholder="Цена ₽/мес" class="input-field flex-1 rounded-lg px-3 py-2 text-sm" />
-            <label class="flex items-center gap-2 text-sm" style="color:var(--text-secondary)">
-              <input id="newTariffDialogs" type="checkbox" /> Диалоги
-            </label>
           </div>
           <button onclick="createTariff()" class="btn-primary px-3 py-1.5 rounded-lg text-xs">Создать</button>
         </div>
@@ -1400,6 +1397,7 @@
     let allBots = [];
     let selectedBotId = '';
     let subscriptionInfo = null;
+    let currentTariff = null;
 
     let previewCacheId = null;
     let previewCurrentPage = 1;
@@ -1458,12 +1456,17 @@
               <div class="text-sm font-bold">${escapeHtml(t.name)}</div>
               <div class="text-sm font-bold" style="color:var(--accent)">${t.price ? t.price + ' ₽/мес' : 'Бесплатно'}</div>
             </div>
-            <div class="flex flex-wrap gap-2 text-xs" style="color:var(--text-secondary)">
+            <div class="flex flex-wrap gap-2 text-xs mb-1" style="color:var(--text-secondary)">
               <span>${t.max_bots} ${t.max_bots === 1 ? 'бот' : 'ботов'}</span>
               <span>•</span>
-              <span>${t.max_contacts} контактов/мес</span>
-              ${t.has_dialogs ? '<span>•</span><span style="color:var(--accent)">Диалоги</span>' : ''}
+              <span>${t.max_contacts.toLocaleString('ru-RU')} контактов/мес</span>
+              <span>•</span>
+              <span>Рассылки + Диалоги</span>
             </div>
+            ${t.price > 0 ? `<div class="flex flex-wrap gap-3 text-xs" style="color:var(--text-muted)">
+              <span>6 мес: <span style="color:var(--accent)">${t.price_6m.toLocaleString('ru-RU')} ₽</span> <span style="text-decoration:line-through">${(t.price*6).toLocaleString('ru-RU')}</span> -15%</span>
+              <span>12 мес: <span style="color:var(--accent)">${t.price_12m.toLocaleString('ru-RU')} ₽</span> <span style="text-decoration:line-through">${(t.price*12).toLocaleString('ru-RU')}</span> -20%</span>
+            </div>` : ''}
           </div>`).join('');
       } catch (e) {
         console.error('loadPublicTariffs error:', e);
@@ -1549,13 +1552,13 @@
         const r = await apiFetch('/api/tenant/info');
         const data = await r.json();
         subscriptionInfo = data.subscription || null;
+        currentTariff = data.tariff || null;
         renderSubscriptionBanner();
 
-        // Доступ к диалогам по тарифу
-        const hasDialogs = data.tariff?.has_dialogs === 1;
+        // Диалоги включены во все тарифы
         const tabChat = document.getElementById('tabChat');
         if (tabChat) {
-          tabChat.style.display = hasDialogs ? '' : 'none';
+          tabChat.style.display = '';
         }
       } catch (e) {
         console.error('loadSubscriptionInfo error:', e);
@@ -1573,7 +1576,14 @@
       const tabCreate = document.getElementById('tabCreate');
       const isExpired = subscriptionInfo.status === 'trial_expired' || subscriptionInfo.status === 'no_subscription';
 
-      if (subscriptionInfo.status === 'trial') {
+      if (subscriptionInfo.status === 'free') {
+        // Бесплатный тариф — показываем предложение апгрейда
+        banner.style.background = 'var(--info-bg, #e0f2fe)';
+        banner.style.color = 'var(--info-text, #0369a1)';
+        banner.innerHTML = `<strong>Бесплатный тариф</strong> (${currentTariff?.max_contacts || 200} контактов/мес). <a href="javascript:void(0)" onclick="showPaymentModal()" style="text-decoration:underline;color:inherit">Перейти на платный</a>`;
+        if (tabCreate) { tabCreate.style.opacity = ''; tabCreate.style.pointerEvents = ''; }
+        updateCreateSubtabsDisabled(false);
+      } else if (subscriptionInfo.status === 'trial') {
         banner.style.background = 'var(--info-bg, #e0f2fe)';
         banner.style.color = 'var(--info-text, #0369a1)';
         banner.innerHTML = `<strong>Пробный период:</strong> осталось ${subscriptionInfo.trialDaysLeft} дн. <a href="javascript:void(0)" onclick="showPaymentModal()" style="text-decoration:underline;color:inherit">Оплатить</a>`;
@@ -1606,6 +1616,16 @@
     }
 
     function showPaymentModal() {
+      const info = document.getElementById('paymentTariffInfo');
+      if (currentTariff && currentTariff.price > 0) {
+        const p = currentTariff.price;
+        info.innerHTML = `<strong>${escapeHtml(currentTariff.name)}</strong> — ${p} ₽/мес<br>` +
+          `<span class="text-xs">6 мес: ${Math.round(p*6*0.85).toLocaleString('ru-RU')} ₽ (-15%) | 12 мес: ${Math.round(p*12*0.80).toLocaleString('ru-RU')} ₽ (-20%)</span>`;
+      } else if (subscriptionInfo?.status === 'free') {
+        info.innerHTML = '<strong>Бесплатный тариф.</strong> Для перехода на платный свяжитесь с администратором.';
+      } else {
+        info.innerHTML = '';
+      }
       document.getElementById('paymentRequestModal').classList.remove('hidden');
     }
 
@@ -3704,16 +3724,21 @@
         container.innerHTML = '<div class="text-sm" style="color:var(--text-muted)">Нет тарифов</div>';
         return;
       }
-      container.innerHTML = tariffs.map(t => `
+      container.innerHTML = tariffs.map(t => {
+        const p = t.price || 0;
+        const p6 = p > 0 ? Math.round(p * 6 * 0.85) : 0;
+        const p12 = p > 0 ? Math.round(p * 12 * 0.80) : 0;
+        return `
         <div class="broadcast-card">
           <div class="text-sm font-medium mb-1">${escapeHtml(t.name)} ${t.is_default ? '<span class="text-xs" style="color:var(--accent)">(по умолч.)</span>' : ''}</div>
-          <div class="grid grid-cols-4 gap-2 text-center text-xs" style="color:var(--text-secondary)">
+          <div class="grid grid-cols-3 gap-2 text-center text-xs" style="color:var(--text-secondary)">
             <div>${t.max_bots} ботов</div>
-            <div>${t.max_contacts} конт./мес</div>
-            <div>${t.has_dialogs ? 'Диалоги' : '—'}</div>
-            <div style="color:var(--accent);font-weight:600">${t.price ? t.price + ' ₽' : '0 ₽'}</div>
+            <div>${t.max_contacts.toLocaleString('ru-RU')} конт./мес</div>
+            <div style="color:var(--accent);font-weight:600">${p ? p + ' ₽/мес' : 'Бесплатно'}</div>
           </div>
-        </div>`).join('');
+          ${p > 0 ? `<div class="text-xs text-center mt-1" style="color:var(--text-muted)">6 мес: ${p6.toLocaleString('ru-RU')} ₽ (-15%) | 12 мес: ${p12.toLocaleString('ru-RU')} ₽ (-20%)</div>` : ''}
+        </div>`;
+      }).join('');
     }
 
     function showAddTariffForm() {
@@ -3724,7 +3749,6 @@
       const name = document.getElementById('newTariffName').value.trim();
       const maxBots = parseInt(document.getElementById('newTariffBots').value) || 3;
       const maxContacts = parseInt(document.getElementById('newTariffContacts').value) || 5000;
-      const hasDialogs = document.getElementById('newTariffDialogs').checked ? 1 : 0;
       const price = parseInt(document.getElementById('newTariffPrice').value) || 0;
 
       if (!name) { showAlert('Введите название'); return; }
@@ -3732,7 +3756,7 @@
       try {
         const r = await apiFetch('/api/super/tariffs', {
           method: 'POST',
-          body: { name, max_bots: maxBots, max_contacts: maxContacts, has_dialogs: hasDialogs, price },
+          body: { name, max_bots: maxBots, max_contacts: maxContacts, has_dialogs: 1, price },
         });
         const data = await r.json();
         if (data.ok) {
@@ -4997,18 +5021,19 @@
 
   <!-- Модал запроса на продление подписки -->
   <div id="paymentRequestModal" class="recipients-overlay hidden">
-    <div class="recipients-modal" style="max-width:340px;height:auto;margin:auto">
+    <div class="recipients-modal" style="max-width:380px;height:auto;margin:auto">
       <div class="recipients-header">
         <h3>Продление подписки</h3>
         <span style="cursor:pointer;font-size:20px;color:var(--text-secondary);padding:4px 8px" onclick="closePaymentModal()">✕</span>
       </div>
       <div style="padding:16px">
+        <div id="paymentTariffInfo" style="font-size:13px;color:var(--text-secondary);margin:0 0 12px"></div>
         <p style="font-size:13px;color:var(--text-secondary);margin:0 0 12px">Выберите период — заявка будет отправлена администратору:</p>
-        <div class="flex flex-col gap-2">
-          <button onclick="sendPaymentRequest('7d')" class="w-full py-2 rounded-lg text-sm btn-secondary">7 дней</button>
+        <div class="flex flex-col gap-2" id="paymentButtons">
           <button onclick="sendPaymentRequest('1m')" class="w-full py-2 rounded-lg text-sm btn-primary">1 месяц</button>
           <button onclick="sendPaymentRequest('3m')" class="w-full py-2 rounded-lg text-sm btn-secondary">3 месяца</button>
-          <button onclick="sendPaymentRequest('1y')" class="w-full py-2 rounded-lg text-sm btn-secondary">1 год</button>
+          <button onclick="sendPaymentRequest('6m')" class="w-full py-2 rounded-lg text-sm btn-secondary">6 месяцев <span style="color:var(--accent);font-weight:600">-15%</span></button>
+          <button onclick="sendPaymentRequest('1y')" class="w-full py-2 rounded-lg text-sm btn-secondary">1 год <span style="color:var(--accent);font-weight:600">-20%</span></button>
         </div>
       </div>
     </div>
