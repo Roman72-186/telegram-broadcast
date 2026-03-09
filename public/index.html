@@ -1763,7 +1763,16 @@
     }
 
     async function applyTariff(period) {
-      if (!confirm('Нажимая «Оплатить», вы принимаете условия публичной оферты.\n\nПродолжить?')) return;
+      // tg.showConfirm вместо confirm() — confirm() не работает в Telegram Mini App
+      const confirmed = await new Promise(resolve => {
+        if (tg?.showConfirm) {
+          tg.showConfirm('Нажимая «Оплатить», вы принимаете условия публичной оферты.\n\nПродолжить?', resolve);
+        } else {
+          resolve(confirm('Нажимая «Оплатить», вы принимаете условия публичной оферты.\n\nПродолжить?'));
+        }
+      });
+      if (!confirmed) return;
+
       const buttons = document.querySelectorAll('#cfgPeriods button');
       buttons.forEach(b => b.disabled = true);
       try {
@@ -1774,14 +1783,16 @@
         const data = await r.json();
         if (data.ok) {
           if (data.payment_url) {
-            // Перенаправить на платёжную форму
             closeConfigurator();
-            if (tg?.openLink) {
-              tg.openLink(data.payment_url);
-            } else {
-              window.open(data.payment_url, '_blank');
-            }
             showAlert('Перенаправление на страницу оплаты...');
+            // Открыть платёжную форму
+            setTimeout(() => {
+              if (tg?.openLink) {
+                tg.openLink(data.payment_url);
+              } else {
+                window.location.href = data.payment_url;
+              }
+            }, 500);
           } else {
             // Ручной режим
             closeConfigurator();
