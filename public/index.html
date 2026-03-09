@@ -1763,16 +1763,6 @@
     }
 
     async function applyTariff(period) {
-      // tg.showConfirm вместо confirm() — confirm() не работает в Telegram Mini App
-      const confirmed = await new Promise(resolve => {
-        if (tg?.showConfirm) {
-          tg.showConfirm('Нажимая «Оплатить», вы принимаете условия публичной оферты.\n\nПродолжить?', resolve);
-        } else {
-          resolve(confirm('Нажимая «Оплатить», вы принимаете условия публичной оферты.\n\nПродолжить?'));
-        }
-      });
-      if (!confirmed) return;
-
       const buttons = document.querySelectorAll('#cfgPeriods button');
       buttons.forEach(b => b.disabled = true);
       try {
