@@ -360,11 +360,12 @@ app.post('/api/auth', rateLimit(req => req.ip, 5, 60000), (req, res) => {
     }
 
     const telegramId = String(validation.user.id);
-    const { role, tenantId } = getUserRole(telegramId, db);
+    const { role, tenantId, reason } = getUserRole(telegramId, db);
 
     if (role === 'none') {
       return res.json({
         authorized: false,
+        reason: reason || 'not_registered',
         message: 'Нет доступа. Обратитесь к администратору платформы.',
       });
     }
