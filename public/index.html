@@ -601,10 +601,10 @@
       <div class="broadcast-card text-left" style="padding: 14px;">
         <div class="text-sm font-bold mb-2" style="color:var(--accent)">Тестовый период — 7 дней</div>
         <div class="text-xs mb-2" style="color:var(--text-secondary)">
-          До 50 сообщений в месяц — бесплатно
+          50 сообщений бесплатно
         </div>
         <div class="text-xs" style="color:var(--text-muted)">
-          Боты — без ограничений. Далее от <span id="publicHintPrice">390 ₽/мес</span>
+          Боты — без ограничений. Далее от <span id="publicHintPrice">390 ₽</span>
         </div>
       </div>
       <button onclick="publicRegister('free')" id="publicBtnFree" class="w-full py-3 rounded-lg text-sm font-medium btn-primary mt-3">
@@ -1315,7 +1315,7 @@
           <input id="newTenantName" type="text" placeholder="Имя / Название" class="input-field w-full rounded-lg px-3 py-2 text-sm mb-2" />
           <input id="newTenantLeadteh" type="text" placeholder="Leadteh API токен (необяз.)" class="input-field w-full rounded-lg px-3 py-2 text-sm" />
           <div class="text-xs mt-1 mb-2" style="color: var(--text-muted)">&#128274; Токен шифруется AES-256 и не хранится в открытом виде</div>
-          <div class="text-xs mb-1" style="color:var(--text-muted)">Тариф: Пробный (50 сообщений/мес, 7 дней). Тенант сможет выбрать план в кабинете.</div>
+          <div class="text-xs mb-1" style="color:var(--text-muted)">Тариф: Пробный (50 сообщений, 7 дней). Тенант сможет выбрать план в кабинете.</div>
           <div class="flex gap-2">
             <button onclick="createTenant()" class="btn-primary px-3 py-1.5 rounded-lg text-xs">Создать</button>
             <button onclick="document.getElementById('addTenantForm').classList.add('hidden')" class="btn-secondary px-3 py-1.5 rounded-lg text-xs">Отмена</button>
@@ -1453,7 +1453,7 @@
         const data = await r.json();
         const minPaid = data.plans ? data.plans.filter(p => p.price > 0).sort((a,b) => a.price - b.price)[0] : null;
         const hintPrice = document.getElementById('publicHintPrice');
-        if (hintPrice && minPaid) hintPrice.textContent = minPaid.price + ' ₽/мес';
+        if (hintPrice && minPaid) hintPrice.textContent = minPaid.price + ' ₽';
       } catch (e) {
         console.error('loadPublicPricing error:', e);
       }
@@ -1609,9 +1609,8 @@
       if (subscriptionInfo.status === 'trial') {
         banner.style.background = 'var(--info-bg, #e0f2fe)';
         banner.style.color = 'var(--info-text, #0369a1)';
-        const msgLimit = currentTariff?.messages_limit || 50;
-        const msgSent = currentTariff?.usage?.messages_sent || 0;
-        banner.innerHTML = `<strong>Тестовый период:</strong> осталось ${subscriptionInfo.trialDaysLeft} дн. (${msgSent}/${msgLimit} сообщ.) <a href="javascript:void(0)" onclick="showTariffConfigurator()" style="text-decoration:underline;color:inherit">Оплатить</a>`;
+        const balance = currentTariff?.messages_balance || 0;
+        banner.innerHTML = `<strong>Тестовый период:</strong> осталось ${subscriptionInfo.trialDaysLeft} дн. (${balance.toLocaleString('ru-RU')} сообщ.) <a href="javascript:void(0)" onclick="showTariffConfigurator()" style="text-decoration:underline;color:inherit">Оплатить</a>`;
         if (tabCreate) { tabCreate.style.opacity = ''; tabCreate.style.pointerEvents = ''; }
         updateCreateSubtabsDisabled(false);
       } else if (isExpired) {
@@ -1651,6 +1650,7 @@
           const r = await apiFetch('/api/public/pricing');
           const data = await r.json();
           tariffPlans = data.plans || [];
+          if (data.extra_messages_price) extraMessagesPrice = data.extra_messages_price;
         } catch (e) {
           showAlert('Ошибка загрузки тарифов');
           return;
@@ -1668,14 +1668,26 @@
           <div class="flex justify-between items-center">
             <div>
               <div class="text-sm font-bold">${p.name}${isCurrent ? ' <span style="color:var(--accent)">(текущий)</span>' : ''}</div>
-              <div class="text-xs" style="color:var(--text-muted)">${p.messages_limit.toLocaleString('ru-RU')} сообщений/мес</div>
+              <div class="text-xs" style="color:var(--text-muted)">${p.messages_limit.toLocaleString('ru-RU')} сообщений</div>
             </div>
-            <div class="text-sm font-bold" style="color:var(--accent)">${isFree ? 'Бесплатно' : p.price + ' ₽/мес'}</div>
+            <div class="text-sm font-bold" style="color:var(--accent)">${isFree ? 'Бесплатно' : p.price + ' ₽'}</div>
           </div>
         </div>`;
       }).join('');
 
       document.getElementById('cfgPeriods').classList.add('hidden');
+
+      // Показать блок докупки сообщений для зарегистрированных пользователей
+      const buyBlock = document.getElementById('cfgBuyMessages');
+      if (currentTariff) {
+        document.getElementById('cfgExtraPrice').textContent = extraMessagesPrice;
+        document.getElementById('cfgBuyQtyInput').value = 100;
+        updateBuyTotal();
+        buyBlock.classList.remove('hidden');
+      } else {
+        buyBlock.classList.add('hidden');
+      }
+
       document.getElementById('tariffConfiguratorModal').classList.remove('hidden');
     }
 
@@ -1690,13 +1702,9 @@
         el.style.borderColor = id === planId ? 'var(--accent)' : 'var(--border)';
       });
 
-      // Показать кнопки оплаты
+      // Показать кнопку оплаты
       const price = plan.price;
-      const p6 = Math.round(price * 6 * 0.85);
-      const p12 = Math.round(price * 12 * 0.80);
-      document.getElementById('cfgPrice1m').textContent = `Оплатить (1 мес) — ${price.toLocaleString('ru-RU')} ₽`;
-      document.getElementById('cfgPrice6m').textContent = `6 мес: ${p6.toLocaleString('ru-RU')} ₽ (-15%)`;
-      document.getElementById('cfgPrice12m').textContent = `12 мес: ${p12.toLocaleString('ru-RU')} ₽ (-20%)`;
+      document.getElementById('cfgPrice1m').textContent = `Купить ${plan.messages_limit.toLocaleString('ru-RU')} сообщ. — ${price.toLocaleString('ru-RU')} ₽`;
       document.getElementById('cfgPeriods').classList.remove('hidden');
     }
 
@@ -1704,14 +1712,14 @@
       document.getElementById('tariffConfiguratorModal').classList.add('hidden');
     }
 
-    async function applyTariff(period) {
+    async function applyTariff() {
       if (!selectedPlanId) { showAlert('Выберите тариф'); return; }
       const buttons = document.querySelectorAll('#cfgPeriods button');
       buttons.forEach(b => b.disabled = true);
       try {
         const r = await apiFetch('/api/tariff/apply', {
           method: 'POST',
-          body: { plan_id: selectedPlanId, period },
+          body: { plan_id: selectedPlanId },
         });
         const data = await r.json();
         if (data.ok) {
@@ -1734,6 +1742,56 @@
         showAlert('Ошибка оформления тарифа');
       } finally {
         buttons.forEach(b => b.disabled = false);
+      }
+    }
+
+    let extraMessagesPrice = 50;
+
+    function setBuyQty(qty) {
+      document.getElementById('cfgBuyQtyInput').value = qty;
+      document.querySelectorAll('.buy-qty-btn').forEach(b => {
+        b.style.borderColor = parseInt(b.textContent) === qty ? 'var(--accent)' : 'var(--border)';
+      });
+      updateBuyTotal();
+    }
+
+    function updateBuyTotal() {
+      const qty = Math.max(100, Math.ceil((parseInt(document.getElementById('cfgBuyQtyInput').value) || 100) / 100) * 100);
+      document.getElementById('cfgBuyQtyInput').value = qty;
+      const total = (qty / 100) * extraMessagesPrice;
+      document.getElementById('cfgBuyTotal').textContent = total.toLocaleString('ru-RU');
+    }
+
+    async function buyExtraMessages() {
+      const qty = parseInt(document.getElementById('cfgBuyQtyInput').value) || 100;
+      const btn = document.getElementById('cfgBuyBtn');
+      btn.disabled = true;
+      try {
+        const r = await apiFetch('/api/tariff/buy-messages', {
+          method: 'POST',
+          body: { count: qty },
+        });
+        const data = await r.json();
+        if (data.ok) {
+          if (data.payment_url) {
+            closeConfigurator();
+            showAlert('Перенаправление на страницу оплаты...');
+            setTimeout(() => {
+              if (tg?.openLink) tg.openLink(data.payment_url);
+              else window.location.href = data.payment_url;
+            }, 500);
+          } else {
+            closeConfigurator();
+            showAlert(`Заявка на ${qty} сообщений отправлена! Администратор свяжется с вами.`);
+          }
+          await loadSubscriptionInfo();
+        } else {
+          showAlert(data.error || 'Ошибка');
+        }
+      } catch (e) {
+        showAlert('Ошибка покупки сообщений');
+      } finally {
+        btn.disabled = false;
       }
     }
 
@@ -3350,25 +3408,18 @@
         return;
       }
       const planName = limits.plan_name || currentTariff?.plan_name || 'Пробный';
-      const price = currentTariff?.price || 0;
-      const priceLabel = price > 0 ? `${price.toLocaleString('ru-RU')} ₽/мес` : 'Бесплатно';
-      const msgSent = limits.messages_sent || 0;
-      const msgLimit = limits.messages_limit || 50;
-      const pct = Math.min(100, Math.round(msgSent / msgLimit * 100));
+      const balance = limits.messages_balance || 0;
+      const isLow = balance <= 10;
       el.innerHTML = `
         <div class="section-label">Тариф: ${planName}</div>
         <div class="mb-2">
-          <div class="flex justify-between text-xs mb-1">
-            <span style="color:var(--text-secondary)">Сообщений: ${msgSent.toLocaleString('ru-RU')} / ${msgLimit.toLocaleString('ru-RU')}</span>
-            <span style="color:var(--text-muted)">${pct}%</span>
-          </div>
-          <div class="w-full rounded-full h-2" style="background:var(--bg-secondary)">
-            <div class="rounded-full h-2" style="width:${pct}%;background:${pct >= 90 ? 'var(--danger-text,#dc2626)' : 'var(--accent)'}"></div>
+          <div class="text-xs mb-1" style="color:${isLow ? 'var(--danger-text,#dc2626)' : 'var(--text-secondary)'}">
+            Баланс сообщений: <strong>${balance.toLocaleString('ru-RU')}</strong>
           </div>
         </div>
         <div class="flex items-center justify-between">
-          <span class="text-xs" style="color:var(--text-secondary)">${priceLabel} · ботов: ${limits.current_bots || 0}</span>
-          <button onclick="showTariffConfigurator()" class="btn-secondary px-3 py-1 rounded-lg text-xs">Изменить тариф</button>
+          <span class="text-xs" style="color:var(--text-secondary)">Ботов: ${limits.current_bots || 0}</span>
+          <button onclick="showTariffConfigurator()" class="btn-secondary px-3 py-1 rounded-lg text-xs">${isLow ? 'Докупить' : 'Тарифы'}</button>
         </div>`;
     }
 
@@ -3649,9 +3700,9 @@
         }
 
         const planName = t.plan_name || 'Пробный';
-        const msgLimit = t.effective_messages_limit || 50;
+        const balance = t.messages_balance || 0;
         const price = t.effective_price || 0;
-        const tariffLabel = `${planName} (${msgLimit.toLocaleString('ru-RU')} сообщ.) — ${price > 0 ? price + ' ₽/мес' : 'Бесплатно'}`;
+        const tariffLabel = `${planName} — ${price > 0 ? price + ' ₽' : 'Бесплатно'}`;
 
         return `
         <div class="broadcast-card">
@@ -3660,7 +3711,7 @@
             <span class="status-badge status-${escapeAttr(t.status)}">${escapeHtml(t.status)}</span>
           </div>
           <div class="text-xs" style="color:var(--text-muted)">TG ID: ${escapeHtml(String(t.telegram_id))}</div>
-          <div class="text-xs mb-1" style="color:var(--text-muted)">Боты: ${t.bots_count} | Сообщ/мес: ${t.messages_sent || 0}/${msgLimit.toLocaleString('ru-RU')}</div>
+          <div class="text-xs mb-1" style="color:var(--text-muted)">Боты: ${t.bots_count} | Баланс: <strong style="color:${balance <= 10 ? 'var(--danger-text,#dc2626)' : 'var(--text-secondary)'}">${balance.toLocaleString('ru-RU')} сообщ.</strong></div>
           <div class="text-xs mb-1" style="color:var(--text-secondary)">Тариф: <span style="color:var(--accent)">${tariffLabel}</span></div>
           <div class="text-xs mb-1">Подписка: ${subLabel}</div>
           <button onclick="impersonateTenant(${t.id})" class="w-full py-2 rounded-lg text-sm font-medium mb-2" style="background:var(--accent);color:#fff">Войти как тенант</button>
@@ -5130,21 +5181,33 @@
       <div style="padding:16px">
         <div id="tariffPlansList" class="flex flex-col gap-2 mb-4"></div>
 
-        <!-- Период оплаты (скрыт до выбора платного тарифа) -->
+        <!-- Кнопка оплаты (скрыта до выбора платного тарифа) -->
         <div id="cfgPeriods" class="hidden flex flex-col gap-2">
-          <button onclick="applyTariff('1m')" class="w-full py-2.5 rounded-lg text-sm font-medium btn-primary">
-            <span id="cfgPrice1m">Оплатить (1 мес)</span>
-          </button>
-          <button onclick="applyTariff('6m')" class="w-full py-2 rounded-lg text-sm btn-secondary">
-            <span id="cfgPrice6m">6 мес (-15%)</span>
-          </button>
-          <button onclick="applyTariff('12m')" class="w-full py-2 rounded-lg text-sm btn-secondary">
-            <span id="cfgPrice12m">12 мес (-20%)</span>
+          <button onclick="applyTariff()" class="w-full py-2.5 rounded-lg text-sm font-medium btn-primary">
+            <span id="cfgPrice1m">Купить</span>
           </button>
           <div class="text-xs text-center mt-2" style="color:var(--text-muted)">
             <a href="/terms.html" target="_blank" style="color:var(--accent)">Оферта</a> ·
             <a href="/privacy.html" target="_blank" style="color:var(--accent)">Конфиденциальность</a> ·
             <a href="/refund.html" target="_blank" style="color:var(--accent)">Возврат</a>
+          </div>
+        </div>
+
+        <!-- Докупить сообщения -->
+        <div id="cfgBuyMessages" class="hidden mt-4" style="border-top:1px solid var(--border);padding-top:14px">
+          <div class="text-sm font-bold mb-2">Докупить сообщения</div>
+          <div class="text-xs mb-3" style="color:var(--text-muted)">Цена: <span id="cfgExtraPrice">50</span> ₽ за 100 сообщений</div>
+          <div class="flex gap-2 mb-2">
+            <button onclick="setBuyQty(100)" class="buy-qty-btn flex-1 py-2 rounded-lg text-xs btn-secondary">100</button>
+            <button onclick="setBuyQty(200)" class="buy-qty-btn flex-1 py-2 rounded-lg text-xs btn-secondary">200</button>
+            <button onclick="setBuyQty(500)" class="buy-qty-btn flex-1 py-2 rounded-lg text-xs btn-secondary">500</button>
+            <button onclick="setBuyQty(1000)" class="buy-qty-btn flex-1 py-2 rounded-lg text-xs btn-secondary">1000</button>
+          </div>
+          <div class="flex gap-2">
+            <input type="number" id="cfgBuyQtyInput" min="100" step="100" value="100" class="input-field rounded-lg px-3 py-2 text-sm flex-1" style="max-width:120px" oninput="updateBuyTotal()">
+            <button id="cfgBuyBtn" onclick="buyExtraMessages()" class="flex-1 py-2 rounded-lg text-sm font-medium btn-primary">
+              Купить — <span id="cfgBuyTotal">50</span> ₽
+            </button>
           </div>
         </div>
       </div>

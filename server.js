@@ -1361,9 +1361,8 @@ app.get('/api/tenant/info', requireTenantAdmin, (req, res) => {
       tariff: {
         plan_id: plan?.id || null,
         plan_name: plan?.name || 'Пробный',
-        messages_limit: (plan?.messages_limit || 50) + (tenant?.extra_messages || 0),
         price: plan?.price || 0,
-        extra_messages: tenant?.extra_messages || 0,
+        messages_balance: tenant?.messages_balance || 0,
       },
       usage: limits.limits || null,
       subscription,
@@ -1379,27 +1378,18 @@ app.get('/api/tenant/info', requireTenantAdmin, (req, res) => {
 // ============================================
 app.post('/api/tariff/apply', requireTenantAdmin, async (req, res) => {
   try {
-    const { plan_id, period } = req.body;
-    const validPeriods = ['1m', '6m', '12m'];
+    const { plan_id } = req.body;
     if (!plan_id) return res.status(400).json({ error: 'Выберите тариф' });
-    if (!period || !validPeriods.includes(period)) {
-      return res.status(400).json({ error: 'Некорректный период' });
-    }
 
     const plan = db.getTariffPlan(plan_id);
     if (!plan || plan.price === 0) return res.status(400).json({ error: 'Некорректный тариф' });
 
-    const price = plan.price;
-    let amount;
-    if (period === '1m') amount = price;
-    else if (period === '6m') amount = Math.round(price * 6 * 0.85);
-    else if (period === '12m') amount = Math.round(price * 12 * 0.80);
-
-    const paymentId = db.createPayment(req.tenantId, amount, period, 0, 0, plan.id);
+    const amount = plan.price;
+    const paymentId = db.createPayment(req.tenantId, amount, '1m', 0, plan.messages_limit, plan.id);
 
     if (paymentProvider) {
       try {
-        const description = `Тариф "${plan.name}": ${plan.messages_limit} сообщ./мес, ${period}`;
+        const description = `Тариф "${plan.name}": ${plan.messages_limit} сообщений`;
         const result = await paymentProvider.createPayment(paymentId, amount, description);
         db.updatePaymentExternal(paymentId, {
           external_id: result.externalId,
@@ -1413,7 +1403,7 @@ app.post('/api/tariff/apply', requireTenantAdmin, async (req, res) => {
           const tgId = tenant?.telegram_id || '';
           let text = `💳 Новый платёж (#${paymentId})\n\nИмя: ${tenantName}\nTelegram ID: ${tgId}`;
           text += `\nТариф: ${plan.name} (${plan.messages_limit} сообщ.)`;
-          text += `\nСумма: ${amount} ₽ (${paymentProvider.name})`;
+          text += `\nСумма: ${amount} ₽`;
           if (tgId) text += `\n\nНаписать: tg://user?id=${tgId}`;
           await fetch(`https://api.telegram.org/bot${config.platformBotToken}/sendMessage`, {
             method: 'POST',
@@ -1422,7 +1412,7 @@ app.post('/api/tariff/apply', requireTenantAdmin, async (req, res) => {
           }).catch(() => {});
         }
 
-        return res.json({ ok: true, payment_id: paymentId, amount, period, payment_url: result.paymentUrl });
+        return res.json({ ok: true, payment_id: paymentId, amount, payment_url: result.paymentUrl });
       } catch (providerErr) {
         console.error('Payment provider error:', providerErr.message);
       }
@@ -1433,12 +1423,10 @@ app.post('/api/tariff/apply', requireTenantAdmin, async (req, res) => {
       const tenant = db.getTenantById(req.tenantId);
       const tenantName = tenant?.name || 'Без имени';
       const tgId = tenant?.telegram_id || '';
-      const periodNames = { '1m': '1 месяц', '6m': '6 месяцев', '12m': '12 месяцев' };
 
       let text = `💳 Заявка на тариф\n\nТенант: ${tenantName}\nTelegram ID: ${tgId}`;
       text += `\nТариф: ${plan.name} (${plan.messages_limit} сообщ.)`;
-      text += `\nЦена: ${price} ₽/мес`;
-      text += `\nПериод: ${periodNames[period]}, итого: ${amount} ₽`;
+      text += `\nСумма: ${amount} ₽`;
       text += `\nPayment ID: ${paymentId}`;
       if (tgId) text += `\n\nНаписать: tg://user?id=${tgId}`;
 
@@ -1449,7 +1437,7 @@ app.post('/api/tariff/apply', requireTenantAdmin, async (req, res) => {
       });
     }
 
-    res.json({ ok: true, payment_id: paymentId, amount, period });
+    res.json({ ok: true, payment_id: paymentId, amount });
   } catch (e) {
     console.error('POST /api/tariff/apply error:', e.message);
     res.status(500).json({ error: 'Ошибка оформления тарифа' });
@@ -1465,8 +1453,10 @@ app.post('/api/tariff/buy-messages', requireTenantAdmin, async (req, res) => {
     const pricePerBlock = cfg.price_per_100_messages || 50;
     const amount = (qty / 100) * pricePerBlock;
 
+    // contacts field хранит кол-во сообщений для типа 'extra'
+    const paymentId = db.createPayment(req.tenantId, amount, 'extra', 0, qty);
+
     if (paymentProvider) {
-      const paymentId = db.createPayment(req.tenantId, amount, 'extra', 0, 0);
       const description = `Докупка ${qty} сообщений`;
       try {
         const result = await paymentProvider.createPayment(paymentId, amount, description);
@@ -1481,14 +1471,18 @@ app.post('/api/tariff/buy-messages', requireTenantAdmin, async (req, res) => {
       }
     }
 
-    // Ручной режим
+    // Ручной режим — уведомить суперадмина
     if (SUPER_ADMIN_ID && config.platformBotToken) {
       const tenant = db.getTenantById(req.tenantId);
       const tenantName = tenant?.name || 'Без имени';
       const tgId = tenant?.telegram_id || '';
-      let text = `📨 Докупка сообщений\n\nТенант: ${tenantName}\nTelegram ID: ${tgId}`;
+      const username = tenant?.username ? `@${tenant.username}` : '';
+      let text = `📨 Докупка сообщений\n\nИмя: ${tenantName}`;
+      if (username) text += `\nUsername: ${username}`;
+      text += `\nTelegram ID: ${tgId}`;
       text += `\nКоличество: ${qty} сообщений`;
       text += `\nСумма: ${amount} ₽`;
+      text += `\nЗаявка #${paymentId}`;
       if (tgId) text += `\n\nНаписать: tg://user?id=${tgId}`;
       await fetch(`https://api.telegram.org/bot${config.platformBotToken}/sendMessage`, {
         method: 'POST',
@@ -1497,7 +1491,7 @@ app.post('/api/tariff/buy-messages', requireTenantAdmin, async (req, res) => {
       }).catch(() => {});
     }
 
-    res.json({ ok: true, amount, count: qty });
+    res.json({ ok: true, amount, count: qty, payment_id: paymentId });
   } catch (e) {
     console.error('POST /api/tariff/buy-messages error:', e.message);
     res.status(500).json({ error: 'Ошибка' });
@@ -1548,8 +1542,14 @@ app.post('/api/payment/webhook/tbank', async (req, res) => {
         const payPlan = payment.tariff_plan_id ? db.getTariffPlan(payment.tariff_plan_id) : null;
         let text = `✅ Оплата #${payment.id} подтверждена (ТБанк)\n\nИмя: ${tenantName}\nTelegram ID: ${tgId}`;
         text += `\nСумма: ${payment.amount} ₽`;
-        text += `\nТариф: ${payPlan ? payPlan.name + ' (' + payPlan.messages_limit + ' сообщ.)' : payment.bots + ' ботов, ' + payment.contacts + ' конт.'}`;
-        text += `\nОплачено до: ${confirmed.paid_until ? new Date(confirmed.paid_until).toLocaleDateString('ru-RU') : '—'}`;
+        if (payment.period === 'extra') {
+          text += `\nДокупка: +${payment.contacts} сообщений`;
+          const updatedTenant = db.getTenantById(payment.tenant_id);
+          text += `\nНовый баланс: ${updatedTenant?.messages_balance || 0} сообщ.`;
+        } else {
+          text += `\nТариф: ${payPlan ? payPlan.name + ' (' + payPlan.messages_limit + ' сообщ.)' : '—'}`;
+          if (confirmed.paid_until) text += `\nОплачено до: ${new Date(confirmed.paid_until).toLocaleDateString('ru-RU')}`;
+        }
         if (tenant?.status === 'pending_payment') text += `\n🆕 Тенант активирован автоматически`;
         if (tgId) text += `\n\nНаписать: tg://user?id=${tgId}`;
         await fetch(`https://api.telegram.org/bot${config.platformBotToken}/sendMessage`, {
@@ -1655,7 +1655,7 @@ app.post('/api/subscription/request', requireTenantAdmin, async (req, res) => {
     }
 
     let text = `💳 Запрос на продление подписки\n\nТенант: ${tenantName}\nTelegram ID: ${tgId || '—'}`;
-    text += `\nТариф: ${plan ? plan.name + ' (' + plan.messages_limit + ' сообщ.)' : 'Пробный'} — ${price} ₽/мес`;
+    text += `\nТариф: ${plan ? plan.name + ' (' + plan.messages_limit + ' сообщ.)' : 'Пробный'} — ${price} ₽`;
     text += `\nПериод: ${validPeriods[period]}`;
     if (amount > 0) text += `\nСумма: ${amount} ₽`;
     if (tgId) text += `\n\nНаписать: tg://user?id=${tgId}`;
@@ -2431,6 +2431,12 @@ async function processChainRuns() {
       const prepared = await prepareStepMessages(ab, step0);
 
       for (const contact of newContacts) {
+        // Проверка баланса
+        const tCheck = db.getTenantById(ab.tenant_id);
+        if (!tCheck || (tCheck.messages_balance || 0) <= 0) {
+          console.log(`[auto-chain] Баланс сообщений исчерпан для тенанта ${ab.tenant_id}`);
+          break;
+        }
         try {
           const ok = await sendPreparedToContact(ab, prepared, contact.telegram_id);
           if (ok) {
@@ -2473,6 +2479,13 @@ async function processChainRuns() {
 
       if (nextStepIdx >= steps.length) {
         db.updateEnrollment(enrollment.id, { status: 'completed' });
+        continue;
+      }
+
+      // Проверка баланса
+      const tBal = db.getTenantById(ab.tenant_id);
+      if (!tBal || (tBal.messages_balance || 0) <= 0) {
+        console.log(`[auto-chain] Баланс сообщений исчерпан для тенанта ${ab.tenant_id}, пропуск шага`);
         continue;
       }
 
@@ -2657,6 +2670,12 @@ async function sendStepMessages(autoBroadcast, step) {
   let failed = 0;
 
   for (const contact of recipients) {
+    // Проверка баланса
+    const t = db.getTenantById(autoBroadcast.tenant_id);
+    if (!t || (t.messages_balance || 0) <= 0) {
+      console.log(`[auto] Баланс сообщений исчерпан для тенанта ${autoBroadcast.tenant_id}`);
+      break;
+    }
     const ok = await sendPreparedToContact(autoBroadcast, prepared, contact.telegram_id);
     if (ok) {
       sent++;
@@ -2780,6 +2799,13 @@ async function sendBroadcast(broadcast) {
   let failed = 0;
 
   for (const contact of recipients) {
+    // Проверка баланса перед отправкой
+    const tenant = db.getTenantById(broadcast.tenant_id);
+    if (!tenant || (tenant.messages_balance || 0) <= 0) {
+      console.log(`[broadcast] Баланс сообщений исчерпан для тенанта ${broadcast.tenant_id}, остановка рассылки`);
+      break;
+    }
+
     let contactFailed = false;
     let lastError = '';
 
