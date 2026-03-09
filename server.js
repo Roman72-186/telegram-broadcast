@@ -147,6 +147,100 @@ app.get('/api/public/pricing', (req, res) => {
 });
 
 // ============================================
+// Регистрация + оплата для новых пользователей (публичный)
+// ============================================
+app.post('/api/public/register-and-pay', rateLimit(req => req.ip, 5, 60000), async (req, res) => {
+  try {
+    const { initData, bots, contacts, period } = req.body;
+    if (!initData) return res.status(400).json({ error: 'initData обязательна' });
+
+    const validation = validateInitData(initData, config.platformBotToken);
+    if (!validation.valid) return res.status(401).json({ error: validation.error });
+
+    const telegramId = String(validation.user.id);
+    const userName = [validation.user.first_name, validation.user.last_name].filter(Boolean).join(' ') || 'Новый пользователь';
+
+    // Проверить что тенант ещё не существует
+    const existing = db.getTenantByTelegramId(telegramId);
+    if (existing) return res.status(400).json({ error: 'Аккаунт уже существует. Перезагрузите приложение.' });
+
+    const cfg = db.getPricingConfig();
+    const b = Math.max(1, Math.min(cfg.max_bots, parseInt(bots) || 1));
+    const c = Math.max(100, Math.min(cfg.max_contacts, Math.ceil((parseInt(contacts) || 100) / 100) * 100));
+    const { price } = db.calculatePrice(b, c);
+
+    // Бесплатный тариф — просто создать тенанта
+    if (price === 0) {
+      const tenantId = db.createTenant(telegramId, userName, '');
+      if (SUPER_ADMIN_ID && config.platformBotToken) {
+        const text = `👤 Новый тенант (бесплатный)\n\nИмя: ${userName}\nTelegram ID: ${telegramId}\nТариф: ${b} бот, ${c} конт.`;
+        await fetch(`https://api.telegram.org/bot${config.platformBotToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: SUPER_ADMIN_ID, text }),
+        }).catch(() => {});
+      }
+      return res.json({ ok: true, registered: true });
+    }
+
+    // Платный тариф — создать тенанта + платёж + оплата
+    const validPeriods = ['1m', '6m', '12m'];
+    const p = validPeriods.includes(period) ? period : '1m';
+    let amount;
+    if (p === '1m') amount = price;
+    else if (p === '6m') amount = Math.round(price * 6 * 0.85);
+    else if (p === '12m') amount = Math.round(price * 12 * 0.80);
+
+    const tenantId = db.createTenant(telegramId, userName, '');
+    const paymentId = db.createPayment(tenantId, amount, p, b, c);
+
+    if (paymentProvider) {
+      try {
+        const description = `Регистрация: ${b} бот(ов), ${c} конт./мес, ${p}`;
+        const result = await paymentProvider.createPayment(paymentId, amount, description);
+        db.updatePaymentExternal(paymentId, {
+          external_id: result.externalId,
+          payment_url: result.paymentUrl,
+          provider: paymentProvider.name,
+        });
+
+        if (SUPER_ADMIN_ID && config.platformBotToken) {
+          let text = `👤 Новый тенант + платёж (#${paymentId})\n\nИмя: ${userName}\nTelegram ID: ${telegramId}`;
+          text += `\nСумма: ${amount} ₽ (${paymentProvider.name})`;
+          text += `\nТариф: ${b} ботов, ${c} конт., ${p}`;
+          await fetch(`https://api.telegram.org/bot${config.platformBotToken}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: SUPER_ADMIN_ID, text }),
+          }).catch(() => {});
+        }
+
+        return res.json({ ok: true, registered: true, payment_id: paymentId, amount, payment_url: result.paymentUrl });
+      } catch (providerErr) {
+        console.error('Register payment provider error:', providerErr.message);
+      }
+    }
+
+    // Ручной режим
+    if (SUPER_ADMIN_ID && config.platformBotToken) {
+      let text = `👤 Новый тенант + заявка на тариф\n\nИмя: ${userName}\nTelegram ID: ${telegramId}`;
+      text += `\nТариф: ${b} ботов, ${c} конт., ${p}`;
+      text += `\nСумма: ${amount} ₽\nPayment ID: ${paymentId}`;
+      await fetch(`https://api.telegram.org/bot${config.platformBotToken}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: SUPER_ADMIN_ID, text }),
+      }).catch(() => {});
+    }
+
+    res.json({ ok: true, registered: true, payment_id: paymentId, amount });
+  } catch (e) {
+    console.error('POST /api/public/register-and-pay error:', e.message);
+    res.status(500).json({ error: 'Ошибка регистрации' });
+  }
+});
+
+// ============================================
 // Webhook для ботов тенантов (обработка /start)
 // ============================================
 app.post('/webhook/bot/:token', async (req, res) => {

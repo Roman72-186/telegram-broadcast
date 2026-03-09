@@ -629,6 +629,29 @@
           <div id="publicCalcPrice" class="text-lg font-bold" style="color:var(--accent)">Бесплатно</div>
           <div id="publicCalcBreakdown" class="text-xs mt-1" style="color:var(--text-muted)"></div>
         </div>
+
+        <!-- Кнопки регистрации -->
+        <div id="publicRegisterBtns" class="mt-3 flex flex-col gap-2">
+          <button onclick="publicRegister('free')" id="publicBtnFree" class="w-full py-2.5 rounded-lg text-sm font-medium btn-primary">
+            Начать бесплатно
+          </button>
+          <div id="publicPaidBtns" class="hidden flex flex-col gap-2">
+            <button onclick="publicRegister('1m')" class="w-full py-2.5 rounded-lg text-sm font-medium btn-primary">
+              <span id="publicPrice1m">Оплатить (1 мес)</span>
+            </button>
+            <button onclick="publicRegister('6m')" class="w-full py-2 rounded-lg text-sm btn-secondary">
+              <span id="publicPrice6m">6 мес (-15%)</span>
+            </button>
+            <button onclick="publicRegister('12m')" class="w-full py-2 rounded-lg text-sm btn-secondary">
+              <span id="publicPrice12m">12 мес (-20%)</span>
+            </button>
+          </div>
+          <div class="text-xs text-center mt-1" style="color:var(--text-muted)">
+            <a href="/terms.html" target="_blank" style="color:var(--accent)">Оферта</a> ·
+            <a href="/privacy.html" target="_blank" style="color:var(--accent)">Конфиденциальность</a> ·
+            <a href="/refund.html" target="_blank" style="color:var(--accent)">Возврат</a>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1498,16 +1521,72 @@
 
       const priceEl = document.getElementById('publicCalcPrice');
       const breakdownEl = document.getElementById('publicCalcBreakdown');
+      const freeBtn = document.getElementById('publicBtnFree');
+      const paidBtns = document.getElementById('publicPaidBtns');
 
       if (total === 0) {
         priceEl.textContent = 'Бесплатно';
         breakdownEl.textContent = '';
+        if (freeBtn) freeBtn.classList.remove('hidden');
+        if (paidBtns) paidBtns.classList.add('hidden');
       } else {
         priceEl.textContent = total.toLocaleString('ru-RU') + ' ₽/мес';
         const parts = [];
         if (botsCost > 0) parts.push(`Боты: ${extraBots}×${cfg.price_per_bot} = ${botsCost} ₽`);
         if (contactsCost > 0) parts.push(`Контакты: ${extraContactBlocks}×${cfg.price_per_100_contacts} = ${contactsCost} ₽`);
         breakdownEl.textContent = parts.join(' | ');
+        if (freeBtn) freeBtn.classList.add('hidden');
+        if (paidBtns) paidBtns.classList.remove('hidden');
+
+        const p6 = Math.round(total * 6 * 0.85);
+        const p12 = Math.round(total * 12 * 0.80);
+        const el1m = document.getElementById('publicPrice1m');
+        const el6m = document.getElementById('publicPrice6m');
+        const el12m = document.getElementById('publicPrice12m');
+        if (el1m) el1m.textContent = `Оплатить (1 мес) — ${total.toLocaleString('ru-RU')} ₽`;
+        if (el6m) el6m.textContent = `6 мес: ${p6.toLocaleString('ru-RU')} ₽ (-15%)`;
+        if (el12m) el12m.textContent = `12 мес: ${p12.toLocaleString('ru-RU')} ₽ (-20%)`;
+      }
+    }
+
+    async function publicRegister(period) {
+      const btns = document.querySelectorAll('#publicRegisterBtns button');
+      btns.forEach(b => b.disabled = true);
+      try {
+        const initData = tg?.initData;
+        if (!initData) { showAlert('Откройте через Telegram'); return; }
+
+        const body = { initData, bots: publicCalcBotsValue, contacts: publicCalcContactsValue };
+        if (period !== 'free') body.period = period;
+
+        const r = await fetch('/api/public/register-and-pay', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await r.json();
+
+        if (data.ok) {
+          if (data.payment_url) {
+            showAlert('Перенаправление на страницу оплаты...');
+            setTimeout(() => {
+              if (tg?.openLink) {
+                tg.openLink(data.payment_url);
+              } else {
+                window.location.href = data.payment_url;
+              }
+            }, 500);
+          } else {
+            showAlert('Регистрация завершена! Перезагрузите приложение.');
+            setTimeout(() => { if (tg?.close) tg.close(); else location.reload(); }, 2000);
+          }
+        } else {
+          showAlert(data.error || 'Ошибка регистрации');
+        }
+      } catch (e) {
+        showAlert('Ошибка регистрации');
+      } finally {
+        btns.forEach(b => b.disabled = false);
       }
     }
 
