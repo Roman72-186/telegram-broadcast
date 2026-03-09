@@ -12,6 +12,7 @@ const { getProvider } = require('./lib/payment');
 const ExcelJS = require('exceljs');
 
 const app = express();
+app.set('trust proxy', true);
 const config = loadConfig();
 const paymentProvider = getProvider(config);
 
@@ -353,7 +354,7 @@ app.post('/webhook/platform', async (req, res) => {
 // ============================================
 // API: Авторизация через initData
 // ============================================
-app.post('/api/auth', rateLimit(req => req.ip, 5, 60000), (req, res) => {
+app.post('/api/auth', rateLimit(req => req.ip, 15, 60000), (req, res) => {
   try {
     const { initData } = req.body;
 
