@@ -601,10 +601,10 @@
       <div class="broadcast-card text-left" style="padding: 14px;">
         <div class="text-sm font-bold mb-2" style="color:var(--accent)">Тестовый период — 7 дней</div>
         <div class="text-xs mb-2" style="color:var(--text-secondary)">
-          1 бот + до 100 контактов/мес — бесплатно
+          До 50 сообщений в месяц — бесплатно
         </div>
         <div class="text-xs" style="color:var(--text-muted)">
-          Далее: <span id="publicHintBotPrice">200 ₽/бот</span> · <span id="publicHintContactPrice">100 ₽/100 конт.</span>
+          Боты — без ограничений. Далее от <span id="publicHintPrice">390 ₽/мес</span>
         </div>
       </div>
       <button onclick="publicRegister('free')" id="publicBtnFree" class="w-full py-3 rounded-lg text-sm font-medium btn-primary mt-3">
@@ -1315,7 +1315,7 @@
           <input id="newTenantName" type="text" placeholder="Имя / Название" class="input-field w-full rounded-lg px-3 py-2 text-sm mb-2" />
           <input id="newTenantLeadteh" type="text" placeholder="Leadteh API токен (необяз.)" class="input-field w-full rounded-lg px-3 py-2 text-sm" />
           <div class="text-xs mt-1 mb-2" style="color: var(--text-muted)">&#128274; Токен шифруется AES-256 и не хранится в открытом виде</div>
-          <div class="text-xs mb-1" style="color:var(--text-muted)">Тариф: бесплатный (1 бот, 100 конт./мес). Тенант сможет расширить через конфигуратор.</div>
+          <div class="text-xs mb-1" style="color:var(--text-muted)">Тариф: Пробный (50 сообщений/мес, 7 дней). Тенант сможет выбрать план в кабинете.</div>
           <div class="flex gap-2">
             <button onclick="createTenant()" class="btn-primary px-3 py-1.5 rounded-lg text-xs">Создать</button>
             <button onclick="document.getElementById('addTenantForm').classList.add('hidden')" class="btn-secondary px-3 py-1.5 rounded-lg text-xs">Отмена</button>
@@ -1450,11 +1450,10 @@
     async function loadPublicPricing() {
       try {
         const r = await fetch('/api/public/pricing');
-        const cfg = await r.json();
-        const hintBot = document.getElementById('publicHintBotPrice');
-        const hintContact = document.getElementById('publicHintContactPrice');
-        if (hintBot) hintBot.textContent = cfg.price_per_bot + ' ₽/бот';
-        if (hintContact) hintContact.textContent = cfg.price_per_100_contacts + ' ₽/100 конт.';
+        const data = await r.json();
+        const minPaid = data.plans ? data.plans.filter(p => p.price > 0).sort((a,b) => a.price - b.price)[0] : null;
+        const hintPrice = document.getElementById('publicHintPrice');
+        if (hintPrice && minPaid) hintPrice.textContent = minPaid.price + ' ₽/мес';
       } catch (e) {
         console.error('loadPublicPricing error:', e);
       }
@@ -1610,14 +1609,15 @@
       if (subscriptionInfo.status === 'trial') {
         banner.style.background = 'var(--info-bg, #e0f2fe)';
         banner.style.color = 'var(--info-text, #0369a1)';
-        const maxC = currentTariff?.max_contacts || 100;
-        banner.innerHTML = `<strong>Тестовый период:</strong> осталось ${subscriptionInfo.trialDaysLeft} дн. (до ${maxC} контактов). <a href="javascript:void(0)" onclick="showTariffConfigurator()" style="text-decoration:underline;color:inherit">Оплатить</a>`;
+        const msgLimit = currentTariff?.messages_limit || 50;
+        const msgSent = currentTariff?.usage?.messages_sent || 0;
+        banner.innerHTML = `<strong>Тестовый период:</strong> осталось ${subscriptionInfo.trialDaysLeft} дн. (${msgSent}/${msgLimit} сообщ.) <a href="javascript:void(0)" onclick="showTariffConfigurator()" style="text-decoration:underline;color:inherit">Оплатить</a>`;
         if (tabCreate) { tabCreate.style.opacity = ''; tabCreate.style.pointerEvents = ''; }
         updateCreateSubtabsDisabled(false);
       } else if (isExpired) {
         banner.style.background = 'var(--danger-bg, #fee2e2)';
         banner.style.color = 'var(--danger-text, #dc2626)';
-        banner.innerHTML = `<strong>Тестовый период истёк.</strong> Создание рассылок заблокировано. <a href="javascript:void(0)" onclick="showTariffConfigurator()" style="text-decoration:underline;color:inherit">Оплатить</a>`;
+        banner.innerHTML = `<strong>Доступ ограничен.</strong> Создание рассылок заблокировано. <a href="javascript:void(0)" onclick="showTariffConfigurator()" style="text-decoration:underline;color:inherit">Выбрать тариф</a>`;
         if (tabCreate) { tabCreate.style.opacity = '0.5'; tabCreate.style.pointerEvents = 'none'; }
         updateCreateSubtabsDisabled(true);
       } else if (subscriptionInfo.status === 'paid' && subscriptionInfo.paidUntil) {
@@ -1629,7 +1629,8 @@
           const daysLeft = Math.max(0, Math.ceil((paidDate - new Date()) / (24*60*60*1000)));
           banner.style.background = daysLeft <= 3 ? 'var(--danger-bg, #fee2e2)' : 'var(--info-bg, #e0f2fe)';
           banner.style.color = daysLeft <= 3 ? 'var(--danger-text, #dc2626)' : 'var(--info-text, #0369a1)';
-          banner.innerHTML = `<strong>Подписка до ${paidDate.toLocaleDateString('ru-RU')}</strong> (осталось ${daysLeft} дн.) <a href="javascript:void(0)" onclick="showTariffConfigurator()" style="text-decoration:underline;color:inherit">Изменить/Продлить</a>`;
+          const planName = currentTariff?.plan_name || '';
+          banner.innerHTML = `<strong>${planName ? planName + ' — ' : ''}до ${paidDate.toLocaleDateString('ru-RU')}</strong> (${daysLeft} дн.) <a href="javascript:void(0)" onclick="showTariffConfigurator()" style="text-decoration:underline;color:inherit">Изменить</a>`;
         }
         if (tabCreate) { tabCreate.style.opacity = ''; tabCreate.style.pointerEvents = ''; }
         updateCreateSubtabsDisabled(false);
@@ -1640,126 +1641,88 @@
       }
     }
 
-    // Тарифный конфигуратор
-    let configuratorPricing = null;
-    let cfgBots = 1;
-    let cfgContacts = 100;
+    // Выбор тарифного плана
+    let tariffPlans = null;
+    let selectedPlanId = null;
 
     async function showTariffConfigurator() {
-      // Загрузить текущие ставки
-      if (!configuratorPricing) {
+      if (!tariffPlans) {
         try {
           const r = await apiFetch('/api/public/pricing');
-          configuratorPricing = await r.json();
+          const data = await r.json();
+          tariffPlans = data.plans || [];
         } catch (e) {
-          showAlert('Ошибка загрузки ставок');
+          showAlert('Ошибка загрузки тарифов');
           return;
         }
       }
 
-      // Предзаполнить текущими лимитами
-      if (currentTariff) {
-        cfgBots = currentTariff.max_bots || 1;
-        cfgContacts = currentTariff.max_contacts || 100;
-      } else {
-        cfgBots = 1;
-        cfgContacts = 100;
-      }
+      selectedPlanId = null;
+      const list = document.getElementById('tariffPlansList');
+      const currentPlanId = currentTariff?.plan_id;
 
-      // Обновить подсказки из конфига
-      const cfg = configuratorPricing;
-      const bh = document.getElementById('cfgBotHint');
-      const ch = document.getElementById('cfgContactHint');
-      if (bh && cfg) bh.textContent = `1 бесплатно, доп. ${cfg.price_per_bot} ₽/бот`;
-      if (ch && cfg) ch.textContent = `100 бесплатно, +${cfg.price_per_100_contacts} ₽/100 контактов`;
+      list.innerHTML = tariffPlans.map(p => {
+        const isCurrent = p.id === currentPlanId;
+        const isFree = p.price === 0;
+        return `<div class="rounded-lg p-3 cursor-pointer tariff-plan-card ${isCurrent ? 'ring-2' : ''}" style="border:2px solid ${isCurrent ? 'var(--accent)' : 'var(--border)'};background:var(--card-bg)" onclick="selectPlan(${p.id})" data-plan-id="${p.id}">
+          <div class="flex justify-between items-center">
+            <div>
+              <div class="text-sm font-bold">${p.name}${isCurrent ? ' <span style="color:var(--accent)">(текущий)</span>' : ''}</div>
+              <div class="text-xs" style="color:var(--text-muted)">${p.messages_limit.toLocaleString('ru-RU')} сообщений/мес</div>
+            </div>
+            <div class="text-sm font-bold" style="color:var(--accent)">${isFree ? 'Бесплатно' : p.price + ' ₽/мес'}</div>
+          </div>
+        </div>`;
+      }).join('');
 
-      updateConfiguratorUI();
+      document.getElementById('cfgPeriods').classList.add('hidden');
       document.getElementById('tariffConfiguratorModal').classList.remove('hidden');
+    }
+
+    function selectPlan(planId) {
+      const plan = tariffPlans.find(p => p.id === planId);
+      if (!plan || plan.price === 0) return;
+      selectedPlanId = planId;
+
+      // Подсветить выбранный
+      document.querySelectorAll('.tariff-plan-card').forEach(el => {
+        const id = parseInt(el.dataset.planId);
+        el.style.borderColor = id === planId ? 'var(--accent)' : 'var(--border)';
+      });
+
+      // Показать кнопки оплаты
+      const price = plan.price;
+      const p6 = Math.round(price * 6 * 0.85);
+      const p12 = Math.round(price * 12 * 0.80);
+      document.getElementById('cfgPrice1m').textContent = `Оплатить (1 мес) — ${price.toLocaleString('ru-RU')} ₽`;
+      document.getElementById('cfgPrice6m').textContent = `6 мес: ${p6.toLocaleString('ru-RU')} ₽ (-15%)`;
+      document.getElementById('cfgPrice12m').textContent = `12 мес: ${p12.toLocaleString('ru-RU')} ₽ (-20%)`;
+      document.getElementById('cfgPeriods').classList.remove('hidden');
     }
 
     function closeConfigurator() {
       document.getElementById('tariffConfiguratorModal').classList.add('hidden');
     }
 
-    function cfgChangeBots(delta) {
-      const cfg = configuratorPricing || { max_bots: 10 };
-      cfgBots = Math.max(1, Math.min(cfg.max_bots, cfgBots + delta));
-      updateConfiguratorUI();
-    }
-
-    function cfgChangeContacts(delta) {
-      const cfg = configuratorPricing || { max_contacts: 50000 };
-      cfgContacts = Math.max(100, Math.min(cfg.max_contacts, cfgContacts + delta));
-      updateConfiguratorUI();
-    }
-
-    function cfgSetContacts() {
-      const val = parseInt(document.getElementById('cfgContactsInput').value);
-      if (isNaN(val) || val < 100) { showAlert('Минимум 100 контактов'); return; }
-      const cfg = configuratorPricing || { max_contacts: 50000 };
-      cfgContacts = Math.min(cfg.max_contacts, Math.ceil(val / 100) * 100);
-      document.getElementById('cfgContactsInput').value = '';
-      updateConfiguratorUI();
-    }
-
-    function updateConfiguratorUI() {
-      const cfg = configuratorPricing || { free_bots: 1, price_per_bot: 200, free_contacts: 100, price_per_100_contacts: 50 };
-      const extraBots = Math.max(0, cfgBots - cfg.free_bots);
-      const extraContactBlocks = Math.max(0, Math.ceil((cfgContacts - cfg.free_contacts) / 100));
-      const botsCost = extraBots * cfg.price_per_bot;
-      const contactsCost = extraContactBlocks * cfg.price_per_100_contacts;
-      const price = botsCost + contactsCost;
-
-      document.getElementById('cfgBotsVal').textContent = cfgBots;
-      document.getElementById('cfgContactsVal').textContent = cfgContacts.toLocaleString('ru-RU');
-
-      const priceEl = document.getElementById('cfgPrice');
-      const breakdownEl = document.getElementById('cfgBreakdown');
-      const periodsEl = document.getElementById('cfgPeriods');
-
-      if (price === 0) {
-        priceEl.textContent = 'Бесплатно';
-        breakdownEl.textContent = '';
-        periodsEl.classList.add('hidden');
-      } else {
-        priceEl.textContent = price.toLocaleString('ru-RU') + ' ₽/мес';
-        const parts = [];
-        if (botsCost > 0) parts.push(`Боты: ${extraBots}×${cfg.price_per_bot} = ${botsCost} ₽`);
-        if (contactsCost > 0) parts.push(`Конт: ${extraContactBlocks}×${cfg.price_per_100_contacts} = ${contactsCost} ₽`);
-        breakdownEl.textContent = parts.join(' | ');
-        periodsEl.classList.remove('hidden');
-
-        const p6 = Math.round(price * 6 * 0.85);
-        const p12 = Math.round(price * 12 * 0.80);
-        document.getElementById('cfgPrice1m').textContent = `Оплатить (1 мес) — ${price.toLocaleString('ru-RU')} ₽`;
-        document.getElementById('cfgPrice6m').textContent = `6 мес: ${p6.toLocaleString('ru-RU')} ₽ (-15%)`;
-        document.getElementById('cfgPrice12m').textContent = `12 мес: ${p12.toLocaleString('ru-RU')} ₽ (-20%)`;
-      }
-    }
-
     async function applyTariff(period) {
+      if (!selectedPlanId) { showAlert('Выберите тариф'); return; }
       const buttons = document.querySelectorAll('#cfgPeriods button');
       buttons.forEach(b => b.disabled = true);
       try {
         const r = await apiFetch('/api/tariff/apply', {
           method: 'POST',
-          body: { bots: cfgBots, contacts: cfgContacts, period },
+          body: { plan_id: selectedPlanId, period },
         });
         const data = await r.json();
         if (data.ok) {
           if (data.payment_url) {
             closeConfigurator();
             showAlert('Перенаправление на страницу оплаты...');
-            // Открыть платёжную форму
             setTimeout(() => {
-              if (tg?.openLink) {
-                tg.openLink(data.payment_url);
-              } else {
-                window.location.href = data.payment_url;
-              }
+              if (tg?.openLink) tg.openLink(data.payment_url);
+              else window.location.href = data.payment_url;
             }, 500);
           } else {
-            // Ручной режим
             closeConfigurator();
             showAlert('Заявка отправлена! Администратор свяжется с вами для оплаты.');
           }
@@ -3386,16 +3349,25 @@
         el.innerHTML = `<div class="text-sm" style="color:var(--text-muted)">Тариф не назначен</div>`;
         return;
       }
+      const planName = limits.plan_name || currentTariff?.plan_name || 'Пробный';
       const price = currentTariff?.price || 0;
       const priceLabel = price > 0 ? `${price.toLocaleString('ru-RU')} ₽/мес` : 'Бесплатно';
+      const msgSent = limits.messages_sent || 0;
+      const msgLimit = limits.messages_limit || 50;
+      const pct = Math.min(100, Math.round(msgSent / msgLimit * 100));
       el.innerHTML = `
-        <div class="section-label">Тариф и использование</div>
-        <div class="grid grid-cols-2 gap-3 text-center mb-2">
-          <div><div class="text-sm font-bold">${limits.current_bots}/${limits.max_bots}</div><div class="text-xs" style="color:var(--text-muted)">Ботов</div></div>
-          <div><div class="text-sm font-bold">${(limits.current_contacts || 0).toLocaleString('ru-RU')}/${limits.max_contacts.toLocaleString('ru-RU')}</div><div class="text-xs" style="color:var(--text-muted)">Контактов/мес</div></div>
+        <div class="section-label">Тариф: ${planName}</div>
+        <div class="mb-2">
+          <div class="flex justify-between text-xs mb-1">
+            <span style="color:var(--text-secondary)">Сообщений: ${msgSent.toLocaleString('ru-RU')} / ${msgLimit.toLocaleString('ru-RU')}</span>
+            <span style="color:var(--text-muted)">${pct}%</span>
+          </div>
+          <div class="w-full rounded-full h-2" style="background:var(--bg-secondary)">
+            <div class="rounded-full h-2" style="width:${pct}%;background:${pct >= 90 ? 'var(--danger-text,#dc2626)' : 'var(--accent)'}"></div>
+          </div>
         </div>
         <div class="flex items-center justify-between">
-          <span class="text-xs" style="color:var(--text-secondary)">Стоимость: <span style="color:var(--accent);font-weight:600">${priceLabel}</span></span>
+          <span class="text-xs" style="color:var(--text-secondary)">${priceLabel} · ботов: ${limits.current_bots || 0}</span>
           <button onclick="showTariffConfigurator()" class="btn-secondary px-3 py-1 rounded-lg text-xs">Изменить тариф</button>
         </div>`;
     }
@@ -3676,10 +3648,10 @@
           subLabel = '<span class="text-xs" style="color:var(--danger)">Истёк</span>';
         }
 
-        const maxB = t.effective_max_bots || 1;
-        const maxC = t.effective_max_contacts || 100;
+        const planName = t.plan_name || 'Пробный';
+        const msgLimit = t.effective_messages_limit || 50;
         const price = t.effective_price || 0;
-        const tariffLabel = price > 0 ? `${maxB} бот, ${maxC.toLocaleString('ru-RU')} конт. — ${price} ₽/мес` : `${maxB} бот, ${maxC} конт. — Бесплатно`;
+        const tariffLabel = `${planName} (${msgLimit.toLocaleString('ru-RU')} сообщ.) — ${price > 0 ? price + ' ₽/мес' : 'Бесплатно'}`;
 
         return `
         <div class="broadcast-card">
@@ -3688,7 +3660,7 @@
             <span class="status-badge status-${escapeAttr(t.status)}">${escapeHtml(t.status)}</span>
           </div>
           <div class="text-xs" style="color:var(--text-muted)">TG ID: ${escapeHtml(String(t.telegram_id))}</div>
-          <div class="text-xs mb-1" style="color:var(--text-muted)">Боты: ${t.bots_count}/${maxB} | Контакты/мес: ${t.unique_contacts || 0}/${maxC.toLocaleString('ru-RU')}</div>
+          <div class="text-xs mb-1" style="color:var(--text-muted)">Боты: ${t.bots_count} | Сообщ/мес: ${t.messages_sent || 0}/${msgLimit.toLocaleString('ru-RU')}</div>
           <div class="text-xs mb-1" style="color:var(--text-secondary)">Тариф: <span style="color:var(--accent)">${tariffLabel}</span></div>
           <div class="text-xs mb-1">Подписка: ${subLabel}</div>
           <button onclick="impersonateTenant(${t.id})" class="w-full py-2 rounded-lg text-sm font-medium mb-2" style="background:var(--accent);color:#fff">Войти как тенант</button>
@@ -3829,53 +3801,26 @@
     function renderPricingConfig(cfg) {
       const container = document.getElementById('pricingConfigContainer');
       container.innerHTML = `
-        <div class="section-label">Ставки конфигуратора</div>
-        <div class="grid grid-cols-2 gap-2 mb-3">
-          <div>
-            <label class="text-xs" style="color:var(--text-muted)">Бесплатных ботов</label>
-            <input id="pcFreeBots" type="number" value="${cfg.free_bots}" class="input-field w-full rounded-lg px-3 py-2 text-sm" />
-          </div>
-          <div>
-            <label class="text-xs" style="color:var(--text-muted)">Цена за доп. бота, ₽</label>
-            <input id="pcPriceBot" type="number" value="${cfg.price_per_bot}" class="input-field w-full rounded-lg px-3 py-2 text-sm" />
-          </div>
-          <div>
-            <label class="text-xs" style="color:var(--text-muted)">Бесплатных контактов</label>
-            <input id="pcFreeContacts" type="number" value="${cfg.free_contacts}" class="input-field w-full rounded-lg px-3 py-2 text-sm" />
-          </div>
-          <div>
-            <label class="text-xs" style="color:var(--text-muted)">Цена за 100 конт., ₽</label>
-            <input id="pcPriceContacts" type="number" value="${cfg.price_per_100_contacts}" class="input-field w-full rounded-lg px-3 py-2 text-sm" />
-          </div>
-          <div>
-            <label class="text-xs" style="color:var(--text-muted)">Макс. ботов</label>
-            <input id="pcMaxBots" type="number" value="${cfg.max_bots}" class="input-field w-full rounded-lg px-3 py-2 text-sm" />
-          </div>
-          <div>
-            <label class="text-xs" style="color:var(--text-muted)">Макс. контактов</label>
-            <input id="pcMaxContacts" type="number" value="${cfg.max_contacts}" class="input-field w-full rounded-lg px-3 py-2 text-sm" />
-          </div>
+        <div class="section-label">Докупка сообщений</div>
+        <div class="mb-3">
+          <label class="text-xs" style="color:var(--text-muted)">Цена за 100 доп. сообщений, ₽</label>
+          <input id="pcPriceMessages" type="number" value="${cfg.price_per_100_messages || 50}" class="input-field w-full rounded-lg px-3 py-2 text-sm" />
         </div>
-        <div class="text-xs mb-2" style="color:var(--text-muted)">Формула: (боты - ${cfg.free_bots}) × ${cfg.price_per_bot} + ((контакты - ${cfg.free_contacts}) / 100) × ${cfg.price_per_100_contacts}</div>
-        <button onclick="savePricingConfig()" class="btn-primary w-full py-2 rounded-lg text-sm">Сохранить ставки</button>
+        <div class="text-xs mb-2" style="color:var(--text-muted)">Тарифные планы управляются через таблицу tariff_plans в БД</div>
+        <button onclick="savePricingConfig()" class="btn-primary w-full py-2 rounded-lg text-sm">Сохранить</button>
       `;
     }
 
     async function savePricingConfig() {
       try {
         const body = {
-          free_bots: parseInt(document.getElementById('pcFreeBots').value) || 1,
-          price_per_bot: parseInt(document.getElementById('pcPriceBot').value) || 200,
-          free_contacts: parseInt(document.getElementById('pcFreeContacts').value) || 100,
-          price_per_100_contacts: parseInt(document.getElementById('pcPriceContacts').value) || 50,
-          max_bots: parseInt(document.getElementById('pcMaxBots').value) || 10,
-          max_contacts: parseInt(document.getElementById('pcMaxContacts').value) || 50000,
+          price_per_100_messages: parseInt(document.getElementById('pcPriceMessages').value) || 50,
         };
         const r = await apiFetch('/api/super/pricing', { method: 'POST', body });
         const data = await r.json();
         if (data.ok) {
-          showAlert('Ставки сохранены');
-          configuratorPricing = null; // сбросить кэш конфигуратора
+          showAlert('Сохранено');
+          tariffPlans = null;
           loadSuperTariffs();
         } else showAlert(data.error || 'Ошибка');
       } catch (e) { showAlert('Ошибка сохранения'); }
@@ -3902,7 +3847,7 @@
               <div class="text-sm font-medium">${escapeHtml(p.tenant_name || 'Без имени')}</div>
               <span class="text-xs font-bold" style="color:${statusColor}">${statusText}</span>
             </div>
-            <div class="text-xs" style="color:var(--text-muted)">${p.bots} бот, ${p.contacts.toLocaleString('ru-RU')} конт. | ${periodNames[p.period] || p.period} | ${p.amount.toLocaleString('ru-RU')} ₽ | ${date}</div>
+            <div class="text-xs" style="color:var(--text-muted)">${p.plan_name || (p.bots + ' бот, ' + (p.contacts || 0).toLocaleString('ru-RU') + ' конт.')} | ${periodNames[p.period] || p.period} | ${p.amount.toLocaleString('ru-RU')} ₽ | ${date}</div>
             ${p.status === 'pending' ? `<button onclick="confirmPayment(${p.id})" class="btn-primary px-3 py-1 rounded-lg text-xs mt-2">Подтвердить оплату</button>` : ''}
           </div>`;
         }).join('');
@@ -5175,51 +5120,17 @@
     </div>
   </div>
 
-  <!-- Модал конфигуратора тарифа -->
+  <!-- Модал выбора тарифа -->
   <div id="tariffConfiguratorModal" class="recipients-overlay hidden">
-    <div class="recipients-modal" style="max-width:380px;height:auto;margin:auto">
+    <div class="recipients-modal" style="max-width:400px;height:auto;margin:auto">
       <div class="recipients-header">
-        <h3>Настройка тарифа</h3>
+        <h3>Выбор тарифа</h3>
         <span style="cursor:pointer;font-size:20px;color:var(--text-secondary);padding:4px 8px" onclick="closeConfigurator()">✕</span>
       </div>
       <div style="padding:16px">
-        <!-- Боты -->
-        <div class="mb-4">
-          <div class="text-sm font-medium mb-2">Количество ботов</div>
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-3">
-              <button onclick="cfgChangeBots(-1)" class="btn-secondary px-3 py-1.5 rounded-lg text-sm font-bold">−</button>
-              <span id="cfgBotsVal" class="text-xl font-bold" style="min-width:32px;text-align:center">1</span>
-              <button onclick="cfgChangeBots(1)" class="btn-secondary px-3 py-1.5 rounded-lg text-sm font-bold">+</button>
-            </div>
-          </div>
-          <div class="text-xs mt-1" style="color:var(--text-muted)" id="cfgBotHint">1 бесплатно, доп. 200 ₽/бот</div>
-        </div>
+        <div id="tariffPlansList" class="flex flex-col gap-2 mb-4"></div>
 
-        <!-- Контакты -->
-        <div class="mb-4">
-          <div class="text-sm font-medium mb-2">Контакты в месяц</div>
-          <div class="flex items-center justify-between mb-2">
-            <div class="flex items-center gap-3">
-              <button onclick="cfgChangeContacts(-100)" class="btn-secondary px-3 py-1.5 rounded-lg text-xs">−100</button>
-              <span id="cfgContactsVal" class="text-xl font-bold" style="min-width:48px;text-align:center">100</span>
-              <button onclick="cfgChangeContacts(100)" class="btn-secondary px-3 py-1.5 rounded-lg text-xs">+100</button>
-            </div>
-          </div>
-          <div class="flex gap-2">
-            <input id="cfgContactsInput" type="number" placeholder="Ввести число" class="input-field flex-1 rounded-lg px-3 py-1.5 text-sm" min="100" step="100" />
-            <button onclick="cfgSetContacts()" class="btn-secondary px-3 py-1.5 rounded-lg text-xs">OK</button>
-          </div>
-          <div class="text-xs mt-1" style="color:var(--text-muted)" id="cfgContactHint">100 бесплатно, +100 ₽/100 контактов</div>
-        </div>
-
-        <!-- Итого -->
-        <div class="rounded-xl p-4 mb-4 text-center" style="background:var(--accent-subtle);border:1px solid var(--border)">
-          <div id="cfgPrice" class="text-2xl font-bold" style="color:var(--accent)">Бесплатно</div>
-          <div id="cfgBreakdown" class="text-xs mt-1" style="color:var(--text-muted)"></div>
-        </div>
-
-        <!-- Кнопки оплаты -->
+        <!-- Период оплаты (скрыт до выбора платного тарифа) -->
         <div id="cfgPeriods" class="hidden flex flex-col gap-2">
           <button onclick="applyTariff('1m')" class="w-full py-2.5 rounded-lg text-sm font-medium btn-primary">
             <span id="cfgPrice1m">Оплатить (1 мес)</span>
@@ -5230,7 +5141,6 @@
           <button onclick="applyTariff('12m')" class="w-full py-2 rounded-lg text-sm btn-secondary">
             <span id="cfgPrice12m">12 мес (-20%)</span>
           </button>
-          <div id="cfgPaymentHint" class="text-xs text-center mt-1" style="color:var(--text-muted)">Безопасная оплата</div>
           <div class="text-xs text-center mt-2" style="color:var(--text-muted)">
             <a href="/terms.html" target="_blank" style="color:var(--accent)">Оферта</a> ·
             <a href="/privacy.html" target="_blank" style="color:var(--accent)">Конфиденциальность</a> ·

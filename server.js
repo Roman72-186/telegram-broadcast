@@ -136,14 +136,17 @@ app.get('/api/public/tariffs', (req, res) => {
 
 // Публичное ценообразование (конфигуратор)
 app.get('/api/public/pricing', (req, res) => {
+  const plans = db.getTariffPlans();
   const cfg = db.getPricingConfig();
   res.json({
-    free_bots: cfg.free_bots,
-    price_per_bot: cfg.price_per_bot,
-    free_contacts: cfg.free_contacts,
-    price_per_100_contacts: cfg.price_per_100_contacts,
-    max_bots: cfg.max_bots,
-    max_contacts: cfg.max_contacts,
+    plans: plans.map(p => ({
+      id: p.id,
+      name: p.name,
+      messages_limit: p.messages_limit,
+      price: p.price,
+      is_default: p.is_default,
+    })),
+    extra_messages_price: cfg.price_per_100_messages || 50,
   });
 });
 
@@ -152,7 +155,7 @@ app.get('/api/public/pricing', (req, res) => {
 // ============================================
 app.post('/api/public/register-and-pay', rateLimit(req => req.ip, 5, 60000), async (req, res) => {
   try {
-    const { initData, bots, contacts, period } = req.body;
+    const { initData } = req.body;
     if (!initData) return res.status(400).json({ error: 'initData обязательна' });
 
     const validation = validateInitData(initData, config.platformBotToken);
@@ -165,74 +168,17 @@ app.post('/api/public/register-and-pay', rateLimit(req => req.ip, 5, 60000), asy
     const existing = db.getTenantByTelegramId(telegramId);
     if (existing) return res.status(400).json({ error: 'Аккаунт уже существует. Перезагрузите приложение.' });
 
-    const cfg = db.getPricingConfig();
-    const b = Math.max(1, Math.min(cfg.max_bots, parseInt(bots) || 1));
-    const c = Math.max(100, Math.min(cfg.max_contacts, Math.ceil((parseInt(contacts) || 100) / 100) * 100));
-    const { price } = db.calculatePrice(b, c);
-
-    // Бесплатный тариф — просто создать тенанта
-    if (price === 0) {
-      const tenantId = db.createTenant(telegramId, userName, '');
-      if (SUPER_ADMIN_ID && config.platformBotToken) {
-        let text = `👤 Новый тенант (тест 7 дней)\n\nИмя: ${userName}\nTelegram ID: ${telegramId}`;
-        if (validation.user.username) text += `\nUsername: @${validation.user.username}`;
-        text += `\nТариф: ${b} бот, ${c} конт.`;
-        text += `\n\nНаписать: tg://user?id=${telegramId}`;
-        await fetch(`https://api.telegram.org/bot${config.platformBotToken}/sendMessage`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ chat_id: SUPER_ADMIN_ID, text, disable_web_page_preview: true }),
-        }).catch(() => {});
-      }
-      return res.json({ ok: true, registered: true });
+    // Создать тенанта на пробном тарифе (7 дней)
+    const trialPlan = db.getTariffPlans().find(p => p.is_default);
+    const tenantId = db.createTenant(telegramId, userName, '');
+    if (trialPlan) {
+      db.updateTenant(tenantId, { tariff_plan_id: trialPlan.id });
     }
 
-    // Платный тариф — создать тенанта + платёж + оплата
-    const validPeriods = ['1m', '6m', '12m'];
-    const p = validPeriods.includes(period) ? period : '1m';
-    let amount;
-    if (p === '1m') amount = price;
-    else if (p === '6m') amount = Math.round(price * 6 * 0.85);
-    else if (p === '12m') amount = Math.round(price * 12 * 0.80);
-
-    const tenantId = db.createTenant(telegramId, userName, '', 'pending_payment');
-    const paymentId = db.createPayment(tenantId, amount, p, b, c);
-
-    if (paymentProvider) {
-      try {
-        const description = `Регистрация: ${b} бот(ов), ${c} конт./мес, ${p}`;
-        const result = await paymentProvider.createPayment(paymentId, amount, description);
-        db.updatePaymentExternal(paymentId, {
-          external_id: result.externalId,
-          payment_url: result.paymentUrl,
-          provider: paymentProvider.name,
-        });
-
-        if (SUPER_ADMIN_ID && config.platformBotToken) {
-          let text = `👤 Новый тенант + платёж (#${paymentId})\n\nИмя: ${userName}\nTelegram ID: ${telegramId}`;
-          if (validation.user.username) text += `\nUsername: @${validation.user.username}`;
-          text += `\nСумма: ${amount} ₽ (${paymentProvider.name})`;
-          text += `\nТариф: ${b} ботов, ${c} конт., ${p}`;
-          text += `\n\nНаписать: tg://user?id=${telegramId}`;
-          await fetch(`https://api.telegram.org/bot${config.platformBotToken}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: SUPER_ADMIN_ID, text, disable_web_page_preview: true }),
-          }).catch(() => {});
-        }
-
-        return res.json({ ok: true, registered: true, payment_id: paymentId, amount, payment_url: result.paymentUrl });
-      } catch (providerErr) {
-        console.error('Register payment provider error:', providerErr.message);
-      }
-    }
-
-    // Ручной режим
     if (SUPER_ADMIN_ID && config.platformBotToken) {
-      let text = `👤 Новый тенант + заявка на тариф\n\nИмя: ${userName}\nTelegram ID: ${telegramId}`;
+      let text = `👤 Новый тенант (тест 7 дней)\n\nИмя: ${userName}\nTelegram ID: ${telegramId}`;
       if (validation.user.username) text += `\nUsername: @${validation.user.username}`;
-      text += `\nТариф: ${b} ботов, ${c} конт., ${p}`;
-      text += `\nСумма: ${amount} ₽\nPayment ID: ${paymentId}`;
+      text += `\nТариф: ${trialPlan ? trialPlan.name : 'Пробный'} (${trialPlan ? trialPlan.messages_limit : 50} сообщ.)`;
       text += `\n\nНаписать: tg://user?id=${telegramId}`;
       await fetch(`https://api.telegram.org/bot${config.platformBotToken}/sendMessage`, {
         method: 'POST',
@@ -241,7 +187,7 @@ app.post('/api/public/register-and-pay', rateLimit(req => req.ip, 5, 60000), asy
       }).catch(() => {});
     }
 
-    res.json({ ok: true, registered: true, payment_id: paymentId, amount });
+    return res.json({ ok: true, registered: true });
   } catch (e) {
     console.error('POST /api/public/register-and-pay error:', e.message);
     res.status(500).json({ error: 'Ошибка регистрации' });
@@ -1405,10 +1351,7 @@ app.get('/api/tenant/info', requireTenantAdmin, (req, res) => {
     const tenant = db.getTenantById(req.tenantId);
     const limits = db.checkTariffLimits(req.tenantId);
     const subscription = db.checkSubscription(req.tenantId);
-
-    const maxBots = tenant?.custom_max_bots != null ? tenant.custom_max_bots : 1;
-    const maxContacts = tenant?.custom_max_contacts != null ? tenant.custom_max_contacts : 100;
-    const price = tenant?.custom_price != null ? tenant.custom_price : 0;
+    const plan = tenant?.tariff_plan_id ? db.getTariffPlan(tenant.tariff_plan_id) : null;
 
     res.json({
       tenant: {
@@ -1416,11 +1359,11 @@ app.get('/api/tenant/info', requireTenantAdmin, (req, res) => {
         status: tenant?.status || 'unknown',
       },
       tariff: {
-        max_bots: maxBots,
-        max_contacts: maxContacts,
-        price,
-        price_6m: price > 0 ? Math.round(price * 6 * 0.85) : 0,
-        price_12m: price > 0 ? Math.round(price * 12 * 0.80) : 0,
+        plan_id: plan?.id || null,
+        plan_name: plan?.name || 'Пробный',
+        messages_limit: (plan?.messages_limit || 50) + (tenant?.extra_messages || 0),
+        price: plan?.price || 0,
+        extra_messages: tenant?.extra_messages || 0,
       },
       usage: limits.limits || null,
       subscription,
@@ -1434,46 +1377,29 @@ app.get('/api/tenant/info', requireTenantAdmin, (req, res) => {
 // ============================================
 // API: Тарифный конфигуратор
 // ============================================
-app.post('/api/tariff/calculate', requireTenantAdmin, (req, res) => {
-  try {
-    const { bots, contacts } = req.body;
-    const cfg = db.getPricingConfig();
-    const b = Math.max(1, Math.min(cfg.max_bots, parseInt(bots) || 1));
-    const c = Math.max(100, Math.min(cfg.max_contacts, Math.ceil((parseInt(contacts) || 100) / 100) * 100));
-    const result = db.calculatePrice(b, c);
-    res.json(result);
-  } catch (e) {
-    console.error('POST /api/tariff/calculate error:', e.message);
-    res.status(500).json({ error: 'Ошибка расчёта' });
-  }
-});
-
 app.post('/api/tariff/apply', requireTenantAdmin, async (req, res) => {
   try {
-    const { bots, contacts, period } = req.body;
+    const { plan_id, period } = req.body;
     const validPeriods = ['1m', '6m', '12m'];
+    if (!plan_id) return res.status(400).json({ error: 'Выберите тариф' });
     if (!period || !validPeriods.includes(period)) {
       return res.status(400).json({ error: 'Некорректный период' });
     }
 
-    const cfg = db.getPricingConfig();
-    const b = Math.max(1, Math.min(cfg.max_bots, parseInt(bots) || 1));
-    const c = Math.max(100, Math.min(cfg.max_contacts, Math.ceil((parseInt(contacts) || 100) / 100) * 100));
-    const { price } = db.calculatePrice(b, c);
+    const plan = db.getTariffPlan(plan_id);
+    if (!plan || plan.price === 0) return res.status(400).json({ error: 'Некорректный тариф' });
 
-    // Расчёт суммы с учётом скидок за период
+    const price = plan.price;
     let amount;
     if (period === '1m') amount = price;
     else if (period === '6m') amount = Math.round(price * 6 * 0.85);
     else if (period === '12m') amount = Math.round(price * 12 * 0.80);
 
-    // Создать платёж
-    const paymentId = db.createPayment(req.tenantId, amount, period, b, c);
+    const paymentId = db.createPayment(req.tenantId, amount, period, 0, 0, plan.id);
 
-    // Если подключён платёжный шлюз — создать платёж через кассу
     if (paymentProvider) {
       try {
-        const description = `Тариф: ${b} бот(ов), ${c} конт./мес, ${period}`;
+        const description = `Тариф "${plan.name}": ${plan.messages_limit} сообщ./мес, ${period}`;
         const result = await paymentProvider.createPayment(paymentId, amount, description);
         db.updatePaymentExternal(paymentId, {
           external_id: result.externalId,
@@ -1481,14 +1407,13 @@ app.post('/api/tariff/apply', requireTenantAdmin, async (req, res) => {
           provider: paymentProvider.name,
         });
 
-        // Уведомить суперадмина о новом платеже
         if (SUPER_ADMIN_ID && config.platformBotToken) {
           const tenant = db.getTenantById(req.tenantId);
           const tenantName = tenant?.name || 'Без имени';
           const tgId = tenant?.telegram_id || '';
           let text = `💳 Новый платёж (#${paymentId})\n\nИмя: ${tenantName}\nTelegram ID: ${tgId}`;
+          text += `\nТариф: ${plan.name} (${plan.messages_limit} сообщ.)`;
           text += `\nСумма: ${amount} ₽ (${paymentProvider.name})`;
-          text += `\nСтатус: ожидает оплаты`;
           if (tgId) text += `\n\nНаписать: tg://user?id=${tgId}`;
           await fetch(`https://api.telegram.org/bot${config.platformBotToken}/sendMessage`, {
             method: 'POST',
@@ -1500,11 +1425,10 @@ app.post('/api/tariff/apply', requireTenantAdmin, async (req, res) => {
         return res.json({ ok: true, payment_id: paymentId, amount, period, payment_url: result.paymentUrl });
       } catch (providerErr) {
         console.error('Payment provider error:', providerErr.message);
-        // Fallback на ручной режим
       }
     }
 
-    // Ручной режим — отправляем заявку суперадмину
+    // Ручной режим
     if (SUPER_ADMIN_ID && config.platformBotToken) {
       const tenant = db.getTenantById(req.tenantId);
       const tenantName = tenant?.name || 'Без имени';
@@ -1512,10 +1436,9 @@ app.post('/api/tariff/apply', requireTenantAdmin, async (req, res) => {
       const periodNames = { '1m': '1 месяц', '6m': '6 месяцев', '12m': '12 месяцев' };
 
       let text = `💳 Заявка на тариф\n\nТенант: ${tenantName}\nTelegram ID: ${tgId}`;
-      text += `\nТариф: ${b} ботов, ${c} конт./мес`;
+      text += `\nТариф: ${plan.name} (${plan.messages_limit} сообщ.)`;
       text += `\nЦена: ${price} ₽/мес`;
-      text += `\nПериод: ${periodNames[period]}`;
-      text += `\nИтого: ${amount} ₽`;
+      text += `\nПериод: ${periodNames[period]}, итого: ${amount} ₽`;
       text += `\nPayment ID: ${paymentId}`;
       if (tgId) text += `\n\nНаписать: tg://user?id=${tgId}`;
 
@@ -1530,6 +1453,54 @@ app.post('/api/tariff/apply', requireTenantAdmin, async (req, res) => {
   } catch (e) {
     console.error('POST /api/tariff/apply error:', e.message);
     res.status(500).json({ error: 'Ошибка оформления тарифа' });
+  }
+});
+
+// Докупка сообщений
+app.post('/api/tariff/buy-messages', requireTenantAdmin, async (req, res) => {
+  try {
+    const { count } = req.body;
+    const qty = Math.max(100, Math.ceil((parseInt(count) || 100) / 100) * 100);
+    const cfg = db.getPricingConfig();
+    const pricePerBlock = cfg.price_per_100_messages || 50;
+    const amount = (qty / 100) * pricePerBlock;
+
+    if (paymentProvider) {
+      const paymentId = db.createPayment(req.tenantId, amount, 'extra', 0, 0);
+      const description = `Докупка ${qty} сообщений`;
+      try {
+        const result = await paymentProvider.createPayment(paymentId, amount, description);
+        db.updatePaymentExternal(paymentId, {
+          external_id: result.externalId,
+          payment_url: result.paymentUrl,
+          provider: paymentProvider.name,
+        });
+        return res.json({ ok: true, payment_id: paymentId, amount, payment_url: result.paymentUrl });
+      } catch (providerErr) {
+        console.error('Buy messages payment error:', providerErr.message);
+      }
+    }
+
+    // Ручной режим
+    if (SUPER_ADMIN_ID && config.platformBotToken) {
+      const tenant = db.getTenantById(req.tenantId);
+      const tenantName = tenant?.name || 'Без имени';
+      const tgId = tenant?.telegram_id || '';
+      let text = `📨 Докупка сообщений\n\nТенант: ${tenantName}\nTelegram ID: ${tgId}`;
+      text += `\nКоличество: ${qty} сообщений`;
+      text += `\nСумма: ${amount} ₽`;
+      if (tgId) text += `\n\nНаписать: tg://user?id=${tgId}`;
+      await fetch(`https://api.telegram.org/bot${config.platformBotToken}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: SUPER_ADMIN_ID, text, disable_web_page_preview: true }),
+      }).catch(() => {});
+    }
+
+    res.json({ ok: true, amount, count: qty });
+  } catch (e) {
+    console.error('POST /api/tariff/buy-messages error:', e.message);
+    res.status(500).json({ error: 'Ошибка' });
   }
 });
 
@@ -1574,9 +1545,10 @@ app.post('/api/payment/webhook/tbank', async (req, res) => {
       if (confirmed && SUPER_ADMIN_ID && config.platformBotToken) {
         const tenantName = tenant?.name || 'Без имени';
         const tgId = tenant?.telegram_id || '';
+        const payPlan = payment.tariff_plan_id ? db.getTariffPlan(payment.tariff_plan_id) : null;
         let text = `✅ Оплата #${payment.id} подтверждена (ТБанк)\n\nИмя: ${tenantName}\nTelegram ID: ${tgId}`;
         text += `\nСумма: ${payment.amount} ₽`;
-        text += `\nТариф: ${payment.bots} ботов, ${payment.contacts} конт.`;
+        text += `\nТариф: ${payPlan ? payPlan.name + ' (' + payPlan.messages_limit + ' сообщ.)' : payment.bots + ' ботов, ' + payment.contacts + ' конт.'}`;
         text += `\nОплачено до: ${confirmed.paid_until ? new Date(confirmed.paid_until).toLocaleDateString('ru-RU') : '—'}`;
         if (tenant?.status === 'pending_payment') text += `\n🆕 Тенант активирован автоматически`;
         if (tgId) text += `\n\nНаписать: tg://user?id=${tgId}`;
@@ -1670,11 +1642,9 @@ app.post('/api/subscription/request', requireTenantAdmin, async (req, res) => {
     const tenant = db.getTenantById(req.tenantId);
     const tenantName = tenant?.name || 'Без имени';
     const tgId = tenant?.telegram_id || '';
-    const price = tenant?.custom_price || 0;
-    const maxBots = tenant?.custom_max_bots != null ? tenant.custom_max_bots : 1;
-    const maxContacts = tenant?.custom_max_contacts != null ? tenant.custom_max_contacts : 100;
+    const plan = tenant?.tariff_plan_id ? db.getTariffPlan(tenant.tariff_plan_id) : null;
+    const price = plan?.price || 0;
 
-    // Расчёт суммы с учётом скидок
     let amount = 0;
     if (price > 0) {
       if (period === '7d') amount = Math.round(price / 4);
@@ -1685,7 +1655,7 @@ app.post('/api/subscription/request', requireTenantAdmin, async (req, res) => {
     }
 
     let text = `💳 Запрос на продление подписки\n\nТенант: ${tenantName}\nTelegram ID: ${tgId || '—'}`;
-    text += `\nТариф: ${maxBots} ботов, ${maxContacts} конт./мес (${price} ₽/мес)`;
+    text += `\nТариф: ${plan ? plan.name + ' (' + plan.messages_limit + ' сообщ.)' : 'Пробный'} — ${price} ₽/мес`;
     text += `\nПериод: ${validPeriods[period]}`;
     if (amount > 0) text += `\nСумма: ${amount} ₽`;
     if (tgId) text += `\n\nНаписать: tg://user?id=${tgId}`;
