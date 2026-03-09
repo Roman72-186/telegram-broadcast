@@ -173,11 +173,14 @@ app.post('/api/public/register-and-pay', rateLimit(req => req.ip, 5, 60000), asy
     if (price === 0) {
       const tenantId = db.createTenant(telegramId, userName, '');
       if (SUPER_ADMIN_ID && config.platformBotToken) {
-        const text = `👤 Новый тенант (тест 7 дней)\n\nИмя: ${userName}\nTelegram ID: ${telegramId}\nТариф: ${b} бот, ${c} конт.`;
+        let text = `👤 Новый тенант (тест 7 дней)\n\nИмя: ${userName}\nTelegram ID: ${telegramId}`;
+        if (validation.user.username) text += `\nUsername: @${validation.user.username}`;
+        text += `\nТариф: ${b} бот, ${c} конт.`;
+        text += `\n\nНаписать: tg://user?id=${telegramId}`;
         await fetch(`https://api.telegram.org/bot${config.platformBotToken}/sendMessage`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ chat_id: SUPER_ADMIN_ID, text }),
+          body: JSON.stringify({ chat_id: SUPER_ADMIN_ID, text, disable_web_page_preview: true }),
         }).catch(() => {});
       }
       return res.json({ ok: true, registered: true });
@@ -206,12 +209,14 @@ app.post('/api/public/register-and-pay', rateLimit(req => req.ip, 5, 60000), asy
 
         if (SUPER_ADMIN_ID && config.platformBotToken) {
           let text = `👤 Новый тенант + платёж (#${paymentId})\n\nИмя: ${userName}\nTelegram ID: ${telegramId}`;
+          if (validation.user.username) text += `\nUsername: @${validation.user.username}`;
           text += `\nСумма: ${amount} ₽ (${paymentProvider.name})`;
           text += `\nТариф: ${b} ботов, ${c} конт., ${p}`;
+          text += `\n\nНаписать: tg://user?id=${telegramId}`;
           await fetch(`https://api.telegram.org/bot${config.platformBotToken}/sendMessage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: SUPER_ADMIN_ID, text }),
+            body: JSON.stringify({ chat_id: SUPER_ADMIN_ID, text, disable_web_page_preview: true }),
           }).catch(() => {});
         }
 
@@ -224,12 +229,14 @@ app.post('/api/public/register-and-pay', rateLimit(req => req.ip, 5, 60000), asy
     // Ручной режим
     if (SUPER_ADMIN_ID && config.platformBotToken) {
       let text = `👤 Новый тенант + заявка на тариф\n\nИмя: ${userName}\nTelegram ID: ${telegramId}`;
+      if (validation.user.username) text += `\nUsername: @${validation.user.username}`;
       text += `\nТариф: ${b} ботов, ${c} конт., ${p}`;
       text += `\nСумма: ${amount} ₽\nPayment ID: ${paymentId}`;
+      text += `\n\nНаписать: tg://user?id=${telegramId}`;
       await fetch(`https://api.telegram.org/bot${config.platformBotToken}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: SUPER_ADMIN_ID, text }),
+        body: JSON.stringify({ chat_id: SUPER_ADMIN_ID, text, disable_web_page_preview: true }),
       }).catch(() => {});
     }
 
@@ -1477,9 +1484,11 @@ app.post('/api/tariff/apply', requireTenantAdmin, async (req, res) => {
         if (SUPER_ADMIN_ID && config.platformBotToken) {
           const tenant = db.getTenantById(req.tenantId);
           const tenantName = tenant?.name || 'Без имени';
-          let text = `💳 Новый платёж (#${paymentId})\n\nТенант: ${tenantName}`;
+          const tgId = tenant?.telegram_id || '';
+          let text = `💳 Новый платёж (#${paymentId})\n\nИмя: ${tenantName}\nTelegram ID: ${tgId}`;
           text += `\nСумма: ${amount} ₽ (${paymentProvider.name})`;
           text += `\nСтатус: ожидает оплаты`;
+          if (tgId) text += `\n\nНаписать: tg://user?id=${tgId}`;
           await fetch(`https://api.telegram.org/bot${config.platformBotToken}/sendMessage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1563,11 +1572,13 @@ app.post('/api/payment/webhook/tbank', async (req, res) => {
 
       if (confirmed && SUPER_ADMIN_ID && config.platformBotToken) {
         const tenantName = tenant?.name || 'Без имени';
-        let text = `✅ Оплата #${payment.id} подтверждена (ТБанк)\n\nТенант: ${tenantName}`;
+        const tgId = tenant?.telegram_id || '';
+        let text = `✅ Оплата #${payment.id} подтверждена (ТБанк)\n\nИмя: ${tenantName}\nTelegram ID: ${tgId}`;
         text += `\nСумма: ${payment.amount} ₽`;
         text += `\nТариф: ${payment.bots} ботов, ${payment.contacts} конт.`;
         text += `\nОплачено до: ${confirmed.paid_until ? new Date(confirmed.paid_until).toLocaleDateString('ru-RU') : '—'}`;
         if (tenant?.status === 'pending_payment') text += `\n🆕 Тенант активирован автоматически`;
+        if (tgId) text += `\n\nНаписать: tg://user?id=${tgId}`;
         await fetch(`https://api.telegram.org/bot${config.platformBotToken}/sendMessage`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1604,8 +1615,10 @@ app.post('/api/payment/webhook/robokassa', express.urlencoded({ extended: false 
       if (confirmed && SUPER_ADMIN_ID && config.platformBotToken) {
         const tenant = db.getTenantById(confirmed.tenant_id);
         const tenantName = tenant?.name || 'Без имени';
-        let text = `✅ Оплата #${paymentId} подтверждена (Робокасса)\n\nТенант: ${tenantName}`;
+        const tgId = tenant?.telegram_id || '';
+        let text = `✅ Оплата #${paymentId} подтверждена (Робокасса)\n\nИмя: ${tenantName}\nTelegram ID: ${tgId}`;
         text += `\nСумма: ${result.amount} ₽`;
+        if (tgId) text += `\n\nНаписать: tg://user?id=${tgId}`;
         await fetch(`https://api.telegram.org/bot${config.platformBotToken}/sendMessage`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -2373,7 +2386,11 @@ async function notifyTrialExpiry() {
     const expiring = db.getExpiringTrials();
     if (expiring.length === 0) return;
 
-    const lines = expiring.map(t => `- ${t.name || 'Без имени'} (TG: ${t.telegram_id}, trial до ${t.trial_ends_at?.slice(0, 10)})`);
+    const lines = expiring.map(t => {
+      let line = `- ${t.name || 'Без имени'} (ID: ${t.telegram_id}, до ${t.trial_ends_at?.slice(0, 10)})`;
+      if (t.telegram_id) line += ` tg://user?id=${t.telegram_id}`;
+      return line;
+    });
     const text = `⏰ Trial истекает в ближайшие 24ч:\n${lines.join('\n')}`;
 
     await fetch(`https://api.telegram.org/bot${config.platformBotToken}/sendMessage`, {
