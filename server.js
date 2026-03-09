@@ -173,7 +173,7 @@ app.post('/api/public/register-and-pay', rateLimit(req => req.ip, 5, 60000), asy
     if (price === 0) {
       const tenantId = db.createTenant(telegramId, userName, '');
       if (SUPER_ADMIN_ID && config.platformBotToken) {
-        const text = `👤 Новый тенант (бесплатный)\n\nИмя: ${userName}\nTelegram ID: ${telegramId}\nТариф: ${b} бот, ${c} конт.`;
+        const text = `👤 Новый тенант (тест 7 дней)\n\nИмя: ${userName}\nTelegram ID: ${telegramId}\nТариф: ${b} бот, ${c} конт.`;
         await fetch(`https://api.telegram.org/bot${config.platformBotToken}/sendMessage`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
