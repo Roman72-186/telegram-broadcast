@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Оплата прошла — LT Кабинет</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  </style>
+</head>
+<body class="bg-white text-gray-800 min-h-screen flex items-center justify-center">
+  <div class="max-w-md mx-auto px-6 py-12 text-center">
+    <div class="text-6xl mb-6">&#9989;</div>
+    <h1 class="text-2xl font-bold mb-3">Оплата прошла успешно!</h1>
+    <p class="text-sm text-gray-500 mb-6">Ваш тариф активирован. Вернитесь в бот и откройте кабинет для начала работы.</p>
+    <div class="flex flex-col gap-3">
+      <a href="https://t.me/starts_klick_bot" class="inline-block bg-green-500 hover:bg-green-600 text-white font-medium py-3 px-6 rounded-lg text-sm transition">
+        Открыть бот
+      </a>
+      <p class="text-xs text-gray-400 mt-4">Если тариф не активировался — подождите минуту и перезагрузите кабинет.</p>
+    </div>
+  </div>
+</body>
+</html>
