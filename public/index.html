@@ -1461,6 +1461,7 @@
     function showAccessDenied() {
       document.getElementById('loadingScreen').classList.add('hidden');
       document.getElementById('accessDenied').classList.remove('hidden');
+      document.getElementById('legalFooter').classList.remove('hidden');
       const tgId = tg?.initDataUnsafe?.user?.id;
       if (tgId) {
         document.getElementById('accessDeniedTgIdValue').textContent = tgId;
@@ -1552,6 +1553,7 @@
 
         document.getElementById('loadingScreen').classList.add('hidden');
         document.getElementById('app').classList.remove('hidden');
+        document.getElementById('legalFooter').classList.remove('hidden');
 
         // Суперадмин: показать таб суперадмина
         if (userRole === 'super_admin') {
@@ -5257,6 +5259,14 @@
         <button onclick="loadRecipientsPage(1)" id="recipientsNext">Далее</button>
       </div>
     </div>
+  </div>
+
+  <!-- Футер с юридическими документами -->
+  <div id="legalFooter" class="hidden text-xs text-center py-3 mt-4" style="color:var(--text-muted)">
+    <a href="/terms.html" target="_blank" style="color:var(--text-secondary)">Оферта</a> ·
+    <a href="/privacy.html" target="_blank" style="color:var(--text-secondary)">Конфиденциальность</a> ·
+    <a href="/consent.html" target="_blank" style="color:var(--text-secondary)">Согласие на ПД</a> ·
+    <a href="/refund.html" target="_blank" style="color:var(--text-secondary)">Возврат</a>
   </div>
 </body>
 </html>
