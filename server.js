@@ -191,7 +191,7 @@ app.post('/api/public/register-and-pay', rateLimit(req => req.ip, 5, 60000), asy
     else if (p === '6m') amount = Math.round(price * 6 * 0.85);
     else if (p === '12m') amount = Math.round(price * 12 * 0.80);
 
-    const tenantId = db.createTenant(telegramId, userName, '');
+    const tenantId = db.createTenant(telegramId, userName, '', 'pending_payment');
     const paymentId = db.createPayment(tenantId, amount, p, b, c);
 
     if (paymentProvider) {
@@ -1553,13 +1553,20 @@ app.post('/api/payment/webhook/tbank', async (req, res) => {
       }
 
       const confirmed = db.confirmPayment(payment.id);
+
+      // Активировать тенанта если он был в статусе pending_payment
+      const tenant = db.getTenantById(payment.tenant_id);
+      if (tenant && tenant.status === 'pending_payment') {
+        db.updateTenant(payment.tenant_id, { status: 'active' });
+      }
+
       if (confirmed && SUPER_ADMIN_ID && config.platformBotToken) {
-        const tenant = db.getTenantById(payment.tenant_id);
         const tenantName = tenant?.name || 'Без имени';
         let text = `✅ Оплата #${payment.id} подтверждена (ТБанк)\n\nТенант: ${tenantName}`;
         text += `\nСумма: ${payment.amount} ₽`;
         text += `\nТариф: ${payment.bots} ботов, ${payment.contacts} конт.`;
         text += `\nОплачено до: ${confirmed.paid_until ? new Date(confirmed.paid_until).toLocaleDateString('ru-RU') : '—'}`;
+        if (tenant?.status === 'pending_payment') text += `\n🆕 Тенант активирован автоматически`;
         await fetch(`https://api.telegram.org/bot${config.platformBotToken}/sendMessage`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
