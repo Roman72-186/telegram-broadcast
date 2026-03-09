@@ -212,6 +212,7 @@ app.post('/webhook/platform', async (req, res) => {
     const from = update.message.from || {};
     db.savePlatformBotUser(from.id, from.first_name, from.last_name, from.username);
 
+    const baseUrl = 'https://broadcast.leadtehsms.ru';
     const caption =
       `<b>LT Кабинет — платформа для Telegram-рассылок</b>\n\n` +
       `Добро пожаловать! Этот бот — ваш личный кабинет для управления рассылками через Telegram.\n\n` +
@@ -220,7 +221,8 @@ app.post('/webhook/platform', async (req, res) => {
       `• Управлять контактами и списками\n` +
       `• Отслеживать статистику отправок\n` +
       `• Вести диалог с пользователями бота прямо из кабинета\n\n` +
-      `Нажмите кнопку ниже, чтобы открыть кабинет.`;
+      `Нажмите кнопку ниже, чтобы открыть кабинет.\n\n` +
+      `<a href="${baseUrl}/terms.html">Оферта</a> · <a href="${baseUrl}/privacy.html">Конфиденциальность</a> · <a href="${baseUrl}/consent.html">Согласие на ПД</a> · <a href="${baseUrl}/refund.html">Возврат</a>`;
 
     const keyboard = {
       inline_keyboard: [
