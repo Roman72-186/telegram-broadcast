@@ -602,9 +602,9 @@
         <div class="text-sm font-bold mb-2" style="color:var(--accent)">Бесплатно для всех</div>
         <div class="text-xs mb-3" style="color:var(--text-secondary)">1 бот + 100 контактов/мес — без оплаты</div>
         <div class="text-xs mb-1" style="color:var(--text-muted)">Нужно больше?</div>
-        <div class="text-xs" style="color:var(--text-secondary)">
-          Доп. боты: <span style="color:var(--accent)">200 ₽/бот</span> (первый бесплатен)<br>
-          Доп. контакты: <span style="color:var(--accent)">50 ₽/100 контактов</span> (первые 100 бесплатны)
+        <div class="text-xs" style="color:var(--text-secondary)" id="publicPricingHints">
+          Доп. боты: <span style="color:var(--accent)" id="publicHintBotPrice">200 ₽/бот</span> (первый бесплатен)<br>
+          Доп. контакты: <span style="color:var(--accent)" id="publicHintContactPrice">100 ₽/100 контактов</span> (первые 100 бесплатны)
         </div>
       </div>
       <div id="publicPricingCalculator" class="broadcast-card text-left mt-2" style="padding: 14px;">
@@ -1492,6 +1492,12 @@
       try {
         const r = await fetch('/api/public/pricing');
         publicPricingConfig = await r.json();
+        // Обновить подсказки из конфига
+        const hintBot = document.getElementById('publicHintBotPrice');
+        const hintContact = document.getElementById('publicHintContactPrice');
+        if (hintBot) hintBot.textContent = publicPricingConfig.price_per_bot + ' ₽/бот';
+        if (hintContact) hintContact.textContent = publicPricingConfig.price_per_100_contacts + ' ₽/100 контактов';
+        updatePublicCalc();
       } catch (e) {
         console.error('loadPublicPricing error:', e);
       }
@@ -1776,6 +1782,13 @@
         cfgBots = 1;
         cfgContacts = 100;
       }
+
+      // Обновить подсказки из конфига
+      const cfg = configuratorPricing;
+      const bh = document.getElementById('cfgBotHint');
+      const ch = document.getElementById('cfgContactHint');
+      if (bh && cfg) bh.textContent = `1 бесплатно, доп. ${cfg.price_per_bot} ₽/бот`;
+      if (ch && cfg) ch.textContent = `100 бесплатно, +${cfg.price_per_100_contacts} ₽/100 контактов`;
 
       updateConfiguratorUI();
       document.getElementById('tariffConfiguratorModal').classList.remove('hidden');
@@ -5297,7 +5310,7 @@
               <button onclick="cfgChangeBots(1)" class="btn-secondary px-3 py-1.5 rounded-lg text-sm font-bold">+</button>
             </div>
           </div>
-          <div class="text-xs mt-1" style="color:var(--text-muted)">1 бесплатно, доп. 200 ₽/бот</div>
+          <div class="text-xs mt-1" style="color:var(--text-muted)" id="cfgBotHint">1 бесплатно, доп. 200 ₽/бот</div>
         </div>
 
         <!-- Контакты -->
@@ -5314,7 +5327,7 @@
             <input id="cfgContactsInput" type="number" placeholder="Ввести число" class="input-field flex-1 rounded-lg px-3 py-1.5 text-sm" min="100" step="100" />
             <button onclick="cfgSetContacts()" class="btn-secondary px-3 py-1.5 rounded-lg text-xs">OK</button>
           </div>
-          <div class="text-xs mt-1" style="color:var(--text-muted)">100 бесплатно, +50 ₽/100 контактов</div>
+          <div class="text-xs mt-1" style="color:var(--text-muted)" id="cfgContactHint">100 бесплатно, +100 ₽/100 контактов</div>
         </div>
 
         <!-- Итого -->
