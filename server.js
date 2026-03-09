@@ -8,10 +8,12 @@ const db = require('./lib/db');
 const { validateInitData, getUserRole, isSuperAdmin, SUPER_ADMIN_ID } = require('./lib/auth');
 const { authMiddleware, requireSuperAdmin, requireTenantAdmin, requireTenantOwner, requireChatUser } = require('./lib/middleware');
 const { fetchAllContacts, extractTags, fetchListSchemas, fetchListItems, extractTelegramIds } = require('./lib/leadteh');
+const { getProvider } = require('./lib/payment');
 const ExcelJS = require('exceljs');
 
 const app = express();
 const config = loadConfig();
+const paymentProvider = getProvider(config);
 
 const VALID_PARSE_MODES = ['Markdown', 'MarkdownV2', 'HTML'];
 
@@ -1363,7 +1365,39 @@ app.post('/api/tariff/apply', requireTenantAdmin, async (req, res) => {
     // Создать платёж
     const paymentId = db.createPayment(req.tenantId, amount, period, b, c);
 
-    // Пока ЮMoney не подключён — отправляем заявку суперадмину
+    // Если подключён платёжный шлюз — создать платёж через кассу
+    if (paymentProvider) {
+      try {
+        const description = `Тариф: ${b} бот(ов), ${c} конт./мес, ${period}`;
+        const result = await paymentProvider.createPayment(paymentId, amount, description);
+        db.updatePaymentExternal(paymentId, {
+          external_id: result.externalId,
+          payment_url: result.paymentUrl,
+          provider: paymentProvider.name,
+        });
+
+        // Уведомить суперадмина о новом платеже
+        if (SUPER_ADMIN_ID && config.platformBotToken) {
+          const tenant = db.getTenantById(req.tenantId);
+          const tenantName = tenant?.name || 'Без имени';
+          let text = `💳 Новый платёж (#${paymentId})\n\nТенант: ${tenantName}`;
+          text += `\nСумма: ${amount} ₽ (${paymentProvider.name})`;
+          text += `\nСтатус: ожидает оплаты`;
+          await fetch(`https://api.telegram.org/bot${config.platformBotToken}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: SUPER_ADMIN_ID, text, disable_web_page_preview: true }),
+          }).catch(() => {});
+        }
+
+        return res.json({ ok: true, payment_id: paymentId, amount, period, payment_url: result.paymentUrl });
+      } catch (providerErr) {
+        console.error('Payment provider error:', providerErr.message);
+        // Fallback на ручной режим
+      }
+    }
+
+    // Ручной режим — отправляем заявку суперадмину
     if (SUPER_ADMIN_ID && config.platformBotToken) {
       const tenant = db.getTenantById(req.tenantId);
       const tenantName = tenant?.name || 'Без имени';
@@ -1399,6 +1433,104 @@ app.get('/api/tariff/payments', requireTenantAdmin, (req, res) => {
   } catch (e) {
     console.error('GET /api/tariff/payments error:', e.message);
     res.status(500).json({ error: 'Ошибка загрузки платежей' });
+  }
+});
+
+// ============================================
+// Webhook платёжного шлюза — ТБанк
+// ============================================
+app.post('/api/payment/webhook/tbank', async (req, res) => {
+  try {
+    if (!paymentProvider || paymentProvider.name !== 'tbank') {
+      return res.status(400).send('OK');
+    }
+    const result = paymentProvider.verifyWebhook(req.body);
+    if (!result.verified) {
+      console.warn('[tbank webhook] Неверная подпись');
+      return res.status(403).send('FAIL');
+    }
+
+    if (result.status === 'CONFIRMED') {
+      const payment = db.findPaymentByExternalId(result.externalId);
+      if (!payment || payment.status === 'paid') {
+        return res.send('OK'); // идемпотентность
+      }
+
+      const confirmed = db.confirmPayment(payment.id);
+      if (confirmed && SUPER_ADMIN_ID && config.platformBotToken) {
+        const tenant = db.getTenantById(payment.tenant_id);
+        const tenantName = tenant?.name || 'Без имени';
+        let text = `✅ Оплата #${payment.id} подтверждена (ТБанк)\n\nТенант: ${tenantName}`;
+        text += `\nСумма: ${payment.amount} ₽`;
+        text += `\nТариф: ${payment.bots} ботов, ${payment.contacts} конт.`;
+        text += `\nОплачено до: ${confirmed.paid_until ? new Date(confirmed.paid_until).toLocaleDateString('ru-RU') : '—'}`;
+        await fetch(`https://api.telegram.org/bot${config.platformBotToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: SUPER_ADMIN_ID, text, disable_web_page_preview: true }),
+        }).catch(() => {});
+      }
+    }
+
+    res.send('OK');
+  } catch (e) {
+    console.error('[tbank webhook] error:', e.message);
+    res.send('OK');
+  }
+});
+
+// ============================================
+// Webhook платёжного шлюза — Робокасса
+// ============================================
+app.post('/api/payment/webhook/robokassa', express.urlencoded({ extended: false }), async (req, res) => {
+  try {
+    if (!paymentProvider || paymentProvider.name !== 'robokassa') {
+      return res.status(400).send('FAIL');
+    }
+    const result = paymentProvider.verifyWebhook(req.body);
+    if (!result.verified) {
+      console.warn('[robokassa webhook] Неверная подпись');
+      return res.status(403).send('FAIL');
+    }
+
+    // Для Робокассы externalId = orderId = payment.id
+    const paymentId = parseInt(result.orderId, 10);
+    if (paymentId) {
+      const confirmed = db.confirmPayment(paymentId);
+      if (confirmed && SUPER_ADMIN_ID && config.platformBotToken) {
+        const tenant = db.getTenantById(confirmed.tenant_id);
+        const tenantName = tenant?.name || 'Без имени';
+        let text = `✅ Оплата #${paymentId} подтверждена (Робокасса)\n\nТенант: ${tenantName}`;
+        text += `\nСумма: ${result.amount} ₽`;
+        await fetch(`https://api.telegram.org/bot${config.platformBotToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: SUPER_ADMIN_ID, text, disable_web_page_preview: true }),
+        }).catch(() => {});
+      }
+    }
+
+    res.send(`OK${result.orderId || ''}`);
+  } catch (e) {
+    console.error('[robokassa webhook] error:', e.message);
+    res.send('FAIL');
+  }
+});
+
+// ============================================
+// Статус платежа (для polling после возврата с кассы)
+// ============================================
+app.get('/api/payment/status/:id', requireTenantAdmin, (req, res) => {
+  try {
+    const payments = db.getPayments(req.tenantId);
+    const payment = payments.find(p => p.id === parseInt(req.params.id, 10));
+    if (!payment) {
+      return res.status(404).json({ error: 'Платёж не найден' });
+    }
+    res.json({ status: payment.status, paid_at: payment.paid_at });
+  } catch (e) {
+    console.error('GET /api/payment/status error:', e.message);
+    res.status(500).json({ error: 'Ошибка' });
   }
 });
 

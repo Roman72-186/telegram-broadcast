@@ -1582,6 +1582,22 @@
 
     init();
 
+    // Обработка возврата с платёжной формы
+    (function handlePaymentReturn() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const paymentResult = urlParams.get('payment');
+      if (paymentResult === 'success') {
+        history.replaceState(null, '', location.pathname);
+        setTimeout(() => {
+          showAlert('Оплата обрабатывается. Статус обновится автоматически.');
+          if (typeof loadSubscriptionInfo === 'function') loadSubscriptionInfo();
+        }, 1500);
+      } else if (paymentResult === 'fail') {
+        history.replaceState(null, '', location.pathname);
+        setTimeout(() => showAlert('Оплата не завершена. Попробуйте снова.'), 1000);
+      }
+    })();
+
     // ============================================
     // Подписка
     // ============================================
@@ -1757,8 +1773,20 @@
         });
         const data = await r.json();
         if (data.ok) {
-          closeConfigurator();
-          showAlert('Заявка отправлена! Администратор свяжется с вами для оплаты.');
+          if (data.payment_url) {
+            // Перенаправить на платёжную форму
+            closeConfigurator();
+            if (tg?.openLink) {
+              tg.openLink(data.payment_url);
+            } else {
+              window.open(data.payment_url, '_blank');
+            }
+            showAlert('Перенаправление на страницу оплаты...');
+          } else {
+            // Ручной режим
+            closeConfigurator();
+            showAlert('Заявка отправлена! Администратор свяжется с вами для оплаты.');
+          }
           await loadSubscriptionInfo();
         } else {
           showAlert(data.error || 'Ошибка');
@@ -5226,7 +5254,7 @@
           <button onclick="applyTariff('12m')" class="w-full py-2 rounded-lg text-sm btn-secondary">
             <span id="cfgPrice12m">12 мес (-20%)</span>
           </button>
-          <div class="text-xs text-center mt-1" style="color:var(--text-muted)">Заявка будет отправлена администратору</div>
+          <div id="cfgPaymentHint" class="text-xs text-center mt-1" style="color:var(--text-muted)">Безопасная оплата</div>
           <div class="text-xs text-center mt-2" style="color:var(--text-muted)">
             <a href="/terms.html" target="_blank" style="color:var(--accent)">Оферта</a> ·
             <a href="/privacy.html" target="_blank" style="color:var(--accent)">Конфиденциальность</a> ·
