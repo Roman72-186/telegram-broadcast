@@ -630,6 +630,11 @@
           <div id="publicCalcBreakdown" class="text-xs mt-1" style="color:var(--text-muted)"></div>
         </div>
       </div>
+      <div class="text-xs text-center mt-4" style="color:var(--text-muted)">
+        <a href="/terms.html" target="_blank" style="color:var(--accent)">Оферта</a> ·
+        <a href="/privacy.html" target="_blank" style="color:var(--accent)">Конфиденциальность</a> ·
+        <a href="/refund.html" target="_blank" style="color:var(--accent)">Возврат</a>
+      </div>
     </div>
   </div>
 
@@ -1745,6 +1750,7 @@
     }
 
     async function applyTariff(period) {
+      if (!confirm('Нажимая «Оплатить», вы принимаете условия публичной оферты.\n\nПродолжить?')) return;
       const buttons = document.querySelectorAll('#cfgPeriods button');
       buttons.forEach(b => b.disabled = true);
       try {
@@ -5224,6 +5230,11 @@
             <span id="cfgPrice12m">12 мес (-20%)</span>
           </button>
           <div class="text-xs text-center mt-1" style="color:var(--text-muted)">Заявка будет отправлена администратору</div>
+          <div class="text-xs text-center mt-2" style="color:var(--text-muted)">
+            <a href="/terms.html" target="_blank" style="color:var(--accent)">Оферта</a> ·
+            <a href="/privacy.html" target="_blank" style="color:var(--accent)">Конфиденциальность</a> ·
+            <a href="/refund.html" target="_blank" style="color:var(--accent)">Возврат</a>
+          </div>
         </div>
       </div>
     </div>
