@@ -613,7 +613,12 @@
           <span class="text-xs" style="color:var(--text-secondary)">Ботов:</span>
           <div class="flex items-center gap-2">
             <button onclick="publicCalcBots(-1)" class="btn-secondary px-2 py-0.5 rounded text-xs">−</button>
-            <span id="publicCalcBotsVal" class="text-sm font-bold" style="min-width:24px;text-align:center">1</span>
+            <input id="publicCalcBotsVal" type="number" min="1"
+              class="text-sm font-bold text-center bg-transparent border-b border-current outline-none"
+              style="width:40px; color:var(--text-primary); -moz-appearance:textfield"
+              value="1"
+              onchange="publicCalcBotsInput(this.value)"
+              onkeydown="if(event.key==='Enter'){this.blur()}" />
             <button onclick="publicCalcBots(1)" class="btn-secondary px-2 py-0.5 rounded text-xs">+</button>
           </div>
         </div>
@@ -621,7 +626,12 @@
           <span class="text-xs" style="color:var(--text-secondary)">Контактов/мес:</span>
           <div class="flex items-center gap-2">
             <button onclick="publicCalcContacts(-100)" class="btn-secondary px-2 py-0.5 rounded text-xs">−100</button>
-            <span id="publicCalcContactsVal" class="text-sm font-bold" style="min-width:40px;text-align:center">100</span>
+            <input id="publicCalcContactsVal" type="number" min="100" step="100"
+              class="text-sm font-bold text-center bg-transparent border-b border-current outline-none"
+              style="width:60px; color:var(--text-primary); -moz-appearance:textfield"
+              value="100"
+              onchange="publicCalcContactsInput(this.value)"
+              onkeydown="if(event.key==='Enter'){this.blur()}" />
             <button onclick="publicCalcContacts(100)" class="btn-secondary px-2 py-0.5 rounded text-xs">+100</button>
           </div>
         </div>
@@ -1501,14 +1511,39 @@
     function publicCalcBots(delta) {
       const cfg = publicPricingConfig || { max_bots: 10 };
       publicCalcBotsValue = Math.max(1, Math.min(cfg.max_bots, publicCalcBotsValue + delta));
-      document.getElementById('publicCalcBotsVal').textContent = publicCalcBotsValue;
+      document.getElementById('publicCalcBotsVal').value = publicCalcBotsValue;
+      updatePublicCalc();
+    }
+
+    function publicCalcBotsInput(val) {
+      const cfg = publicPricingConfig || { max_bots: 10 };
+      const num = parseInt(val);
+      if (isNaN(num) || num < 1) {
+        publicCalcBotsValue = 1;
+      } else {
+        publicCalcBotsValue = Math.min(cfg.max_bots, num);
+      }
+      document.getElementById('publicCalcBotsVal').value = publicCalcBotsValue;
       updatePublicCalc();
     }
 
     function publicCalcContacts(delta) {
       const cfg = publicPricingConfig || { max_contacts: 50000 };
       publicCalcContactsValue = Math.max(100, Math.min(cfg.max_contacts, publicCalcContactsValue + delta));
-      document.getElementById('publicCalcContactsVal').textContent = publicCalcContactsValue.toLocaleString('ru-RU');
+      document.getElementById('publicCalcContactsVal').value = publicCalcContactsValue;
+      updatePublicCalc();
+    }
+
+    function publicCalcContactsInput(val) {
+      const cfg = publicPricingConfig || { max_contacts: 50000 };
+      const num = parseInt(val);
+      if (isNaN(num) || num < 100) {
+        publicCalcContactsValue = 100;
+      } else {
+        publicCalcContactsValue = Math.min(cfg.max_contacts, Math.round(num / 100) * 100);
+        if (publicCalcContactsValue < 100) publicCalcContactsValue = 100;
+      }
+      document.getElementById('publicCalcContactsVal').value = publicCalcContactsValue;
       updatePublicCalc();
     }
 
