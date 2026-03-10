@@ -590,28 +590,52 @@
 
   <!-- Экран «Доступ запрещён» -->
   <div id="accessDenied" class="hidden flex flex-col items-center min-h-screen p-6 text-center">
-    <div class="text-5xl mb-4 mt-8">&#128274;</div>
-    <h1 class="text-xl font-bold mb-2">Доступ запрещён</h1>
-    <p class="text-sm mb-4" style="color: var(--text-secondary)">Нет доступа. Обратитесь к <a href="https://t.me/roman_chatbots" target="_blank" style="color: var(--accent); text-decoration: underline;">администратору</a> платформы.</p>
-    <div id="accessDeniedTgId" class="hidden mb-4 px-4 py-2 rounded-lg text-xs" style="background: var(--card-bg); color: var(--text-secondary); border: 1px solid var(--border-color);">
-      Ваш Telegram ID: <span id="accessDeniedTgIdValue" class="font-mono font-bold" style="color: var(--text-primary); user-select: all;"></span>
-      <div class="mt-1" style="color: var(--text-muted)">Сообщите этот ID администратору для открытия доступа</div>
+    <!-- Блок для заблокированных -->
+    <div id="accessDeniedBlocked" class="hidden w-full max-w-md">
+      <div class="text-5xl mb-4 mt-8">&#128683;</div>
+      <h1 class="text-xl font-bold mb-2" style="color: var(--danger)">Доступ заблокирован</h1>
+      <p class="text-sm mb-4" style="color: var(--text-secondary)">Ваш аккаунт заблокирован администратором платформы.</p>
+      <div id="accessDeniedBlockedTgId" class="mb-4 px-4 py-3 rounded-lg text-xs" style="background: var(--bg-tertiary); border: 1px solid var(--border);">
+        Ваш Telegram ID: <span id="accessDeniedBlockedTgIdValue" class="font-mono font-bold" style="color: var(--text-primary); user-select: all;"></span>
+        <div class="mt-1" style="color: var(--text-muted)">Сообщите этот ID администратору для разблокировки</div>
+      </div>
+      <a href="https://t.me/roman_chatbots" target="_blank" class="inline-flex items-center gap-2 px-5 py-3 rounded-lg text-sm font-medium" style="background: var(--bg-tertiary); color: var(--accent); border: 1px solid var(--border);">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Связаться с администратором
+      </a>
     </div>
 
-    <!-- Информация о тарифе -->
-    <div id="accessDeniedInfo" class="w-full max-w-md mt-2">
-      <div id="accessDeniedPricingCard" class="broadcast-card text-left" style="padding: 14px;">
-        <div class="text-sm font-bold mb-2" style="color:var(--accent)">Тестовый период — 7 дней</div>
-        <div class="text-xs mb-2" style="color:var(--text-secondary)">
-          50 сообщений бесплатно
-        </div>
-        <div class="text-xs" style="color:var(--text-muted)">
-          Боты — без ограничений. Далее от <span id="publicHintPrice">390 ₽</span>
-        </div>
+    <!-- Блок для незарегистрированных -->
+    <div id="accessDeniedRegister" class="hidden w-full max-w-md">
+      <div class="text-5xl mb-4 mt-8">&#128274;</div>
+      <h1 class="text-xl font-bold mb-2">Добро пожаловать</h1>
+      <p class="text-sm mb-4" style="color: var(--text-secondary)">Зарегистрируйтесь, чтобы начать работу с платформой.</p>
+      <div id="accessDeniedTgId" class="hidden mb-4 px-4 py-2 rounded-lg text-xs" style="background: var(--bg-tertiary); color: var(--text-secondary); border: 1px solid var(--border);">
+        Ваш Telegram ID: <span id="accessDeniedTgIdValue" class="font-mono font-bold" style="color: var(--text-primary); user-select: all;"></span>
       </div>
-      <button onclick="publicRegister('free')" id="publicBtnFree" class="w-full py-3 rounded-lg text-sm font-medium btn-primary mt-3">
-        Попробовать бесплатно 7 дней
-      </button>
+
+      <!-- Информация о тарифе -->
+      <div id="accessDeniedInfo" class="w-full mt-2">
+        <div id="accessDeniedPricingCard" class="broadcast-card text-left" style="padding: 14px;">
+          <div class="text-sm font-bold mb-2" style="color:var(--accent)">Тестовый период — 7 дней</div>
+          <div class="text-xs mb-2" style="color:var(--text-secondary)">
+            50 сообщений бесплатно
+          </div>
+          <div class="text-xs" style="color:var(--text-muted)">
+            Боты — без ограничений. Далее от <span id="publicHintPrice">390 ₽</span>
+          </div>
+        </div>
+        <button onclick="publicRegister('free')" id="publicBtnFree" class="w-full py-3 rounded-lg text-sm font-medium btn-primary mt-3">
+          Попробовать бесплатно 7 дней
+        </button>
+      </div>
+
+      <div class="mt-4 pt-4" style="border-top: 1px solid var(--border);">
+        <a href="https://t.me/roman_chatbots" target="_blank" class="inline-flex items-center gap-2 text-xs" style="color: var(--text-secondary);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Связаться с администратором
+        </a>
+      </div>
     </div>
   </div>
 
@@ -1472,15 +1496,25 @@
       document.getElementById('accessDenied').classList.remove('hidden');
       document.getElementById('legalFooter').classList.remove('hidden');
       const tgId = tg?.initDataUnsafe?.user?.id;
-      if (tgId) {
-        document.getElementById('accessDeniedTgIdValue').textContent = tgId;
-        document.getElementById('accessDeniedTgId').classList.remove('hidden');
-      }
-      const infoBlock = document.getElementById('accessDeniedInfo');
+
+      const blockedBlock = document.getElementById('accessDeniedBlocked');
+      const registerBlock = document.getElementById('accessDeniedRegister');
+
       if (reason === 'blocked' || reason === 'pending_payment') {
-        infoBlock.classList.add('hidden');
+        // Заблокирован — показать блок блокировки
+        blockedBlock.classList.remove('hidden');
+        registerBlock.classList.add('hidden');
+        if (tgId) {
+          document.getElementById('accessDeniedBlockedTgIdValue').textContent = tgId;
+        }
       } else {
-        infoBlock.classList.remove('hidden');
+        // Не зарегистрирован — показать блок регистрации
+        blockedBlock.classList.add('hidden');
+        registerBlock.classList.remove('hidden');
+        if (tgId) {
+          document.getElementById('accessDeniedTgIdValue').textContent = tgId;
+          document.getElementById('accessDeniedTgId').classList.remove('hidden');
+        }
         loadPublicPricing();
       }
     }
