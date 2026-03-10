@@ -14,7 +14,7 @@ const ExcelJS = require('exceljs');
 const app = express();
 app.set('trust proxy', true);
 const config = loadConfig();
-const paymentProvider = getProvider(config);
+const paymentProvider = config.freeMode ? null : getProvider(config);
 
 const VALID_PARSE_MODES = ['Markdown', 'MarkdownV2', 'HTML'];
 
@@ -147,6 +147,7 @@ app.get('/api/public/pricing', (req, res) => {
       is_default: p.is_default,
     })),
     extra_messages_price: cfg.price_per_100_messages || 50,
+    free_mode: config.freeMode || false,
   });
 });
 
@@ -1360,12 +1361,13 @@ app.get('/api/tenant/info', requireTenantAdmin, (req, res) => {
       },
       tariff: {
         plan_id: plan?.id || null,
-        plan_name: plan?.name || 'Пробный',
+        plan_name: config.freeMode ? 'Бесплатный' : (plan?.name || 'Пробный'),
         price: plan?.price || 0,
-        messages_balance: tenant?.messages_balance || 0,
+        messages_balance: config.freeMode ? 999999 : (tenant?.messages_balance || 0),
       },
       usage: limits.limits || null,
       subscription,
+      free_mode: config.freeMode || false,
     });
   } catch (e) {
     console.error('GET /api/tenant/info error:', e.message);
@@ -1377,6 +1379,7 @@ app.get('/api/tenant/info', requireTenantAdmin, (req, res) => {
 // API: Тарифный конфигуратор
 // ============================================
 app.post('/api/tariff/apply', requireTenantAdmin, async (req, res) => {
+  if (config.freeMode) return res.json({ ok: true, free_mode: true, message: 'Сейчас всё бесплатно!' });
   try {
     const { plan_id } = req.body;
     if (!plan_id) return res.status(400).json({ error: 'Выберите тариф' });
@@ -1446,6 +1449,7 @@ app.post('/api/tariff/apply', requireTenantAdmin, async (req, res) => {
 
 // Докупка сообщений
 app.post('/api/tariff/buy-messages', requireTenantAdmin, async (req, res) => {
+  if (config.freeMode) return res.json({ ok: true, free_mode: true, message: 'Сейчас всё бесплатно!' });
   try {
     const { count } = req.body;
     const qty = Math.max(100, Math.ceil((parseInt(count) || 100) / 100) * 100);
@@ -1828,7 +1832,8 @@ app.post('/api/super/impersonate', requireSuperAdmin, (req, res) => {
 
 // --- Ценообразование ---
 app.get('/api/super/pricing', requireSuperAdmin, (req, res) => {
-  res.json(db.getPricingConfig());
+  const cfg = db.getPricingConfig();
+  res.json({ ...cfg, free_mode: config.freeMode ? 1 : 0 });
 });
 
 app.post('/api/super/pricing', requireSuperAdmin, (req, res) => {
@@ -1838,6 +1843,21 @@ app.post('/api/super/pricing', requireSuperAdmin, (req, res) => {
   } catch (e) {
     console.error('POST /api/super/pricing error:', e.message);
     res.status(500).json({ error: 'Ошибка обновления ставок' });
+  }
+});
+
+// --- Переключение бесплатного режима ---
+app.post('/api/super/free-mode', requireSuperAdmin, (req, res) => {
+  try {
+    const enabled = !!req.body.enabled;
+    db.updatePricingConfig({ free_mode: enabled ? 1 : 0 });
+    config.freeMode = enabled;
+    db.setFreeMode(enabled);
+    console.log(`[FREE_MODE] ${enabled ? 'Включён' : 'Выключен'} суперадмином`);
+    res.json({ ok: true, free_mode: enabled });
+  } catch (e) {
+    console.error('POST /api/super/free-mode error:', e.message);
+    res.status(500).json({ error: 'Ошибка переключения режима' });
   }
 });
 
@@ -2352,6 +2372,7 @@ cron.schedule('* * * * *', async () => {
 // Уведомления суперадмину об истекающем trial
 // ============================================
 async function notifyTrialExpiry() {
+  if (config.freeMode) return; // FREE_MODE: уведомления о trial не нужны
   if (!SUPER_ADMIN_ID || !config.platformBotToken) return;
   try {
     const expiring = db.getExpiringTrials();
@@ -2431,11 +2452,13 @@ async function processChainRuns() {
       const prepared = await prepareStepMessages(ab, step0);
 
       for (const contact of newContacts) {
-        // Проверка баланса
-        const tCheck = db.getTenantById(ab.tenant_id);
-        if (!tCheck || (tCheck.messages_balance || 0) <= 0) {
-          console.log(`[auto-chain] Баланс сообщений исчерпан для тенанта ${ab.tenant_id}`);
-          break;
+        // Проверка баланса (пропуск в FREE_MODE)
+        if (!config.freeMode) {
+          const tCheck = db.getTenantById(ab.tenant_id);
+          if (!tCheck || (tCheck.messages_balance || 0) <= 0) {
+            console.log(`[auto-chain] Баланс сообщений исчерпан для тенанта ${ab.tenant_id}`);
+            break;
+          }
         }
         try {
           const ok = await sendPreparedToContact(ab, prepared, contact.telegram_id);
@@ -2482,11 +2505,13 @@ async function processChainRuns() {
         continue;
       }
 
-      // Проверка баланса
-      const tBal = db.getTenantById(ab.tenant_id);
-      if (!tBal || (tBal.messages_balance || 0) <= 0) {
-        console.log(`[auto-chain] Баланс сообщений исчерпан для тенанта ${ab.tenant_id}, пропуск шага`);
-        continue;
+      // Проверка баланса (пропуск в FREE_MODE)
+      if (!config.freeMode) {
+        const tBal = db.getTenantById(ab.tenant_id);
+        if (!tBal || (tBal.messages_balance || 0) <= 0) {
+          console.log(`[auto-chain] Баланс сообщений исчерпан для тенанта ${ab.tenant_id}, пропуск шага`);
+          continue;
+        }
       }
 
       const step = steps[nextStepIdx];
@@ -2670,11 +2695,13 @@ async function sendStepMessages(autoBroadcast, step) {
   let failed = 0;
 
   for (const contact of recipients) {
-    // Проверка баланса
-    const t = db.getTenantById(autoBroadcast.tenant_id);
-    if (!t || (t.messages_balance || 0) <= 0) {
-      console.log(`[auto] Баланс сообщений исчерпан для тенанта ${autoBroadcast.tenant_id}`);
-      break;
+    // Проверка баланса (пропуск в FREE_MODE)
+    if (!config.freeMode) {
+      const t = db.getTenantById(autoBroadcast.tenant_id);
+      if (!t || (t.messages_balance || 0) <= 0) {
+        console.log(`[auto] Баланс сообщений исчерпан для тенанта ${autoBroadcast.tenant_id}`);
+        break;
+      }
     }
     const ok = await sendPreparedToContact(autoBroadcast, prepared, contact.telegram_id);
     if (ok) {
@@ -2799,11 +2826,13 @@ async function sendBroadcast(broadcast) {
   let failed = 0;
 
   for (const contact of recipients) {
-    // Проверка баланса перед отправкой
-    const tenant = db.getTenantById(broadcast.tenant_id);
-    if (!tenant || (tenant.messages_balance || 0) <= 0) {
-      console.log(`[broadcast] Баланс сообщений исчерпан для тенанта ${broadcast.tenant_id}, остановка рассылки`);
-      break;
+    // Проверка баланса перед отправкой (пропуск в FREE_MODE)
+    if (!config.freeMode) {
+      const tenant = db.getTenantById(broadcast.tenant_id);
+      if (!tenant || (tenant.messages_balance || 0) <= 0) {
+        console.log(`[broadcast] Баланс сообщений исчерпан для тенанта ${broadcast.tenant_id}, остановка рассылки`);
+        break;
+      }
     }
 
     let contactFailed = false;
@@ -3132,6 +3161,15 @@ async function setupPlatformWebhook() {
 
 async function main() {
   await db.initDb();
+  // FREE_MODE: .env перезаписывает БД, иначе читаем из БД
+  if (process.env.FREE_MODE === 'true' || process.env.FREE_MODE === 'false') {
+    config.freeMode = process.env.FREE_MODE === 'true';
+  } else {
+    const pricingCfg = db.getPricingConfig();
+    config.freeMode = !!(pricingCfg && pricingCfg.free_mode);
+  }
+  db.setFreeMode(config.freeMode);
+  if (config.freeMode) console.log('[FREE_MODE] Бесплатный режим включён — все лимиты и оплата отключены');
   const PORT = config.port;
   app.listen(PORT, () => {
     console.log(`Сервер запущен: http://localhost:${PORT}`);

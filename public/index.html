@@ -1576,6 +1576,8 @@
     // ============================================
     // Подписка
     // ============================================
+    let isFreeMode = false;
+
     async function loadSubscriptionInfo() {
       if (userRole === 'super_admin' && !userTenantId) return;
       try {
@@ -1583,6 +1585,7 @@
         const data = await r.json();
         subscriptionInfo = data.subscription || null;
         currentTariff = data.tariff || null;
+        isFreeMode = data.free_mode || false;
         renderSubscriptionBanner();
 
         // Диалоги включены во все тарифы
@@ -1597,8 +1600,11 @@
 
     function renderSubscriptionBanner() {
       const banner = document.getElementById('subscriptionBanner');
-      if (!subscriptionInfo || userRole === 'super_admin') {
+      if (!subscriptionInfo || userRole === 'super_admin' || isFreeMode) {
         banner.classList.add('hidden');
+        const tabCreate = document.getElementById('tabCreate');
+        if (tabCreate) { tabCreate.style.opacity = ''; tabCreate.style.pointerEvents = ''; }
+        updateCreateSubtabsDisabled(false);
         return;
       }
 
@@ -1645,12 +1651,19 @@
     let selectedPlanId = null;
 
     async function showTariffConfigurator() {
+      // FREE_MODE: тарифы не нужны
+      if (isFreeMode) {
+        showAlert('Сейчас действует бесплатный доступ без ограничений!');
+        return;
+      }
+
       if (!tariffPlans) {
         try {
           const r = await apiFetch('/api/public/pricing');
           const data = await r.json();
           tariffPlans = data.plans || [];
           if (data.extra_messages_price) extraMessagesPrice = data.extra_messages_price;
+          if (data.free_mode) { isFreeMode = true; showAlert('Сейчас действует бесплатный доступ без ограничений!'); return; }
         } catch (e) {
           showAlert('Ошибка загрузки тарифов');
           return;
@@ -3407,6 +3420,18 @@
         el.innerHTML = `<div class="text-sm" style="color:var(--text-muted)">Тариф не назначен</div>`;
         return;
       }
+
+      // FREE_MODE: показываем упрощённый блок без тарифов и баланса
+      if (isFreeMode) {
+        el.innerHTML = `
+          <div class="section-label" style="color:var(--success-text,#16a34a)">Бесплатный доступ</div>
+          <div class="flex items-center justify-between">
+            <span class="text-xs" style="color:var(--text-secondary)">Ботов: ${limits.current_bots || 0}</span>
+            <span class="text-xs" style="color:var(--success-text,#16a34a)">Без ограничений</span>
+          </div>`;
+        return;
+      }
+
       const planName = limits.plan_name || currentTariff?.plan_name || 'Пробный';
       const balance = limits.messages_balance || 0;
       const isLow = balance <= 10;
@@ -3851,15 +3876,53 @@
 
     function renderPricingConfig(cfg) {
       const container = document.getElementById('pricingConfigContainer');
+      const isFreeModeOn = !!cfg.free_mode;
       container.innerHTML = `
+        <div class="section-label mb-2">Режим доступа</div>
+        <div class="flex items-center justify-between mb-3 p-3 rounded-lg" style="background:${isFreeModeOn ? 'var(--success-bg,#dcfce7)' : 'var(--card-bg)'}; border:1px solid ${isFreeModeOn ? 'var(--success,#16a34a)' : 'var(--border)'}">
+          <div>
+            <div class="text-sm font-bold" style="color:${isFreeModeOn ? 'var(--success-text,#16a34a)' : 'var(--text-primary)'}">
+              ${isFreeModeOn ? 'Бесплатный режим' : 'Платный режим'}
+            </div>
+            <div class="text-xs" style="color:var(--text-muted)">
+              ${isFreeModeOn ? 'Все функции доступны без ограничений и оплаты' : 'Действуют тарифы, лимиты и оплата'}
+            </div>
+          </div>
+          <label style="position:relative;display:inline-block;width:48px;height:26px;cursor:pointer">
+            <input type="checkbox" ${isFreeModeOn ? 'checked' : ''} onchange="toggleFreeMode(this.checked)" style="opacity:0;width:0;height:0">
+            <span style="position:absolute;inset:0;background:${isFreeModeOn ? 'var(--success,#16a34a)' : 'var(--border,#ccc)'};border-radius:13px;transition:.3s"></span>
+            <span style="position:absolute;top:3px;left:${isFreeModeOn ? '25px' : '3px'};width:20px;height:20px;background:#fff;border-radius:50%;transition:.3s;box-shadow:0 1px 3px rgba(0,0,0,.2)"></span>
+          </label>
+        </div>
         <div class="section-label">Докупка сообщений</div>
         <div class="mb-3">
           <label class="text-xs" style="color:var(--text-muted)">Цена за 100 доп. сообщений, ₽</label>
-          <input id="pcPriceMessages" type="number" value="${cfg.price_per_100_messages || 50}" class="input-field w-full rounded-lg px-3 py-2 text-sm" />
+          <input id="pcPriceMessages" type="number" value="${cfg.price_per_100_messages || 50}" class="input-field w-full rounded-lg px-3 py-2 text-sm" ${isFreeModeOn ? 'disabled style="opacity:0.5"' : ''} />
         </div>
         <div class="text-xs mb-2" style="color:var(--text-muted)">Тарифные планы управляются через таблицу tariff_plans в БД</div>
-        <button onclick="savePricingConfig()" class="btn-primary w-full py-2 rounded-lg text-sm">Сохранить</button>
+        <button onclick="savePricingConfig()" class="btn-primary w-full py-2 rounded-lg text-sm" ${isFreeModeOn ? 'disabled style="opacity:0.5"' : ''}>Сохранить</button>
       `;
+    }
+
+    async function toggleFreeMode(enabled) {
+      try {
+        const r = await apiFetch('/api/super/free-mode', {
+          method: 'POST',
+          body: { enabled },
+        });
+        const data = await r.json();
+        if (data.ok) {
+          isFreeMode = data.free_mode;
+          showAlert(data.free_mode ? 'Бесплатный режим включён' : 'Платный режим включён');
+          loadSuperTariffs();
+        } else {
+          showAlert(data.error || 'Ошибка');
+          loadSuperTariffs();
+        }
+      } catch (e) {
+        showAlert('Ошибка переключения режима');
+        loadSuperTariffs();
+      }
     }
 
     async function savePricingConfig() {
