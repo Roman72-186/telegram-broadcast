@@ -1,5 +1,6 @@
 // server.js — Express-сервер LT Кабинет (SaaS)
 const express = require('express');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const cron = require('node-cron');
@@ -17,6 +18,7 @@ const config = loadConfig();
 const paymentProvider = config.freeMode ? null : getProvider(config);
 
 const VALID_PARSE_MODES = ['Markdown', 'MarkdownV2', 'HTML'];
+const WEBHOOK_SECRET = crypto.randomBytes(32).toString('hex');
 
 // ============================================
 // Кэш превью получателей (in-memory, TTL 10 мин)
@@ -57,7 +59,13 @@ setInterval(() => {
   }
 }, 300000);
 
-app.use(express.json({ limit: '30mb' }));
+// Общий лимит JSON — 2MB; для upload используется отдельный middleware
+app.use((req, res, next) => {
+  if (req.path === '/api/upload') {
+    return express.json({ limit: '30mb' })(req, res, next);
+  }
+  return express.json({ limit: '2mb' })(req, res, next);
+});
 
 // Access log для диагностики
 app.use((req, res, next) => {
@@ -103,7 +111,11 @@ app.use((req, res, next) => {
       return res.status(403).json({ error: 'CORS: невалидный Origin' });
     }
   }
-  res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  if (!origin) {
+    // Запросы без Origin (cURL, серверные) — не ставим CORS заголовки, но пропускаем
+    return next();
+  }
+  res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   if (req.method === 'OPTIONS') return res.sendStatus(204);
@@ -203,6 +215,11 @@ app.post('/api/public/register-and-pay', rateLimit(req => req.ip, 5, 60000), asy
 // Webhook для платформенного бота (команда /start)
 // ============================================
 app.post('/webhook/platform', async (req, res) => {
+  // Верификация: запрос должен быть от Telegram
+  const secretHeader = req.headers['x-telegram-bot-api-secret-token'];
+  if (secretHeader !== WEBHOOK_SECRET) {
+    return res.sendStatus(403);
+  }
   res.sendStatus(200);
 
   try {
@@ -1808,7 +1825,10 @@ app.post('/api/subscription/request', requireTenantAdmin, async (req, res) => {
 // --- Список тенантов ---
 app.get('/api/super/tenants', requireSuperAdmin, (req, res) => {
   try {
-    const tenants = db.getAllTenants();
+    const tenants = db.getAllTenants().map(t => {
+      const { leadteh_api_token, ...safe } = t;
+      return { ...safe, has_leadteh_token: !!leadteh_api_token };
+    });
     res.json({ tenants });
   } catch (e) {
     console.error('GET /api/super/tenants error:', e.message);
@@ -2478,7 +2498,9 @@ app.post('/api/chat/user/send', requireChatUser, (req, res) => {
 // ============================================
 app.get('/api/cron/send', async (req, res) => {
   const secret = req.query.secret || req.headers['x-cron-secret'];
-  if (!secret || secret !== config.cronSecret) {
+  const expected = config.cronSecret;
+  if (!secret || !expected || secret.length !== expected.length ||
+      !crypto.timingSafeEqual(Buffer.from(secret), Buffer.from(expected))) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
@@ -3287,11 +3309,7 @@ function maskToken(token) {
 // они управляются Leadteh/другим сервисом.
 
 function generateId() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
+  return crypto.randomUUID();
 }
 
 // ============================================
@@ -3304,7 +3322,7 @@ async function setupPlatformWebhook() {
     const r = await fetch(`https://api.telegram.org/bot${config.platformBotToken}/setWebhook`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: webhookUrl, allowed_updates: ['message'] }),
+      body: JSON.stringify({ url: webhookUrl, allowed_updates: ['message'], secret_token: WEBHOOK_SECRET }),
     });
     const data = await r.json();
     if (data.ok) {

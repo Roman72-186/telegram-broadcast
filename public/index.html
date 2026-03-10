@@ -1762,7 +1762,7 @@
         return `<div class="rounded-lg p-3 cursor-pointer tariff-plan-card ${isCurrent ? 'ring-2' : ''}" style="border:2px solid ${isCurrent ? 'var(--accent)' : 'var(--border)'};background:var(--card-bg)" onclick="selectPlan(${p.id})" data-plan-id="${p.id}">
           <div class="flex justify-between items-center">
             <div>
-              <div class="text-sm font-bold">${p.name}${isCurrent ? ' <span style="color:var(--accent)">(текущий)</span>' : ''}</div>
+              <div class="text-sm font-bold">${escapeHtml(p.name)}${isCurrent ? ' <span style="color:var(--accent)">(текущий)</span>' : ''}</div>
               <div class="text-xs" style="color:var(--text-muted)">${p.messages_limit.toLocaleString('ru-RU')} сообщений</div>
             </div>
             <div class="text-sm font-bold" style="color:var(--accent)">${isFree ? 'Бесплатно' : p.price + ' ₽'}</div>
@@ -3566,7 +3566,7 @@
       const balance = limits.messages_balance || 0;
       const isLow = balance <= 10;
       el.innerHTML = `
-        <div class="section-label">Тариф: ${planName}</div>
+        <div class="section-label">Тариф: ${escapeHtml(planName)}</div>
         <div class="mb-2">
           <div class="text-xs mb-1" style="color:${isLow ? 'var(--danger-text,#dc2626)' : 'var(--text-secondary)'}">
             Баланс сообщений: <strong>${balance.toLocaleString('ru-RU')}</strong>
@@ -3898,7 +3898,7 @@
           </div>
           <div class="text-xs" style="color:var(--text-muted)">TG ID: ${escapeHtml(String(t.telegram_id))}</div>
           <div class="text-xs mb-1" style="color:var(--text-muted)">Боты: ${t.bots_count} | Баланс: <strong style="color:${balance <= 10 ? 'var(--danger-text,#dc2626)' : 'var(--text-secondary)'}">${balance.toLocaleString('ru-RU')} сообщ.</strong></div>
-          <div class="text-xs mb-1" style="color:var(--text-secondary)">Тариф: <span style="color:var(--accent)">${tariffLabel}</span></div>
+          <div class="text-xs mb-1" style="color:var(--text-secondary)">Тариф: <span style="color:var(--accent)">${escapeHtml(tariffLabel)}</span></div>
           <div class="text-xs mb-1">Подписка: ${subLabel}</div>
           <button onclick="impersonateTenant(${t.id})" class="w-full py-2 rounded-lg text-sm font-medium mb-2" style="background:var(--accent);color:#fff">Войти как тенант</button>
           <div class="flex gap-2">
@@ -4122,7 +4122,7 @@
               <div class="text-sm font-medium">${escapeHtml(p.tenant_name || 'Без имени')}</div>
               <span class="text-xs font-bold" style="color:${statusColor}">${statusText}</span>
             </div>
-            <div class="text-xs" style="color:var(--text-muted)">${p.plan_name || (p.bots + ' бот, ' + (p.contacts || 0).toLocaleString('ru-RU') + ' конт.')} | ${periodNames[p.period] || p.period} | ${p.amount.toLocaleString('ru-RU')} ₽ | ${date}</div>
+            <div class="text-xs" style="color:var(--text-muted)">${escapeHtml(p.plan_name || (p.bots + ' бот, ' + (p.contacts || 0).toLocaleString('ru-RU') + ' конт.'))} | ${escapeHtml(periodNames[p.period] || p.period)} | ${Number(p.amount).toLocaleString('ru-RU')} ₽ | ${escapeHtml(date)}</div>
             ${p.status === 'pending' ? `<button onclick="confirmPayment(${p.id})" class="btn-primary px-3 py-1 rounded-lg text-xs mt-2">Подтвердить оплату</button>` : ''}
           </div>`;
         }).join('');
@@ -4149,12 +4149,12 @@
         const r = await apiFetch('/api/super/stats');
         const data = await r.json();
         document.getElementById('statsContainer').innerHTML = `
-          <div class="stat-card"><div class="stat-value">${data.total_tenants}</div><div class="stat-label">Всего тенантов</div></div>
-          <div class="stat-card"><div class="stat-value">${data.active_tenants}</div><div class="stat-label">Активных</div></div>
-          <div class="stat-card"><div class="stat-value">${data.total_bots}</div><div class="stat-label">Всего ботов</div></div>
-          <div class="stat-card"><div class="stat-value">${data.total_broadcasts}</div><div class="stat-label">Всего рассылок</div></div>
-          <div class="stat-card"><div class="stat-value">${data.sent_broadcasts}</div><div class="stat-label">Отправлено</div></div>
-          <div class="stat-card"><div class="stat-value">${data.month_broadcasts}</div><div class="stat-label">Рассылок за ${data.month}</div></div>`;
+          <div class="stat-card"><div class="stat-value">${Number(data.total_tenants) || 0}</div><div class="stat-label">Всего тенантов</div></div>
+          <div class="stat-card"><div class="stat-value">${Number(data.active_tenants) || 0}</div><div class="stat-label">Активных</div></div>
+          <div class="stat-card"><div class="stat-value">${Number(data.total_bots) || 0}</div><div class="stat-label">Всего ботов</div></div>
+          <div class="stat-card"><div class="stat-value">${Number(data.total_broadcasts) || 0}</div><div class="stat-label">Всего рассылок</div></div>
+          <div class="stat-card"><div class="stat-value">${Number(data.sent_broadcasts) || 0}</div><div class="stat-label">Отправлено</div></div>
+          <div class="stat-card"><div class="stat-value">${Number(data.month_broadcasts) || 0}</div><div class="stat-label">Рассылок за ${escapeHtml(data.month || '')}</div></div>`;
       } catch (e) { console.error(e); }
     }
 
