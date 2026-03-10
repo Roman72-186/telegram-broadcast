@@ -195,52 +195,9 @@ app.post('/api/public/register-and-pay', rateLimit(req => req.ip, 5, 60000), asy
   }
 });
 
-// ============================================
-// Webhook для ботов тенантов (обработка /start)
-// ============================================
-app.post('/webhook/bot/:token', async (req, res) => {
-  res.sendStatus(200); // Telegram ждёт быстрый ответ
-
-  try {
-    const update = req.body;
-    if (!update?.message?.text) return;
-
-    const text = update.message.text;
-    const chatId = update.message.chat.id;
-    const botToken = req.params.token;
-
-    // Обрабатываем только /start
-    if (!text.startsWith('/start')) return;
-
-    // Находим бота по токену
-    const allBots = db.getAllActiveBots();
-    const bot = allBots.find(b => b.token === botToken);
-    if (!bot) return;
-
-    const tenant = db.getTenantById(bot.tenant_id);
-    const tenantName = tenant?.name || 'нашу компанию';
-
-    const welcomeText = `Здравствуйте! Добро пожаловать в ${tenantName}.\n\nЗдесь вы сможете получать сообщения и общаться с нами.`;
-
-    const keyboard = {
-      inline_keyboard: [
-        [{ text: 'Связаться с технической поддержкой', url: 'https://t.me/roman_chatbots' }],
-      ],
-    };
-
-    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: welcomeText,
-        reply_markup: keyboard,
-      }),
-    });
-  } catch (e) {
-    console.error('[webhook] error:', e.message);
-  }
-});
+// Webhook для ботов тенантов ОТКЛЮЧЁН.
+// Боты используются только для отправки сообщений через Bot API.
+// Webhook остаётся за Leadteh/другим сервисом, привязанным к боту.
 
 // ============================================
 // Webhook для платформенного бота (команда /start)
@@ -1282,8 +1239,8 @@ app.post('/api/settings/bot/add', requireTenantOwner, async (req, res) => {
 
     const botId = db.createBot(req.tenantId, botName, token, leadteh_id || '', botUsername);
 
-    // Установить webhook для бота
-    setupBotWebhook(token).catch(e => console.error(`[webhook] Ошибка установки для ${botUsername}:`, e.message));
+    // НЕ устанавливаем webhook — бот может использоваться в Leadteh/другом сервисе.
+    // Токен используется только для отправки сообщений через Bot API.
 
     res.json({ ok: true, bot_id: botId, bot_username: botUsername, bot_name: botName });
   } catch (e) {
@@ -3268,35 +3225,9 @@ function maskToken(token) {
   return token.slice(0, 4) + '...' + token.slice(-3);
 }
 
-// ============================================
-// Webhook: установка для ботов
-// ============================================
-async function setupBotWebhook(botToken) {
-  const webhookUrl = `https://broadcast.leadtehsms.ru/webhook/bot/${botToken}`;
-  const r = await fetch(`https://api.telegram.org/bot${botToken}/setWebhook`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url: webhookUrl, allowed_updates: ['message'] }),
-  });
-  const data = await r.json();
-  if (data.ok) {
-    console.log(`[webhook] Установлен для бота`);
-  } else {
-    console.error(`[webhook] Ошибка:`, data.description);
-  }
-  return data;
-}
-
-async function setupAllWebhooks() {
-  const bots = db.getAllActiveBots();
-  for (const bot of bots) {
-    try {
-      await setupBotWebhook(bot.token);
-    } catch (e) {
-      console.error(`[webhook] Ошибка для bot_id=${bot.id}:`, e.message);
-    }
-  }
-}
+// setupBotWebhook / setupAllWebhooks УДАЛЕНЫ.
+// Платформа не устанавливает webhook для ботов тенантов —
+// они управляются Leadteh/другим сервисом.
 
 function generateId() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
