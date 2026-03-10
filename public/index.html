@@ -1227,10 +1227,12 @@
           <div class="broadcast-card mb-3">
             <div class="section-label">Переменные</div>
             <div id="profileVariables"></div>
-            <div class="flex gap-2 mt-2">
-              <input type="text" id="profileNewVarKey" placeholder="Ключ" class="input-field flex-1 rounded-lg px-3 py-2 text-sm" />
-              <input type="text" id="profileNewVarValue" placeholder="Значение" class="input-field flex-1 rounded-lg px-3 py-2 text-sm" />
-              <button onclick="addProfileVariable()" class="btn-secondary rounded-lg px-3 py-2 text-sm shrink-0">+</button>
+            <div class="mt-2 p-2 rounded-lg" style="border:1px dashed var(--border)">
+              <input type="text" id="profileNewVarKey" placeholder="Имя переменной" class="input-field w-full rounded-lg px-3 py-2 text-sm mb-2" />
+              <div class="flex gap-2">
+                <input type="text" id="profileNewVarValue" placeholder="Значение" class="input-field flex-1 rounded-lg px-3 py-2 text-sm" />
+                <button onclick="addProfileVariable()" class="btn-secondary rounded-lg px-3 py-2 text-sm shrink-0">Добавить</button>
+              </div>
             </div>
           </div>
           <button onclick="openChatFromProfile()" class="w-full py-3 rounded-xl text-sm font-medium btn-primary">Открыть чат</button>
@@ -5181,10 +5183,12 @@
         container.innerHTML = '<div class="text-xs" style="color:var(--text-muted)">Нет переменных</div>';
         return;
       }
-      container.innerHTML = vars.map(v => `<div class="flex items-center gap-2 mb-1">
-        <span class="text-xs font-medium" style="color:var(--text-secondary);min-width:80px">${escapeHtml(v.key)}</span>
-        <input type="text" value="${escapeAttr(v.value)}" onchange="setProfileVariable('${escapeAttr(v.key)}', this.value)" class="input-field flex-1 rounded px-2 py-1 text-xs" />
-        <button onclick="deleteProfileVariable('${escapeAttr(v.key)}')" class="text-xs px-1" style="color:var(--danger)">&times;</button>
+      container.innerHTML = vars.map(v => `<div class="mb-2 p-2 rounded-lg" style="background:var(--bg-secondary)">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-xs font-medium" style="color:var(--text-secondary)">${escapeHtml(v.key)}</span>
+          <button onclick="deleteProfileVariable('${escapeAttr(v.key)}')" class="text-xs px-1" style="color:var(--danger)">&times;</button>
+        </div>
+        <input type="text" value="${escapeAttr(v.value)}" onchange="setProfileVariable('${escapeAttr(v.key)}', this.value)" class="input-field w-full rounded px-2 py-1.5 text-sm" />
       </div>`).join('');
     }
 
