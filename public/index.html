@@ -3618,13 +3618,22 @@
       container.innerHTML = settingsBots.map(bot => {
         const canDelete = settingsBots.length > 1 || userRole === 'super_admin';
         return `
-          <div class="p-3 rounded-lg flex items-center justify-between" style="background:var(--bg-secondary);border:1px solid var(--border)">
-            <div class="flex-1 min-w-0">
-              <div class="text-sm font-medium truncate">${escapeHtml(bot.name)}</div>
-              <div class="text-xs" style="color:var(--text-muted)">Токен: ${escapeHtml(bot.token_masked)}</div>
-              ${bot.leadteh_id ? `<div class="text-xs" style="color:var(--text-muted)">Leadteh: ${escapeHtml(bot.leadteh_id)}</div>` : ''}
+          <div class="p-3 rounded-lg" style="background:var(--bg-secondary);border:1px solid var(--border)">
+            <div class="flex items-center justify-between mb-1">
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-medium truncate">${escapeHtml(bot.name)}</div>
+                <div class="text-xs" style="color:var(--text-muted)">Токен: ${escapeHtml(bot.token_masked)}</div>
+                ${bot.leadteh_id ? `<div class="text-xs" style="color:var(--text-muted)">Leadteh: ${escapeHtml(bot.leadteh_id)}</div>` : ''}
+              </div>
+              ${canDelete ? `<button onclick="removeBot(${bot.id})" class="ml-2 text-xs px-2 py-1 rounded" style="color:var(--danger)">&#10005;</button>` : ''}
             </div>
-            ${canDelete ? `<button onclick="removeBot(${bot.id})" class="ml-2 text-xs px-2 py-1 rounded" style="color:var(--danger)">&#10005;</button>` : ''}
+            <button onclick="showUpdateTokenForm(${bot.id})" class="text-xs btn-secondary rounded px-2 py-1 mt-1">Изменить токен</button>
+            <div id="updateTokenForm_${bot.id}" class="hidden mt-2">
+              <div class="flex gap-2">
+                <input type="text" id="newToken_${bot.id}" placeholder="Новый токен от BotFather" class="input-field flex-1 rounded-lg px-3 py-2 text-sm" />
+                <button onclick="updateBotToken(${bot.id})" class="btn-primary rounded-lg px-3 py-2 text-sm shrink-0">Сохранить</button>
+              </div>
+            </div>
           </div>`;
       }).join('');
     }
@@ -3649,6 +3658,28 @@
         if (data.ok) { loadSettings(); loadBots(); }
         else showAlert(data.error || 'Ошибка');
       } catch (e) { showAlert('Ошибка удаления бота'); }
+    }
+
+    function showUpdateTokenForm(botId) {
+      const form = document.getElementById('updateTokenForm_' + botId);
+      if (form) form.classList.toggle('hidden');
+    }
+
+    async function updateBotToken(botId) {
+      const input = document.getElementById('newToken_' + botId);
+      const token = input.value.trim();
+      if (!token) { showAlert('Вставьте токен от BotFather'); return; }
+      try {
+        const r = await apiFetch('/api/settings/bot/update-token', { method: 'POST', body: { bot_id: botId, token } });
+        const data = await r.json();
+        if (data.ok) {
+          showAlert('Токен обновлён');
+          loadSettings();
+          loadBots();
+        } else {
+          showAlert(data.error || 'Ошибка');
+        }
+      } catch (e) { showAlert('Ошибка обновления токена'); }
     }
 
     async function removeAdmin(telegramId) {

@@ -1249,6 +1249,40 @@ app.post('/api/settings/bot/add', requireTenantOwner, async (req, res) => {
   }
 });
 
+app.post('/api/settings/bot/update-token', requireTenantOwner, async (req, res) => {
+  try {
+    const { bot_id, token } = req.body;
+    if (!bot_id) return res.status(400).json({ error: 'bot_id обязателен' });
+    if (!token || !token.trim()) return res.status(400).json({ error: 'Токен обязателен' });
+
+    const bot = db.getBotById(bot_id);
+    if (!bot || bot.tenant_id !== req.tenantId) {
+      return res.status(404).json({ error: 'Бот не найден' });
+    }
+
+    // Валидация нового токена через Telegram API
+    let botUsername = '';
+    let botName = '';
+    try {
+      const r = await fetch(`https://api.telegram.org/bot${token.trim()}/getMe`);
+      const data = await r.json();
+      if (!data.ok) {
+        return res.status(400).json({ error: 'Невалидный токен бота' });
+      }
+      botUsername = data.result.username || '';
+      botName = `${data.result.first_name}${data.result.last_name ? ' ' + data.result.last_name : ''}`;
+    } catch (e) {
+      return res.status(400).json({ error: 'Ошибка проверки токена' });
+    }
+
+    db.updateBot(bot_id, { token: token.trim(), bot_username: botUsername, name: botName });
+    res.json({ ok: true, bot_username: botUsername, bot_name: botName });
+  } catch (e) {
+    console.error('POST /api/settings/bot/update-token error:', e.message);
+    res.status(500).json({ error: 'Ошибка обновления токена' });
+  }
+});
+
 app.post('/api/settings/bot/remove', requireTenantOwner, (req, res) => {
   try {
     const { bot_id } = req.body;
