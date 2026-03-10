@@ -67,6 +67,16 @@ app.use((req, res, next) => {
   return express.json({ limit: '2mb' })(req, res, next);
 });
 
+// Security headers
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '0');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  next();
+});
+
 // Access log для диагностики
 app.use((req, res, next) => {
   if (req.path !== '/health' && !req.path.startsWith('/api/cron')) {

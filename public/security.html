@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Безопасность — LT Кабинет</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --bg-primary: #101014;
+      --bg-secondary: #1a1a21;
+      --bg-tertiary: #24242e;
+      --accent: #c4956a;
+      --text-primary: #e8e4e0;
+      --text-secondary: rgba(232, 228, 224, 0.6);
+      --border: rgba(200, 180, 160, 0.15);
+    }
+    body {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    .card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge-green { background: rgba(92, 184, 122, 0.15); color: #5cb87a; }
+    .accent { color: var(--accent); }
+    .muted { color: var(--text-secondary); }
+    .section-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+    h2 { border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+    .check-list li {
+      position: relative;
+      padding-left: 28px;
+      margin-bottom: 10px;
+      line-height: 1.5;
+    }
+    .check-list li::before {
+      content: '✓';
+      position: absolute;
+      left: 0;
+      color: #5cb87a;
+      font-weight: bold;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="max-w-2xl mx-auto px-4 py-8">
+
+    <!-- Header -->
+    <div class="text-center mb-8">
+      <div class="text-4xl mb-3">&#128737;</div>
+      <h1 class="text-2xl font-bold mb-2">Безопасность LT Кабинет</h1>
+      <p class="text-sm muted">Как мы защищаем ваши данные, токены и аккаунты</p>
+      <div class="mt-3">
+        <span class="badge badge-green">&#10003; Аудит пройден</span>
+      </div>
+    </div>
+
+    <!-- 1. Шифрование токенов -->
+    <div class="card mb-4">
+      <div class="flex items-start gap-3 mb-3">
+        <div class="section-icon" style="background: rgba(196, 149, 106, 0.12);">&#128272;</div>
+        <div>
+          <h2 class="text-base font-bold mb-1">Шифрование токенов</h2>
+          <p class="text-sm muted">Все чувствительные данные зашифрованы и недоступны в открытом виде</p>
+        </div>
+      </div>
+      <ul class="check-list text-sm">
+        <li><strong>AES-256-GCM</strong> &mdash; токены ботов (BotFather) и Leadteh API-токены шифруются алгоритмом AES-256-GCM перед сохранением в базу данных. Это тот же стандарт, который используют банки и госструктуры.</li>
+        <li><strong>Уникальный вектор инициализации (IV)</strong> &mdash; для каждого токена генерируется случайный IV, что делает невозможным определение одинаковых токенов по зашифрованным данным.</li>
+        <li><strong>AuthTag</strong> &mdash; каждый зашифрованный блок содержит тег аутентичности, защищающий от подмены данных в базе.</li>
+        <li><strong>Ключ шифрования</strong> хранится только в файле <code>.env</code> на сервере и нигде не передается. Без ключа расшифровать данные невозможно.</li>
+        <li><strong>Маскирование</strong> &mdash; в API и интерфейсе токены ботов отображаются в маскированном виде (<code>1234****:****DEF</code>). Полный токен не передается клиенту.</li>
+      </ul>
+    </div>
+
+    <!-- 2. Авторизация -->
+    <div class="card mb-4">
+      <div class="flex items-start gap-3 mb-3">
+        <div class="section-icon" style="background: rgba(196, 149, 106, 0.12);">&#128274;</div>
+        <div>
+          <h2 class="text-base font-bold mb-1">Авторизация через Telegram</h2>
+          <p class="text-sm muted">Многоуровневая проверка личности без паролей</p>
+        </div>
+      </div>
+      <ul class="check-list text-sm">
+        <li><strong>HMAC-SHA-256</strong> &mdash; каждый запрос на вход проверяется криптографической подписью Telegram. Подделать запрос авторизации невозможно &mdash; подпись формируется серверами Telegram.</li>
+        <li><strong>Защита от replay-атак</strong> &mdash; подпись действительна только 24 часа. Повторное использование старых данных авторизации будет отклонено.</li>
+        <li><strong>Timing-safe сравнение</strong> &mdash; проверка подписи выполняется через <code>timingSafeEqual</code>, что исключает атаки по времени отклика (timing attacks).</li>
+        <li><strong>Сессии</strong> &mdash; после успешной авторизации создается Bearer-токен (32 случайных байта через <code>crypto.randomBytes</code>). Сессия действует 24 часа.</li>
+        <li><strong>Без паролей</strong> &mdash; в системе нет паролей, которые можно украсть или подобрать. Вход только через Telegram.</li>
+      </ul>
+    </div>
+
+    <!-- 3. Изоляция данных -->
+    <div class="card mb-4">
+      <div class="flex items-start gap-3 mb-3">
+        <div class="section-icon" style="background: rgba(196, 149, 106, 0.12);">&#128193;</div>
+        <div>
+          <h2 class="text-base font-bold mb-1">Изоляция данных между аккаунтами</h2>
+          <p class="text-sm muted">Один пользователь никогда не увидит данные другого</p>
+        </div>
+      </div>
+      <ul class="check-list text-sm">
+        <li><strong>Tenant ID из сессии</strong> &mdash; идентификатор аккаунта берется из серверной сессии, а не из запроса клиента. Подменить его невозможно.</li>
+        <li><strong>Каждый SQL-запрос</strong> фильтрует данные по <code>tenant_id</code>. Рассылки, боты, настройки, диалоги &mdash; всё привязано к конкретному аккаунту.</li>
+        <li><strong>Загрузки файлов</strong> изолированы по папкам: каждый аккаунт хранит медиа в отдельной директории. Доступ к чужим файлам заблокирован.</li>
+        <li><strong>Защита от IDOR</strong> &mdash; даже зная ID чужого бота или рассылки, получить к ним доступ невозможно &mdash; сервер всегда проверяет принадлежность ресурса.</li>
+      </ul>
+    </div>
+
+    <!-- 4. Защита от атак -->
+    <div class="card mb-4">
+      <div class="flex items-start gap-3 mb-3">
+        <div class="section-icon" style="background: rgba(196, 149, 106, 0.12);">&#128737;</div>
+        <div>
+          <h2 class="text-base font-bold mb-1">Защита от атак</h2>
+          <p class="text-sm muted">Многослойная защита от распространенных веб-угроз</p>
+        </div>
+      </div>
+      <ul class="check-list text-sm">
+        <li><strong>SQL Injection</strong> &mdash; все запросы к базе данных параметризованы. Пользовательские данные никогда не подставляются в SQL напрямую.</li>
+        <li><strong>XSS (межсайтовый скриптинг)</strong> &mdash; все пользовательские данные (имена, теги, тексты сообщений) экранируются через <code>escapeHtml()</code> и <code>escapeAttr()</code> перед отображением.</li>
+        <li><strong>Path Traversal</strong> &mdash; при работе с файлами проверяется, что путь не выходит за пределы разрешенной директории. Символы <code>../</code> блокируются.</li>
+        <li><strong>CORS</strong> &mdash; запросы к API разрешены только с доверенных доменов (Telegram WebApp, leadtehsms.ru). Запросы с неизвестных сайтов блокируются.</li>
+        <li><strong>Rate Limiting</strong> &mdash; ограничение частоты запросов: 15 попыток авторизации/мин, 60 API-запросов/мин, 3 загрузки файлов/мин. Защищает от brute-force и DDoS.</li>
+        <li><strong>Лимит размера запросов</strong> &mdash; API принимает максимум 2 МБ данных. Увеличенный лимит (30 МБ) только для загрузки медиа. Защита от исчерпания памяти сервера.</li>
+      </ul>
+    </div>
+
+    <!-- 5. HTTP Security Headers -->
+    <div class="card mb-4">
+      <div class="flex items-start gap-3 mb-3">
+        <div class="section-icon" style="background: rgba(196, 149, 106, 0.12);">&#127760;</div>
+        <div>
+          <h2 class="text-base font-bold mb-1">HTTP-заголовки безопасности</h2>
+          <p class="text-sm muted">Дополнительные инструкции для браузера</p>
+        </div>
+      </div>
+      <ul class="check-list text-sm">
+        <li><strong>X-Content-Type-Options: nosniff</strong> &mdash; браузер не будет угадывать тип файла, предотвращая атаки через подмену MIME-типа.</li>
+        <li><strong>X-Frame-Options: DENY</strong> &mdash; страницу нельзя встроить в iframe на стороннем сайте (защита от clickjacking).</li>
+        <li><strong>Referrer-Policy</strong> &mdash; при переходе на внешние сайты не передается полный URL страницы.</li>
+        <li><strong>Permissions-Policy</strong> &mdash; заблокирован доступ к камере, микрофону и геолокации.</li>
+        <li><strong>HTTPS</strong> &mdash; весь трафик шифруется SSL-сертификатом (Let's Encrypt). Перехватить данные между вами и сервером невозможно.</li>
+      </ul>
+    </div>
+
+    <!-- 6. Webhook -->
+    <div class="card mb-4">
+      <div class="flex items-start gap-3 mb-3">
+        <div class="section-icon" style="background: rgba(196, 149, 106, 0.12);">&#128232;</div>
+        <div>
+          <h2 class="text-base font-bold mb-1">Защита Webhook</h2>
+          <p class="text-sm muted">Только настоящие уведомления от Telegram</p>
+        </div>
+      </div>
+      <ul class="check-list text-sm">
+        <li><strong>Secret Token</strong> &mdash; при регистрации Webhook устанавливается секретный токен. Каждый входящий запрос проверяется &mdash; поддельные уведомления отклоняются.</li>
+        <li><strong>Боты тенантов не перехватываются</strong> &mdash; платформа использует токены ботов только для отправки сообщений. Webhook бота остается за Leadteh или другим сервисом. Мы не вмешиваемся в логику вашего бота.</li>
+      </ul>
+    </div>
+
+    <!-- 7. Хранение данных -->
+    <div class="card mb-4">
+      <div class="flex items-start gap-3 mb-3">
+        <div class="section-icon" style="background: rgba(196, 149, 106, 0.12);">&#128451;</div>
+        <div>
+          <h2 class="text-base font-bold mb-1">Хранение данных</h2>
+          <p class="text-sm muted">Где хранятся данные и кто имеет к ним доступ</p>
+        </div>
+      </div>
+      <ul class="check-list text-sm">
+        <li><strong>База данных</strong> хранится на выделенном VPS-сервере в защищенной директории. Доступ только у администратора платформы.</li>
+        <li><strong>Токены зашифрованы</strong> &mdash; даже при физическом доступе к базе данных токены невозможно прочитать без ключа шифрования.</li>
+        <li><strong>Автосохранение</strong> &mdash; данные сохраняются на диск каждые 5 секунд и при каждом изменении (с debounce 500 мс). При выключении сервера база корректно сохраняется (graceful shutdown).</li>
+        <li><strong>Нет данных в браузере</strong> &mdash; токены авторизации хранятся только в оперативной памяти приложения, а не в localStorage. При закрытии Mini App все данные стираются.</li>
+        <li><strong>API никогда не возвращает</strong> полные токены ботов или API-ключи в ответах. Суперадмин видит только факт наличия токена, но не его значение.</li>
+      </ul>
+    </div>
+
+    <!-- 8. Идентификаторы -->
+    <div class="card mb-4">
+      <div class="flex items-start gap-3 mb-3">
+        <div class="section-icon" style="background: rgba(196, 149, 106, 0.12);">&#128290;</div>
+        <div>
+          <h2 class="text-base font-bold mb-1">Генерация идентификаторов</h2>
+          <p class="text-sm muted">Криптографически безопасные и непредсказуемые</p>
+        </div>
+      </div>
+      <ul class="check-list text-sm">
+        <li><strong>crypto.randomUUID()</strong> &mdash; все идентификаторы рассылок генерируются криптографически безопасным генератором случайных чисел. Угадать или перебрать ID невозможно.</li>
+        <li><strong>crypto.randomBytes()</strong> &mdash; сессионные токены, ключи шифрования и секреты webhook генерируются через криптографический генератор операционной системы.</li>
+      </ul>
+    </div>
+
+    <!-- Итого -->
+    <div class="card mb-4" style="border-color: rgba(92, 184, 122, 0.3);">
+      <h2 class="text-base font-bold mb-3 accent" style="border: none; padding: 0;">Итого: 12 уровней защиты</h2>
+      <div class="grid grid-cols-2 gap-2 text-xs">
+        <div class="badge badge-green">&#10003; Шифрование AES-256-GCM</div>
+        <div class="badge badge-green">&#10003; HMAC-SHA-256 авторизация</div>
+        <div class="badge badge-green">&#10003; Изоляция данных</div>
+        <div class="badge badge-green">&#10003; Защита от SQL Injection</div>
+        <div class="badge badge-green">&#10003; Защита от XSS</div>
+        <div class="badge badge-green">&#10003; CORS-политика</div>
+        <div class="badge badge-green">&#10003; Rate Limiting</div>
+        <div class="badge badge-green">&#10003; HTTPS + Security Headers</div>
+        <div class="badge badge-green">&#10003; Webhook верификация</div>
+        <div class="badge badge-green">&#10003; Path Traversal защита</div>
+        <div class="badge badge-green">&#10003; Крипто-ID (UUID v4)</div>
+        <div class="badge badge-green">&#10003; Timing-safe сравнения</div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="text-center text-xs muted mt-6 mb-4">
+      <p>LT Кабинет &mdash; безопасная платформа для Telegram-рассылок</p>
+      <p class="mt-1">Вопросы по безопасности: <a href="https://t.me/roman_chatbots" style="color: var(--accent);">@roman_chatbots</a></p>
+    </div>
+
+  </div>
+</body>
+</html>
