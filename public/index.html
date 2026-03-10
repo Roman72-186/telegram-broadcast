@@ -598,7 +598,7 @@
 
     <!-- Информация о тарифе -->
     <div id="accessDeniedInfo" class="w-full max-w-md mt-2">
-      <div class="broadcast-card text-left" style="padding: 14px;">
+      <div id="accessDeniedPricingCard" class="broadcast-card text-left" style="padding: 14px;">
         <div class="text-sm font-bold mb-2" style="color:var(--accent)">Тестовый период — 7 дней</div>
         <div class="text-xs mb-2" style="color:var(--text-secondary)">
           50 сообщений бесплатно
@@ -1487,9 +1487,19 @@
       try {
         const r = await fetch('/api/public/pricing');
         const data = await r.json();
-        const minPaid = data.plans ? data.plans.filter(p => p.price > 0).sort((a,b) => a.price - b.price)[0] : null;
-        const hintPrice = document.getElementById('publicHintPrice');
-        if (hintPrice && minPaid) hintPrice.textContent = minPaid.price + ' ₽';
+        const pricingCard = document.getElementById('accessDeniedPricingCard');
+        const freeBtn = document.getElementById('publicBtnFree');
+        if (data.free_mode) {
+          // Бесплатный режим — скрываем тарифную информацию
+          if (pricingCard) pricingCard.classList.add('hidden');
+          if (freeBtn) freeBtn.textContent = 'Начать работу';
+        } else {
+          if (pricingCard) pricingCard.classList.remove('hidden');
+          if (freeBtn) freeBtn.textContent = 'Попробовать бесплатно 7 дней';
+          const minPaid = data.plans ? data.plans.filter(p => p.price > 0).sort((a,b) => a.price - b.price)[0] : null;
+          const hintPrice = document.getElementById('publicHintPrice');
+          if (hintPrice && minPaid) hintPrice.textContent = minPaid.price + ' ₽';
+        }
       } catch (e) {
         console.error('loadPublicPricing error:', e);
       }
