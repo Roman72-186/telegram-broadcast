@@ -2353,13 +2353,23 @@
       onEditorTextInput();
     }
 
+    function isVideoFile(file) {
+      if (file.type && file.type.startsWith('video/')) return true;
+      const ext = (file.name || '').split('.').pop().toLowerCase();
+      return ['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext);
+    }
+
+    function fileSizeMB(size) {
+      return (size / 1024 / 1024).toFixed(1);
+    }
+
     async function onPhotoFileSelect(input) {
       const file = input.files[0];
       if (!file) return;
-      const isVideo = file.type.startsWith('video/');
+      const isVideo = isVideoFile(file);
       const maxSize = isVideo ? 20 * 1024 * 1024 : 10 * 1024 * 1024;
       if (file.size > maxSize) {
-        showAlert(`Файл слишком большой (макс. ${isVideo ? '20' : '10'} МБ)`);
+        showAlert(`Файл ${fileSizeMB(file.size)} МБ — превышает лимит ${isVideo ? '20' : '10'} МБ для ${isVideo ? 'видео' : 'фото'}`);
         input.value = '';
         return;
       }
@@ -4410,10 +4420,10 @@
     async function autoUploadPhoto(event) {
       const file = event.target.files[0];
       if (!file) return;
-      const isVideo = file.type.startsWith('video/');
+      const isVideo = isVideoFile(file);
       const maxSize = isVideo ? 20 * 1024 * 1024 : 10 * 1024 * 1024;
       if (file.size > maxSize) {
-        showAlert(`Файл слишком большой (макс. ${isVideo ? '20' : '10'} МБ)`);
+        showAlert(`Файл ${fileSizeMB(file.size)} МБ — превышает лимит ${isVideo ? '20' : '10'} МБ для ${isVideo ? 'видео' : 'фото'}`);
         event.target.value = '';
         return;
       }
