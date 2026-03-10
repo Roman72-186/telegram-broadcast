@@ -7,7 +7,7 @@ const { loadConfig } = require('./lib/config');
 const db = require('./lib/db');
 const { validateInitData, getUserRole, isSuperAdmin, SUPER_ADMIN_ID } = require('./lib/auth');
 const { authMiddleware, requireSuperAdmin, requireTenantAdmin, requireTenantOwner, requireChatUser } = require('./lib/middleware');
-const { fetchAllContacts, extractTags, fetchListSchemas, fetchListItems, extractTelegramIds } = require('./lib/leadteh');
+const { fetchAllContacts, extractTags, extractVariables, fetchListSchemas, fetchListItems, extractTelegramIds, getContactTags, attachTag, detachTag, getContactVariables, setVariable, deleteVariable, getBotTags } = require('./lib/leadteh');
 const { getProvider } = require('./lib/payment');
 const ExcelJS = require('exceljs');
 
@@ -57,7 +57,7 @@ setInterval(() => {
   }
 }, 300000);
 
-app.use(express.json({ limit: '15mb' }));
+app.use(express.json({ limit: '30mb' }));
 
 // Access log для диагностики
 app.use((req, res, next) => {
@@ -402,6 +402,16 @@ app.use('/api', rateLimit(req => `api:${req.ip}`, 60, 60000), (req, res, next) =
   authMiddleware(req, res, next);
 });
 
+// Определение типа медиа по расширению
+function detectMediaType(filename) {
+  if (!filename) return null;
+  const ext = filename.split('.').pop().toLowerCase();
+  if (['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext)) return 'video';
+  if (ext === 'gif') return 'animation';
+  if (['jpg', 'jpeg', 'png', 'webp'].includes(ext)) return 'photo';
+  return null;
+}
+
 // ============================================
 // API: Загрузка фото
 // ============================================
@@ -410,16 +420,18 @@ app.post('/api/upload', requireTenantAdmin, rateLimit(req => `upload:${req.teleg
     const { data, filename } = req.body;
     if (!data) return res.status(400).json({ error: 'Нет данных' });
 
-    const base64Data = data.replace(/^data:image\/\w+;base64,/, '');
+    const base64Data = data.replace(/^data:[^;]+;base64,/, '');
     const buffer = Buffer.from(base64Data, 'base64');
 
-    if (buffer.length > 10 * 1024 * 1024) {
-      return res.status(400).json({ error: 'Файл слишком большой (макс. 10 МБ)' });
-    }
-
     const ext = (filename || 'image.jpg').split('.').pop().toLowerCase();
-    const allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+    const allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'mov', 'webm'];
     const safeExt = allowed.includes(ext) ? ext : 'jpg';
+    const mediaType = detectMediaType(filename);
+    const maxSize = mediaType === 'video' ? 20 * 1024 * 1024 : 10 * 1024 * 1024;
+
+    if (buffer.length > maxSize) {
+      return res.status(400).json({ error: `Файл слишком большой (макс. ${mediaType === 'video' ? '20' : '10'} МБ)` });
+    }
 
     // Загрузки в директорию тенанта
     const tenantDir = req.tenantId ? String(req.tenantId) : '_super';
@@ -429,7 +441,7 @@ app.post('/api/upload', requireTenantAdmin, rateLimit(req => `upload:${req.teleg
     const name = generateId() + '.' + safeExt;
     fs.writeFileSync(path.join(uploadsDir, name), buffer);
 
-    res.json({ ok: true, url: `/api/uploads/${tenantDir}/${name}` });
+    res.json({ ok: true, url: `/api/uploads/${tenantDir}/${name}`, media_type: mediaType });
   } catch (e) {
     console.error('POST /api/upload error:', e.message);
     res.status(500).json({ error: 'Ошибка загрузки файла' });
@@ -593,14 +605,128 @@ app.get('/api/contacts', requireTenantAdmin, async (req, res) => {
     if (countOnly) return res.json({ count: filtered.length });
 
     const contacts = filtered.map(c => ({
+      id: c.id,
       telegram_id: String(c.telegram_id),
       name: c.name || '',
       tags: extractTags(c),
+      variables: extractVariables(c),
     }));
     res.json({ count: contacts.length, contacts });
   } catch (e) {
     console.error('GET /api/contacts error:', e.message);
     res.status(500).json({ error: 'Ошибка загрузки контактов' });
+  }
+});
+
+// ============================================
+// API: Профиль контакта (теги + переменные)
+// ============================================
+app.get('/api/contacts/bot-tags', requireTenantAdmin, async (req, res) => {
+  try {
+    const botConfig = getBotConfigForLeadteh(req);
+    if (!botConfig) return res.status(400).json({ error: 'Нет настроенных ботов' });
+
+    const tags = await getBotTags(botConfig);
+    res.json({ tags: Array.isArray(tags) ? tags : [] });
+  } catch (e) {
+    console.error('GET /api/contacts/bot-tags error:', e.message);
+    res.status(500).json({ error: 'Ошибка загрузки тегов бота' });
+  }
+});
+
+app.get('/api/contacts/:contactId/profile', requireTenantAdmin, async (req, res) => {
+  try {
+    const botConfig = getBotConfigForLeadteh(req);
+    if (!botConfig) return res.status(400).json({ error: 'Нет настроенных ботов' });
+
+    const contactId = req.params.contactId;
+    const [tags, variables] = await Promise.all([
+      getContactTags(botConfig, contactId),
+      getContactVariables(botConfig, contactId),
+    ]);
+
+    // Нормализация тегов
+    const normalizedTags = Array.isArray(tags) ? tags.map(t => typeof t === 'string' ? t : (t.name || '')) : [];
+
+    // Нормализация переменных
+    const normalizedVars = Array.isArray(variables) ? variables
+      .filter(v => {
+        const key = v.key || v.name || (v.variable && v.variable.name);
+        return key && key !== 'tags';
+      })
+      .map(v => ({
+        key: v.key || v.name || (v.variable && v.variable.name) || '',
+        value: v.value || v.data || '',
+      })) : [];
+
+    res.json({ tags: normalizedTags, variables: normalizedVars });
+  } catch (e) {
+    console.error('GET /api/contacts/:contactId/profile error:', e.message);
+    res.status(500).json({ error: 'Ошибка загрузки профиля контакта' });
+  }
+});
+
+app.post('/api/contacts/:contactId/tags/add', requireTenantAdmin, async (req, res) => {
+  try {
+    const botConfig = getBotConfigForLeadteh(req);
+    if (!botConfig) return res.status(400).json({ error: 'Нет настроенных ботов' });
+
+    const { name } = req.body;
+    if (!name || !name.trim()) return res.status(400).json({ error: 'Укажите имя тега' });
+
+    await attachTag(botConfig, req.params.contactId, name.trim());
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('POST /api/contacts/:contactId/tags/add error:', e.message);
+    res.status(500).json({ error: 'Ошибка добавления тега' });
+  }
+});
+
+app.post('/api/contacts/:contactId/tags/remove', requireTenantAdmin, async (req, res) => {
+  try {
+    const botConfig = getBotConfigForLeadteh(req);
+    if (!botConfig) return res.status(400).json({ error: 'Нет настроенных ботов' });
+
+    const { name } = req.body;
+    if (!name || !name.trim()) return res.status(400).json({ error: 'Укажите имя тега' });
+
+    await detachTag(botConfig, req.params.contactId, name.trim());
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('POST /api/contacts/:contactId/tags/remove error:', e.message);
+    res.status(500).json({ error: 'Ошибка удаления тега' });
+  }
+});
+
+app.post('/api/contacts/:contactId/variables', requireTenantAdmin, async (req, res) => {
+  try {
+    const botConfig = getBotConfigForLeadteh(req);
+    if (!botConfig) return res.status(400).json({ error: 'Нет настроенных ботов' });
+
+    const { name, value } = req.body;
+    if (!name || !name.trim()) return res.status(400).json({ error: 'Укажите имя переменной' });
+
+    const result = await setVariable(botConfig, req.params.contactId, name.trim(), value || '');
+    res.json({ ok: true, variable: result });
+  } catch (e) {
+    console.error('POST /api/contacts/:contactId/variables error:', e.message);
+    res.status(500).json({ error: 'Ошибка сохранения переменной' });
+  }
+});
+
+app.post('/api/contacts/:contactId/variables/delete', requireTenantAdmin, async (req, res) => {
+  try {
+    const botConfig = getBotConfigForLeadteh(req);
+    if (!botConfig) return res.status(400).json({ error: 'Нет настроенных ботов' });
+
+    const { name } = req.body;
+    if (!name || !name.trim()) return res.status(400).json({ error: 'Укажите имя переменной' });
+
+    await deleteVariable(botConfig, req.params.contactId, name.trim());
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('POST /api/contacts/:contactId/variables/delete error:', e.message);
+    res.status(500).json({ error: 'Ошибка удаления переменной' });
   }
 });
 
@@ -878,6 +1004,7 @@ app.post('/api/broadcast/save', requireTenantAdmin, (req, res) => {
         photo_url: msg.photo_url?.trim() || '',
         text: msg.text.trim(),
         parse_mode: msg.parse_mode || parse_mode || null,
+        media_type: msg.media_type || detectMediaType(msg.photo_url) || null,
         buttons: Array.isArray(msg.buttons) ? msg.buttons.slice(0, 6).map(b => {
           const nb = { text: b.text, type: b.type, value: b.value };
           if (b.style) nb.style = b.style;
@@ -893,6 +1020,7 @@ app.post('/api/broadcast/save', requireTenantAdmin, (req, res) => {
         photo_url: '',
         text: text.trim(),
         parse_mode: parse_mode || null,
+        media_type: null,
         buttons: Array.isArray(buttons) ? buttons.slice(0, 6).map(b => {
           const nb = { text: b.text, type: b.type, value: b.value };
           if (b.style) nb.style = b.style;
@@ -2022,6 +2150,7 @@ app.post('/api/auto/save', requireTenantAdmin, (req, res) => {
         photo_url: msg.photo_url?.trim() || '',
         text: msg.text.trim(),
         parse_mode: msg.parse_mode || null,
+        media_type: msg.media_type || detectMediaType(msg.photo_url) || null,
         buttons: Array.isArray(msg.buttons) ? msg.buttons.slice(0, 6).map(b => {
           const nb = { text: b.text, type: b.type, value: b.value };
           if (b.style) nb.style = b.style;
@@ -2607,6 +2736,7 @@ async function prepareStepMessages(autoBroadcast, step) {
       photoUrl: msg.photo_url || '',
       keyboard: buildKeyboard(msg.buttons || [], botUsername),
       parseMode: msg.parse_mode || null,
+      mediaType: msg.media_type || null,
     })),
   };
 }
@@ -2623,7 +2753,8 @@ async function sendPreparedToContact(autoBroadcast, prepared, telegramId) {
         msg.photoUrl,
         msg.keyboard,
         msg.parseMode,
-        prepared.tenantId
+        prepared.tenantId,
+        msg.mediaType
       );
       if (!r.ok) return false;
     } catch (e) {
@@ -2817,6 +2948,7 @@ async function sendBroadcast(broadcast) {
     keyboard: buildKeyboard(msg.buttons || [], botUsername),
     parseMode: msg.parse_mode || broadcast.parse_mode || null,
     delayBefore: msg.delay_before || 0,
+    mediaType: msg.media_type || null,
   }));
 
   // Сохраняем общее количество
@@ -2848,7 +2980,8 @@ async function sendBroadcast(broadcast) {
           msg.photoUrl,
           msg.keyboard,
           msg.parseMode,
-          broadcast.tenant_id
+          broadcast.tenant_id,
+          msg.mediaType
         );
 
         if (!r.ok) {
@@ -2973,27 +3106,43 @@ async function telegramFetch(url, options, maxRetries = 3) {
   }
 }
 
-async function sendSingleMessage(botToken, chatId, text, photoUrl, inlineKeyboard, parseMode, tenantId) {
+async function sendSingleMessage(botToken, chatId, text, photoUrl, inlineKeyboard, parseMode, tenantId, mediaType) {
   const replyMarkup = inlineKeyboard.length > 0
     ? { inline_keyboard: inlineKeyboard }
     : undefined;
   const usedParseMode = parseMode || undefined;
 
   if (photoUrl) {
+    // Определяем тип медиа
+    const type = mediaType || detectMediaType(photoUrl) || 'photo';
+
     // Локальный файл — отправляем через multipart
     if (photoUrl.startsWith('/api/uploads/')) {
-      return await sendLocalPhoto(botToken, chatId, text, photoUrl, replyMarkup, usedParseMode);
+      return await sendLocalMedia(botToken, chatId, text, photoUrl, replyMarkup, usedParseMode, type);
+    }
+
+    // Выбираем метод API и поле в зависимости от типа
+    let apiMethod, mediaField;
+    if (type === 'video') {
+      apiMethod = 'sendVideo';
+      mediaField = 'video';
+    } else if (type === 'animation') {
+      apiMethod = 'sendAnimation';
+      mediaField = 'animation';
+    } else {
+      apiMethod = 'sendPhoto';
+      mediaField = 'photo';
     }
 
     const body = {
       chat_id: String(chatId),
-      photo: photoUrl,
+      [mediaField]: photoUrl,
       caption: text.slice(0, 1024),
     };
     if (usedParseMode) body.parse_mode = usedParseMode;
     if (replyMarkup) body.reply_markup = replyMarkup;
 
-    let r = await telegramFetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+    let r = await telegramFetch(`https://api.telegram.org/bot${botToken}/${apiMethod}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -3003,7 +3152,7 @@ async function sendSingleMessage(botToken, chatId, text, photoUrl, inlineKeyboar
       const err = await r.json().catch(() => ({}));
       if (err.description && err.description.includes("can't parse entities")) {
         delete body.parse_mode;
-        r = await telegramFetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+        r = await telegramFetch(`https://api.telegram.org/bot${botToken}/${apiMethod}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
@@ -3044,7 +3193,7 @@ async function sendSingleMessage(botToken, chatId, text, photoUrl, inlineKeyboar
   return r;
 }
 
-async function sendLocalPhoto(botToken, chatId, text, localPath, replyMarkup, parseMode) {
+async function sendLocalMedia(botToken, chatId, text, localPath, replyMarkup, parseMode, mediaType) {
   // localPath = /api/uploads/{tenantId}/{filename}
   const parts = localPath.replace('/api/uploads/', '').split('/');
   const uploadsBase = path.resolve(__dirname, 'data', 'uploads');
@@ -3061,19 +3210,40 @@ async function sendLocalPhoto(botToken, chatId, text, localPath, replyMarkup, pa
 
   const fileBuffer = fs.readFileSync(filePath);
   const ext = path.extname(filePath).toLowerCase();
-  const mimeType = ext === '.png' ? 'image/png' : ext === '.gif' ? 'image/gif' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+
+  // Определяем MIME-тип
+  const mimeTypes = {
+    '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+    '.gif': 'image/gif', '.webp': 'image/webp',
+    '.mp4': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm',
+  };
+  const mimeType = mimeTypes[ext] || 'application/octet-stream';
+
+  // Тип медиа и метод API
+  const type = mediaType || detectMediaType(path.basename(filePath)) || 'photo';
+  let apiMethod, fieldName;
+  if (type === 'video') {
+    apiMethod = 'sendVideo';
+    fieldName = 'video';
+  } else if (type === 'animation') {
+    apiMethod = 'sendAnimation';
+    fieldName = 'animation';
+  } else {
+    apiMethod = 'sendPhoto';
+    fieldName = 'photo';
+  }
 
   function buildFormData(withParseMode) {
     const fd = new FormData();
     fd.append('chat_id', String(chatId));
-    fd.append('photo', new Blob([fileBuffer], { type: mimeType }), 'photo' + ext);
+    fd.append(fieldName, new Blob([fileBuffer], { type: mimeType }), fieldName + ext);
     if (text) fd.append('caption', text.slice(0, 1024));
     if (withParseMode && parseMode) fd.append('parse_mode', parseMode);
     if (replyMarkup) fd.append('reply_markup', JSON.stringify(replyMarkup));
     return fd;
   }
 
-  let r = await telegramFetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+  let r = await telegramFetch(`https://api.telegram.org/bot${botToken}/${apiMethod}`, {
     method: 'POST',
     body: buildFormData(true),
   });
@@ -3081,7 +3251,7 @@ async function sendLocalPhoto(botToken, chatId, text, localPath, replyMarkup, pa
   if (!r.ok && parseMode) {
     const err = await r.json().catch(() => ({}));
     if (err.description && err.description.includes("can't parse entities")) {
-      r = await telegramFetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+      r = await telegramFetch(`https://api.telegram.org/bot${botToken}/${apiMethod}`, {
         method: 'POST',
         body: buildFormData(false),
       });

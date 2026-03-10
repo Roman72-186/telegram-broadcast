@@ -738,26 +738,23 @@
           <button onclick="finishEditMessage()" class="text-sm btn-primary rounded-lg px-4 py-1.5">Готово</button>
         </div>
         <div class="hint-box">
-          Заполните текст сообщения. Можно прикрепить фото (ссылка или файл до 10 МБ) и до 6 кнопок. С фото лимит текста — 1024 символа, без фото — 4096. Выберите формат разметки: Markdown, HTML или MarkdownV2.
+          Заполните текст сообщения. Можно прикрепить медиа (фото до 10 МБ, видео до 20 МБ) и до 6 кнопок. С медиа лимит текста — 1024 символа, без медиа — 4096. Выберите формат разметки: Markdown, HTML или MarkdownV2.
         </div>
 
         <div class="mb-3">
-          <label class="text-sm font-medium mb-1 flex items-center">Фото (необязательно)<span class="tooltip-trigger">?<span class="tooltip-text">Ссылка на изображение или загрузите файл (до 10 МБ). JPG, PNG, GIF, WebP</span></span></label>
+          <label class="text-sm font-medium mb-1 flex items-center">Медиа (необязательно)<span class="tooltip-trigger">?<span class="tooltip-text">Фото (JPG, PNG, GIF, WebP — до 10 МБ) или видео (MP4, MOV, WebM — до 20 МБ). Ссылка или файл</span></span></label>
           <div class="flex gap-2">
             <input type="text" id="editorPhotoUrl" placeholder="Ссылка или загрузите файл"
               class="input-field flex-1 rounded-lg px-3 py-2 text-sm"
               oninput="onEditorPhotoInput()" />
             <label class="btn-secondary rounded-lg px-3 py-2 text-sm cursor-pointer flex items-center gap-1 shrink-0">
-              <input type="file" id="editorPhotoFile" accept="image/*" class="hidden" onchange="onPhotoFileSelect(this)" />
+              <input type="file" id="editorPhotoFile" accept="image/*,video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm" class="hidden" onchange="onPhotoFileSelect(this)" />
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
               Файл
             </label>
           </div>
           <div id="editorPhotoUploading" class="hidden text-xs mt-1" style="color: var(--text-secondary)">Загрузка файла...</div>
-          <div id="editorPhotoPreview" class="mt-2 hidden">
-            <img id="editorPhotoImg" class="photo-preview" alt="Превью фото"
-              onerror="this.parentElement.classList.add('hidden')" />
-          </div>
+          <div id="editorPhotoPreview" class="mt-2 hidden"></div>
         </div>
 
         <div class="mb-3">
@@ -1066,15 +1063,15 @@
                 <option value="MarkdownV2">MarkdownV2</option>
                 <option value="HTML">HTML</option>
               </select>
-              <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Фото (необязательно)</label>
+              <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Медиа (необязательно)</label>
               <div class="flex gap-2 mb-2">
                 <input type="text" id="autoMsgPhotoUrl" placeholder="URL или загрузите" class="input-field flex-1 rounded-lg px-3 py-2 text-sm" oninput="onAutoMsgPhotoChange()" />
                 <label class="py-2 px-3 rounded-lg text-sm font-medium btn-secondary cursor-pointer shrink-0">
                   Загрузить
-                  <input type="file" accept="image/*" class="hidden" onchange="autoUploadPhoto(event)" />
+                  <input type="file" accept="image/*,video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm" class="hidden" onchange="autoUploadPhoto(event)" />
                 </label>
               </div>
-              <div id="autoMsgPhotoPreview" class="hidden mb-2"><img class="w-full rounded-lg" style="max-height:150px;object-fit:cover" /></div>
+              <div id="autoMsgPhotoPreview" class="hidden mb-2"></div>
               <label class="text-xs mb-1 block" style="color: var(--text-secondary)">Текст сообщения</label>
               <textarea id="autoMsgText" rows="5" class="input-field w-full rounded-lg px-3 py-2 text-sm resize-y" placeholder="Текст сообщения..." oninput="onAutoMsgTextChange()"></textarea>
             </div>
@@ -1206,14 +1203,51 @@
         </div>
       </div>
 
+      <!-- Профиль контакта -->
+      <div id="contactProfile" class="hidden">
+        <div class="flex items-center gap-2 mb-3">
+          <button onclick="closeContactProfile()" class="py-2 px-3 rounded-lg text-sm btn-secondary">&larr;</button>
+          <div>
+            <div id="profileName" class="font-bold text-sm"></div>
+            <div id="profileInfo" class="text-xs" style="color: var(--text-secondary)"></div>
+          </div>
+        </div>
+        <div id="profileLoading" class="text-center py-8">
+          <div class="text-sm" style="color: var(--text-secondary)">Загрузка профиля...</div>
+        </div>
+        <div id="profileContent" class="hidden">
+          <div class="broadcast-card mb-3">
+            <div class="section-label">Теги</div>
+            <div id="profileTags" class="flex flex-wrap gap-1 mb-2"></div>
+            <div class="flex gap-2">
+              <input type="text" id="profileNewTag" placeholder="Новый тег..." class="input-field flex-1 rounded-lg px-3 py-2 text-sm" />
+              <button onclick="addProfileTag()" class="btn-secondary rounded-lg px-3 py-2 text-sm shrink-0">Добавить</button>
+            </div>
+          </div>
+          <div class="broadcast-card mb-3">
+            <div class="section-label">Переменные</div>
+            <div id="profileVariables"></div>
+            <div class="flex gap-2 mt-2">
+              <input type="text" id="profileNewVarKey" placeholder="Ключ" class="input-field flex-1 rounded-lg px-3 py-2 text-sm" />
+              <input type="text" id="profileNewVarValue" placeholder="Значение" class="input-field flex-1 rounded-lg px-3 py-2 text-sm" />
+              <button onclick="addProfileVariable()" class="btn-secondary rounded-lg px-3 py-2 text-sm shrink-0">+</button>
+            </div>
+          </div>
+          <button onclick="openChatFromProfile()" class="w-full py-3 rounded-xl text-sm font-medium btn-primary">Открыть чат</button>
+        </div>
+      </div>
+
       <!-- Окно чата (переписка) -->
       <div id="chatConversation" class="hidden">
         <div class="flex items-center gap-2 mb-3">
           <button onclick="closeChatConversation()" class="py-2 px-3 rounded-lg text-sm btn-secondary">&larr;</button>
-          <div>
+          <div class="flex-1">
             <div id="chatConvName" class="font-bold text-sm"></div>
             <div id="chatConvInfo" class="text-xs" style="color: var(--text-secondary)"></div>
           </div>
+          <button onclick="openProfileFromChat()" class="py-2 px-3 rounded-lg text-sm btn-secondary" title="Профиль контакта">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </button>
         </div>
         <div id="chatMessagesArea" class="chat-messages-area"></div>
         <div class="chat-input-area">
@@ -1386,7 +1420,7 @@
     let filterConditions = [];
     let filterOperators = [];
 
-    let messages = [{ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown', delay_before: 0 }];
+    let messages = [{ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown', delay_before: 0, media_type: null }];
     let currentMessageIndex = 0;
 
     let allLists = [];
@@ -2210,7 +2244,8 @@
         const textPreview = msg.text
           ? (msg.text.length > 60 ? msg.text.slice(0, 60) + '...' : msg.text)
           : '(пустое сообщение)';
-        const photoIcon = msg.photo_url ? '<span class="text-xs mr-2" style="color:var(--text-muted)">&#128247;</span>' : '';
+        const mediaIcon = msg.photo_url ? (msg.media_type === 'video' || detectMediaTypeByUrl(msg.photo_url) === 'video' ? '<span class="text-xs mr-2" style="color:var(--text-muted)">&#127909;</span>' : '<span class="text-xs mr-2" style="color:var(--text-muted)">&#128247;</span>') : '';
+        const photoIcon = mediaIcon;
         const btnCount = msg.buttons.length > 0
           ? `<span class="text-xs ml-2" style="color:var(--text-muted)">${msg.buttons.length} кн.</span>`
           : '';
@@ -2237,7 +2272,7 @@
 
     function addMessage() {
       if (messages.length >= 5) { showAlert('Максимум 5 сообщений'); return; }
-      messages.push({ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown', delay_before: 0 });
+      messages.push({ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown', delay_before: 0, media_type: null });
       renderMessagesList();
       editMessage(messages.length - 1);
     }
@@ -2265,6 +2300,7 @@
     function finishEditMessage() {
       const msg = messages[currentMessageIndex];
       msg.photo_url = document.getElementById('editorPhotoUrl').value.trim();
+      msg.media_type = detectMediaTypeByUrl(msg.photo_url) || msg.media_type || null;
       msg.text = document.getElementById('editorText').value;
       msg.parse_mode = document.getElementById('parseModeSelect').value || '';
       document.getElementById('emojiPicker').classList.remove('open');
@@ -2274,28 +2310,54 @@
     // ============================================
     // Шаг 2: Редактор сообщения
     // ============================================
+    function detectMediaTypeByUrl(url) {
+      if (!url) return null;
+      const ext = url.split(/[?#]/)[0].split('.').pop().toLowerCase();
+      if (['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext)) return 'video';
+      if (ext === 'gif') return 'animation';
+      if (['jpg', 'jpeg', 'png', 'webp'].includes(ext)) return 'photo';
+      return null;
+    }
+
+    function renderMediaPreview(container, url) {
+      const type = detectMediaTypeByUrl(url);
+      if (!url) {
+        container.innerHTML = '';
+        container.classList.add('hidden');
+        return;
+      }
+      if (type === 'video') {
+        container.innerHTML = `<video src="${escapeAttr(url)}" controls class="photo-preview" style="max-height:200px" onerror="this.parentElement.classList.add('hidden')"></video>`;
+      } else {
+        container.innerHTML = `<img src="${escapeAttr(url)}" class="photo-preview" alt="Превью" onerror="this.parentElement.classList.add('hidden')" />`;
+      }
+      container.classList.remove('hidden');
+    }
+
     function onEditorPhotoInput() {
       const url = document.getElementById('editorPhotoUrl').value.trim();
       const preview = document.getElementById('editorPhotoPreview');
-      const img = document.getElementById('editorPhotoImg');
       const counter = document.getElementById('editorCharCounter');
       if (url) {
-        img.src = url;
-        preview.classList.remove('hidden');
+        renderMediaPreview(preview, url);
         counter.classList.remove('hidden');
       } else {
+        preview.innerHTML = '';
         preview.classList.add('hidden');
         counter.classList.add('hidden');
       }
       messages[currentMessageIndex].photo_url = url;
+      messages[currentMessageIndex].media_type = detectMediaTypeByUrl(url);
       onEditorTextInput();
     }
 
     async function onPhotoFileSelect(input) {
       const file = input.files[0];
       if (!file) return;
-      if (file.size > 10 * 1024 * 1024) {
-        showAlert('Файл слишком большой (макс. 10 МБ)');
+      const isVideo = file.type.startsWith('video/');
+      const maxSize = isVideo ? 20 * 1024 * 1024 : 10 * 1024 * 1024;
+      if (file.size > maxSize) {
+        showAlert(`Файл слишком большой (макс. ${isVideo ? '20' : '10'} МБ)`);
         input.value = '';
         return;
       }
@@ -2318,6 +2380,9 @@
         const data = await r.json();
         if (data.ok && data.url) {
           document.getElementById('editorPhotoUrl').value = data.url;
+          if (data.media_type) {
+            messages[currentMessageIndex].media_type = data.media_type;
+          }
           onEditorPhotoInput();
         } else {
           showAlert(data.error || 'Ошибка загрузки');
@@ -2878,7 +2943,12 @@
         card.className = 'broadcast-card mb-3';
         let html = `<div class="section-label">Сообщение ${i + 1} из ${messages.length}</div>`;
         if (msg.photo_url) {
-          html += `<img src="${escapeAttr(msg.photo_url)}" class="photo-preview mb-2" onerror="this.style.display='none'" />`;
+          const mediaT = msg.media_type || detectMediaTypeByUrl(msg.photo_url);
+          if (mediaT === 'video') {
+            html += `<video src="${escapeAttr(msg.photo_url)}" controls class="photo-preview mb-2" style="max-height:200px" onerror="this.style.display='none'"></video>`;
+          } else {
+            html += `<img src="${escapeAttr(msg.photo_url)}" class="photo-preview mb-2" onerror="this.style.display='none'" />`;
+          }
         }
         html += `<div class="text-sm preview-text mb-2">${formatMarkdown(msg.text)}</div>`;
         if (msg.buttons.length > 0) {
@@ -3098,6 +3168,7 @@
               photo_url: msg.photo_url || '',
               text: msg.text.trim(),
               parse_mode: msg.parse_mode || null,
+              media_type: msg.media_type || null,
               delay_before: idx === 0 ? 0 : (msg.delay_before || 0),
               buttons: msg.buttons.map(btn => {
                 const b = { text: btn.text, type: btn.type, value: btn.value };
@@ -3137,7 +3208,7 @@
     }
 
     function resetForm() {
-      messages = [{ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown', delay_before: 0 }];
+      messages = [{ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown', delay_before: 0, media_type: null }];
       currentMessageIndex = 0;
       filterConditions = [];
       filterOperators = [];
@@ -3338,8 +3409,9 @@
         buttons: (m.buttons || []).map(b => ({ text: b.text, type: b.type, value: b.value, style: b.style || '' })),
         parse_mode: m.parse_mode || 'Markdown',
         delay_before: m.delay_before || 0,
+        media_type: m.media_type || null,
       }));
-      if (messages.length === 0) messages = [{ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown', delay_before: 0 }];
+      if (messages.length === 0) messages = [{ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown', delay_before: 0, media_type: null }];
       currentMessageIndex = 0;
 
       // Заполняем фильтры
@@ -4060,7 +4132,7 @@
     // Авторассылки
     // ============================================
     let autoType = 'chain';
-    let autoSteps = [{ messages: [{ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown' }], delay_value: 0, delay_unit: 'hours', message_delay: 0 }];
+    let autoSteps = [{ messages: [{ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown', media_type: null }], delay_value: 0, delay_unit: 'hours', message_delay: 0 }];
     let autoSchedule = { days: [], time: '10:00' };
     let currentAutoStep = 0;
     let currentAutoMsgIndex = 0;
@@ -4086,7 +4158,7 @@
 
     function showAutoCreate() {
       // Сбрасываем состояние
-      autoSteps = [{ messages: [{ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown' }], delay_value: 0, delay_unit: 'hours', message_delay: 0 }];
+      autoSteps = [{ messages: [{ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown', media_type: null }], delay_value: 0, delay_unit: 'hours', message_delay: 0 }];
       autoSchedule = { days: [], time: '10:00' };
       autoFilterConditions = [];
       autoFilterOperators = [];
@@ -4131,7 +4203,7 @@
           autoSchedule.time = document.getElementById('autoScheduleTime').value;
           if (autoSchedule.days.length === 0) { showAlert('Выберите дни недели'); return; }
           // recurring — 1 шаг, сразу к редактору сообщений
-          if (autoSteps.length === 0) autoSteps = [{ messages: [{ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown' }], delay_value: 0, delay_unit: 'hours', message_delay: 0 }];
+          if (autoSteps.length === 0) autoSteps = [{ messages: [{ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown', media_type: null }], delay_value: 0, delay_unit: 'hours', message_delay: 0 }];
           currentAutoStep = 0;
           showAutoStep(3);
           renderAutoMsgList();
@@ -4216,7 +4288,7 @@
 
     function addAutoStep() {
       if (autoSteps.length >= 5) { showAlert('Максимум 5 шагов'); return; }
-      autoSteps.push({ messages: [{ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown' }], delay_value: 1, delay_unit: 'hours', message_delay: 0 });
+      autoSteps.push({ messages: [{ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown', media_type: null }], delay_value: 1, delay_unit: 'hours', message_delay: 0 });
       renderAutoSteps();
     }
 
@@ -4255,7 +4327,8 @@
         const card = document.createElement('div');
         card.className = 'msg-card fade-in';
         const textPreview = msg.text ? (msg.text.length > 60 ? msg.text.slice(0, 60) + '...' : msg.text) : '(пустое сообщение)';
-        const photoIcon = msg.photo_url ? '<span class="text-xs mr-2" style="color:var(--text-muted)">&#128247;</span>' : '';
+        const mediaIcon = msg.photo_url ? (msg.media_type === 'video' || detectMediaTypeByUrl(msg.photo_url) === 'video' ? '<span class="text-xs mr-2" style="color:var(--text-muted)">&#127909;</span>' : '<span class="text-xs mr-2" style="color:var(--text-muted)">&#128247;</span>') : '';
+        const photoIcon = mediaIcon;
         const btnCount = msg.buttons.length > 0 ? `<span class="text-xs ml-2" style="color:var(--text-muted)">${msg.buttons.length} кн.</span>` : '';
         const deleteBtn = step.messages.length > 1 ? `<button onclick="event.stopPropagation();removeAutoMessage(${i})" class="text-xs ml-2" style="color:var(--danger)">&#10005;</button>` : '';
         card.innerHTML = `
@@ -4280,7 +4353,7 @@
     function addAutoMessage() {
       const step = autoSteps[currentAutoStep];
       if (step.messages.length >= 5) { showAlert('Максимум 5 сообщений'); return; }
-      step.messages.push({ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown' });
+      step.messages.push({ photo_url: '', text: '', buttons: [], parse_mode: 'Markdown', media_type: null });
       renderAutoMsgList();
     }
 
@@ -4304,14 +4377,9 @@
       document.getElementById('autoMsgParseMode').value = msg.parse_mode || 'Markdown';
       document.getElementById('autoMsgPhotoUrl').value = msg.photo_url || '';
       document.getElementById('autoMsgText').value = msg.text || '';
-      // Фото превью
+      // Медиа превью
       const preview = document.getElementById('autoMsgPhotoPreview');
-      if (msg.photo_url) {
-        preview.classList.remove('hidden');
-        preview.querySelector('img').src = msg.photo_url;
-      } else {
-        preview.classList.add('hidden');
-      }
+      renderMediaPreview(preview, msg.photo_url);
       renderAutoButtons();
       showAutoStep(4);
     }
@@ -4328,9 +4396,9 @@
     function onAutoMsgPhotoChange() {
       const url = document.getElementById('autoMsgPhotoUrl').value.trim();
       autoSteps[currentAutoStep].messages[currentAutoMsgIndex].photo_url = url;
+      autoSteps[currentAutoStep].messages[currentAutoMsgIndex].media_type = detectMediaTypeByUrl(url);
       const preview = document.getElementById('autoMsgPhotoPreview');
-      if (url) { preview.classList.remove('hidden'); preview.querySelector('img').src = url; }
-      else { preview.classList.add('hidden'); }
+      renderMediaPreview(preview, url);
     }
 
     function onAutoMsgTextChange() {
@@ -4340,6 +4408,13 @@
     async function autoUploadPhoto(event) {
       const file = event.target.files[0];
       if (!file) return;
+      const isVideo = file.type.startsWith('video/');
+      const maxSize = isVideo ? 20 * 1024 * 1024 : 10 * 1024 * 1024;
+      if (file.size > maxSize) {
+        showAlert(`Файл слишком большой (макс. ${isVideo ? '20' : '10'} МБ)`);
+        event.target.value = '';
+        return;
+      }
       const reader = new FileReader();
       reader.onload = async function(e) {
         try {
@@ -4347,11 +4422,14 @@
           const data = await r.json();
           if (data.ok) {
             document.getElementById('autoMsgPhotoUrl').value = data.url;
+            if (data.media_type) {
+              autoSteps[currentAutoStep].messages[currentAutoMsgIndex].media_type = data.media_type;
+            }
             onAutoMsgPhotoChange();
           } else {
             showAlert(data.error || 'Ошибка загрузки');
           }
-        } catch (err) { showAlert('Ошибка загрузки фото'); }
+        } catch (err) { showAlert('Ошибка загрузки медиа'); }
       };
       reader.readAsDataURL(file);
     }
@@ -4594,6 +4672,7 @@
               photo_url: m.photo_url || '',
               text: m.text,
               parse_mode: m.parse_mode || null,
+              media_type: m.media_type || null,
               buttons: m.buttons.map(b => ({ text: b.text, type: b.type, value: b.value })),
             })),
           })),
@@ -4840,7 +4919,7 @@
       list.innerHTML = shown.map(c => {
         const initials = (c.name || '?').charAt(0).toUpperCase();
         const tagsStr = (c.tags || []).slice(0, 3).map(t => escapeHtml(t)).join(', ');
-        return `<div class="chat-list-item" data-tgid="${c.telegram_id}" data-name="${escapeHtml(c.name || '')}" onclick="onContactClick(this)">
+        return `<div class="chat-list-item" data-tgid="${c.telegram_id}" data-contactid="${c.id || ''}" data-name="${escapeHtml(c.name || '')}" onclick="onContactClick(this)">
           <div class="chat-avatar">${initials}</div>
           <div style="flex:1;min-width:0">
             <div class="font-medium text-sm truncate">${escapeHtml(c.name || 'Без имени')}</div>
@@ -4855,7 +4934,12 @@
     }
 
     function onContactClick(el) {
-      startNewChat(el.dataset.tgid, el.dataset.name);
+      const contactId = el.dataset.contactid || '';
+      const tgId = el.dataset.tgid;
+      const name = el.dataset.name;
+      const botId = document.getElementById('chatBotSelect').value;
+      if (!botId) { showAlert('Выберите бота'); return; }
+      openContactProfile(contactId, tgId, name, botId);
     }
 
     async function startNewChat(telegramId, contactName) {
@@ -5028,6 +5112,177 @@
 
     function stopChatPolling() {
       if (chatPollingTimer) { clearInterval(chatPollingTimer); chatPollingTimer = null; }
+    }
+
+    // ============================================
+    // Профиль контакта
+    // ============================================
+    let profileContactId = null;
+    let profileTelegramId = null;
+    let profileContactName = '';
+    let profileBotId = null;
+
+    async function openContactProfile(contactId, telegramId, name, botId) {
+      profileContactId = contactId;
+      profileTelegramId = telegramId;
+      profileContactName = name || '';
+      profileBotId = botId;
+
+      document.getElementById('chatTopPanel').classList.add('hidden');
+      document.getElementById('chatContactsView').classList.add('hidden');
+      document.getElementById('chatDialogsView').classList.add('hidden');
+      document.getElementById('chatConversation').classList.add('hidden');
+      document.getElementById('contactProfile').classList.remove('hidden');
+      document.getElementById('profileName').textContent = name || 'Без имени';
+      document.getElementById('profileInfo').textContent = 'Telegram ID: ' + telegramId;
+      document.getElementById('profileLoading').classList.remove('hidden');
+      document.getElementById('profileContent').classList.add('hidden');
+
+      if (!contactId) {
+        // Нет Leadteh contact_id — показываем пустой профиль
+        document.getElementById('profileLoading').classList.add('hidden');
+        document.getElementById('profileContent').classList.remove('hidden');
+        renderProfileTags([]);
+        renderProfileVariables([]);
+        return;
+      }
+
+      try {
+        const r = await apiFetch(`/api/contacts/${contactId}/profile?bot_id=${botId}`);
+        const data = await r.json();
+        document.getElementById('profileLoading').classList.add('hidden');
+        document.getElementById('profileContent').classList.remove('hidden');
+        renderProfileTags(data.tags || []);
+        renderProfileVariables(data.variables || []);
+      } catch (e) {
+        console.error('Profile load error:', e);
+        document.getElementById('profileLoading').innerHTML = '<div class="text-sm" style="color:var(--danger)">Ошибка загрузки профиля</div>';
+      }
+    }
+
+    function closeContactProfile() {
+      document.getElementById('contactProfile').classList.add('hidden');
+      document.getElementById('chatTopPanel').classList.remove('hidden');
+      showChatSubtab(chatCurrentSubtab);
+    }
+
+    function renderProfileTags(tags) {
+      const container = document.getElementById('profileTags');
+      if (tags.length === 0) {
+        container.innerHTML = '<span class="text-xs" style="color:var(--text-muted)">Нет тегов</span>';
+        return;
+      }
+      container.innerHTML = tags.map(t => `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium" style="background:var(--accent-light,#e0e7ff);color:var(--accent)">${escapeHtml(t)}<button onclick="removeProfileTag('${escapeAttr(t)}')" class="ml-1" style="color:var(--danger);font-size:10px">&times;</button></span>`).join('');
+    }
+
+    function renderProfileVariables(vars) {
+      const container = document.getElementById('profileVariables');
+      if (vars.length === 0) {
+        container.innerHTML = '<div class="text-xs" style="color:var(--text-muted)">Нет переменных</div>';
+        return;
+      }
+      container.innerHTML = vars.map(v => `<div class="flex items-center gap-2 mb-1">
+        <span class="text-xs font-medium" style="color:var(--text-secondary);min-width:80px">${escapeHtml(v.key)}</span>
+        <input type="text" value="${escapeAttr(v.value)}" onchange="setProfileVariable('${escapeAttr(v.key)}', this.value)" class="input-field flex-1 rounded px-2 py-1 text-xs" />
+        <button onclick="deleteProfileVariable('${escapeAttr(v.key)}')" class="text-xs px-1" style="color:var(--danger)">&times;</button>
+      </div>`).join('');
+    }
+
+    async function addProfileTag() {
+      const input = document.getElementById('profileNewTag');
+      const name = input.value.trim();
+      if (!name || !profileContactId) return;
+      try {
+        const r = await apiFetch(`/api/contacts/${profileContactId}/tags/add`, {
+          method: 'POST', body: { bot_id: profileBotId, name },
+        });
+        const data = await r.json();
+        if (data.ok) {
+          input.value = '';
+          openContactProfile(profileContactId, profileTelegramId, profileContactName, profileBotId);
+        } else {
+          showAlert(data.error || 'Ошибка');
+        }
+      } catch (e) { showAlert('Ошибка добавления тега'); }
+    }
+
+    async function removeProfileTag(tagName) {
+      if (!profileContactId) return;
+      try {
+        const r = await apiFetch(`/api/contacts/${profileContactId}/tags/remove`, {
+          method: 'POST', body: { bot_id: profileBotId, name: tagName },
+        });
+        const data = await r.json();
+        if (data.ok) {
+          openContactProfile(profileContactId, profileTelegramId, profileContactName, profileBotId);
+        } else {
+          showAlert(data.error || 'Ошибка');
+        }
+      } catch (e) { showAlert('Ошибка удаления тега'); }
+    }
+
+    async function setProfileVariable(name, value) {
+      if (!profileContactId) return;
+      try {
+        const r = await apiFetch(`/api/contacts/${profileContactId}/variables`, {
+          method: 'POST', body: { bot_id: profileBotId, name, value },
+        });
+        const data = await r.json();
+        if (!data.ok) showAlert(data.error || 'Ошибка');
+      } catch (e) { showAlert('Ошибка сохранения переменной'); }
+    }
+
+    async function deleteProfileVariable(name) {
+      if (!profileContactId) return;
+      try {
+        const r = await apiFetch(`/api/contacts/${profileContactId}/variables/delete`, {
+          method: 'POST', body: { bot_id: profileBotId, name },
+        });
+        const data = await r.json();
+        if (data.ok) {
+          openContactProfile(profileContactId, profileTelegramId, profileContactName, profileBotId);
+        } else {
+          showAlert(data.error || 'Ошибка');
+        }
+      } catch (e) { showAlert('Ошибка удаления переменной'); }
+    }
+
+    async function addProfileVariable() {
+      const keyInput = document.getElementById('profileNewVarKey');
+      const valueInput = document.getElementById('profileNewVarValue');
+      const name = keyInput.value.trim();
+      const value = valueInput.value.trim();
+      if (!name || !profileContactId) return;
+      try {
+        const r = await apiFetch(`/api/contacts/${profileContactId}/variables`, {
+          method: 'POST', body: { bot_id: profileBotId, name, value },
+        });
+        const data = await r.json();
+        if (data.ok) {
+          keyInput.value = '';
+          valueInput.value = '';
+          openContactProfile(profileContactId, profileTelegramId, profileContactName, profileBotId);
+        } else {
+          showAlert(data.error || 'Ошибка');
+        }
+      } catch (e) { showAlert('Ошибка добавления переменной'); }
+    }
+
+    function openChatFromProfile() {
+      document.getElementById('contactProfile').classList.add('hidden');
+      startNewChat(profileTelegramId, profileContactName);
+    }
+
+    function openProfileFromChat() {
+      // Открыть профиль из окна чата
+      const tgId = chatNewChatData?.telegramId || document.getElementById('chatConvInfo')?.textContent?.match(/ID:\s*(\d+)/)?.[1] || '';
+      const name = document.getElementById('chatConvName')?.textContent || '';
+      const botId = document.getElementById('chatBotSelect').value;
+      // Попытка найти contactId из кэшированных контактов
+      const contact = chatAllContacts.find(c => String(c.telegram_id) === String(tgId));
+      const contactId = contact?.id || '';
+      closeChatConversation();
+      openContactProfile(contactId, tgId, name, botId);
     }
 
     function closeChatConversation() {
