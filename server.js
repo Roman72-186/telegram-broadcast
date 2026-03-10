@@ -2447,19 +2447,20 @@ app.post('/api/chat/user/send', requireChatUser, (req, res) => {
     const message = db.addChatMessage(chat.id, 'incoming', text.trim());
     res.json({ ok: true, message });
 
-    // Уведомляем админов тенанта о новом сообщении
+    // Уведомляем админов тенанта через платформенный бот
     try {
-      const bot = db.getBotById(chat.bot_id);
-      if (bot) {
+      if (config.platformBotToken) {
         const admins = db.getTenantAdmins(chat.tenant_id);
         const contactName = chat.contact_name || chat.contact_telegram_id;
-        const notifyText = `💬 Новое сообщение от ${contactName}:\n\n${text.trim()}`;
+        const bot = db.getBotById(chat.bot_id);
+        const botName = bot ? bot.name : '';
+        const notifyText = `💬 Новое сообщение${botName ? ` (${botName})` : ''} от ${contactName}:\n\n${text.trim()}`;
         const openChatButton = [[{
           text: '💬 Открыть диалог',
           web_app: { url: `https://broadcast.leadtehsms.ru/` }
         }]];
         for (const admin of admins) {
-          sendSingleMessage(bot.token, admin.telegram_id, notifyText, null, openChatButton, null, chat.tenant_id)
+          sendSingleMessage(config.platformBotToken, admin.telegram_id, notifyText, null, openChatButton, null, null)
             .catch(err => console.error(`[chat] Ошибка уведомления админа ${admin.telegram_id}:`, err.message));
         }
       }
