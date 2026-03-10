@@ -2370,14 +2370,16 @@ app.post('/api/chat/send', requireTenantAdmin, requireDialogsAccess, async (req,
     // Сохраняем сообщение
     const message = db.addChatMessage(chat.id, 'outgoing', text.trim());
 
-    // Отправляем через Telegram Bot API с кнопкой «Ответить»
+    // Отправляем через Telegram Bot API с кнопкой «Диалог»
     const bot = db.getBotById(chat.bot_id);
     if (bot) {
+      const botName = bot.name || 'администратор';
+      const formattedText = `✉️ Вам пишет ${botName}:\n\n${text.trim()}`;
       const replyButton = [[{
-        text: 'Ответить',
+        text: '💬 Диалог',
         web_app: { url: `https://broadcast.leadtehsms.ru/?mode=chat&bot=${chat.bot_id}` }
       }]];
-      const tgResp = await sendSingleMessage(bot.token, chat.contact_telegram_id, text.trim(), null, replyButton, null, chat.tenant_id);
+      const tgResp = await sendSingleMessage(bot.token, chat.contact_telegram_id, formattedText, null, replyButton, null, chat.tenant_id);
       if (!tgResp.ok) {
         const err = await tgResp.json().catch(() => ({}));
         console.error(`[chat] Ошибка отправки в Telegram:`, err.description || 'unknown');
@@ -2444,6 +2446,26 @@ app.post('/api/chat/user/send', requireChatUser, (req, res) => {
 
     const message = db.addChatMessage(chat.id, 'incoming', text.trim());
     res.json({ ok: true, message });
+
+    // Уведомляем админов тенанта о новом сообщении
+    try {
+      const bot = db.getBotById(chat.bot_id);
+      if (bot) {
+        const admins = db.getTenantAdmins(chat.tenant_id);
+        const contactName = chat.contact_name || chat.contact_telegram_id;
+        const notifyText = `💬 Новое сообщение от ${contactName}:\n\n${text.trim()}`;
+        const openChatButton = [[{
+          text: '💬 Открыть диалог',
+          web_app: { url: `https://broadcast.leadtehsms.ru/` }
+        }]];
+        for (const admin of admins) {
+          sendSingleMessage(bot.token, admin.telegram_id, notifyText, null, openChatButton, null, chat.tenant_id)
+            .catch(err => console.error(`[chat] Ошибка уведомления админа ${admin.telegram_id}:`, err.message));
+        }
+      }
+    } catch (notifyErr) {
+      console.error('[chat] Ошибка отправки уведомлений:', notifyErr.message);
+    }
   } catch (e) {
     console.error('POST /api/chat/user/send error:', e.message);
     res.status(500).json({ error: 'Ошибка отправки' });
