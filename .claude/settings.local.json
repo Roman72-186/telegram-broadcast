@@ -3,7 +3,8 @@
     "allow": [
       "Bash(ssh:*)",
       "WebFetch(domain:core.telegram.org)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "WebFetch(domain:docs.leadteh.ru)"
     ]
   }
 }
