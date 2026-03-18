@@ -4,7 +4,8 @@
       "Bash(ssh:*)",
       "WebFetch(domain:core.telegram.org)",
       "Bash(node:*)",
-      "WebFetch(domain:docs.leadteh.ru)"
+      "WebFetch(domain:docs.leadteh.ru)",
+      "Bash(echo \"EXIT: $?\")"
     ]
   }
 }

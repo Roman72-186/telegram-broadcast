@@ -66,7 +66,7 @@ telegram-broadcast/
 
 | Роль | Описание |
 |---|---|
-| `super_admin` | SUPER_ADMIN_ID из .env. Управляет тенантами, тарифами, статистикой |
+| `super_admin` | SUPER_ADMIN_ID из .env. Имеет собственный тенант (автосоздаётся при первой авторизации). Видит все табы + суперадмин-панель. Может impersonate чужих тенантов и возвращаться к своему |
 | `owner` | Владелец тенанта. Управляет ботами, админами, Leadteh API |
 | `admin` | Админ тенанта. Создаёт рассылки, просматривает данные |
 
@@ -103,6 +103,7 @@ telegram-broadcast/
 - `POST /api/super/tenants/:id/update` — обновить тенанта
 - `POST /api/super/tenants/:id/delete` — удалить тенанта
 - `POST /api/super/impersonate` — войти под тенантом
+- `POST /api/super/exit-impersonate` — вернуться к своему тенанту
 - `GET /api/super/tariffs` — тарифные планы
 - `POST /api/super/tariffs` — создать тариф
 - `POST /api/super/tariffs/:id/update` — обновить тариф
