@@ -688,6 +688,11 @@
 
   <!-- Основной контент -->
   <div id="app" class="hidden max-w-lg mx-auto p-4">
+    <!-- Баннер impersonate -->
+    <div id="impersonateBanner" class="hidden rounded-xl px-4 py-3 mb-4 text-sm flex items-center justify-between" style="background:#fef3c7;color:#92400e">
+      <span id="impersonateBannerText"></span>
+      <button onclick="exitImpersonate()" class="ml-3 px-3 py-1 rounded-lg text-xs font-medium" style="background:#92400e;color:#fff">Вернуться</button>
+    </div>
     <!-- Баннер подписки -->
     <div id="subscriptionBanner" class="hidden rounded-xl px-4 py-3 mb-4 text-sm"></div>
 
@@ -1441,6 +1446,7 @@
     let userRole = null;
     let userTenantId = null;
     let currentUser = null;
+    let isImpersonating = false;
 
     let currentStep = 1;
     const mainSteps = [1, 3, 4, 5];
@@ -1615,7 +1621,7 @@
         // Тенант: загружаем ботов
         if (userTenantId) {
           await loadBots();
-          // Если нет ботов — показать онбординг вместо приложения
+          // Если нет ботов — показать онбординг (кроме суперадмина)
           if (allBots.length === 0 && userRole !== 'super_admin') {
             document.getElementById('app').classList.add('hidden');
             document.getElementById('onboardingScreen').classList.remove('hidden');
@@ -1623,13 +1629,10 @@
           }
           renderMessagesList();
           await loadSubscriptionInfo();
-        } else if (userRole === 'super_admin') {
-          // Суперадмин без тенанта — скрыть обычные табы, только панель управления
-          showTab('super');
-          document.getElementById('tabCreate').style.display = 'none';
-          document.getElementById('tabList').style.display = 'none';
-          document.getElementById('tabChat').style.display = 'none';
-          document.getElementById('tabSettings').style.display = 'none';
+          // Суперадмин по умолчанию видит панель управления
+          if (userRole === 'super_admin') {
+            showTab('super');
+          }
         }
       } catch (e) {
         console.error('Auth error:', e);
@@ -1661,7 +1664,6 @@
     let isFreeMode = false;
 
     async function loadSubscriptionInfo() {
-      if (userRole === 'super_admin' && !userTenantId) return;
       try {
         const r = await apiFetch('/api/tenant/info');
         const data = await r.json();
@@ -3984,16 +3986,35 @@
         if (data.ok) {
           authToken = data.token;
           userTenantId = tenantId;
+          isImpersonating = true;
           showAlert(`Вы вошли как тенант: ${data.tenant_name || tenantId}`);
-          // Восстановить табы при импersonации (Диалог управляется через loadSubscriptionInfo)
-          document.getElementById('tabCreate').style.display = '';
-          document.getElementById('tabList').style.display = '';
-          document.getElementById('tabSettings').style.display = '';
+          // Показать баннер impersonate
+          const banner = document.getElementById('impersonateBanner');
+          document.getElementById('impersonateBannerText').textContent = `Вы работаете как тенант: ${data.tenant_name || tenantId}`;
+          banner.classList.remove('hidden');
           await loadBots();
           renderMessagesList();
           await loadSubscriptionInfo();
           showTab('create');
         } else showAlert(data.error || 'Ошибка');
+      } catch (e) { showAlert('Ошибка'); }
+    }
+
+    async function exitImpersonate() {
+      try {
+        const r = await apiFetch('/api/super/exit-impersonate', { method: 'POST' });
+        const data = await r.json();
+        if (data.ok) {
+          authToken = data.token;
+          userTenantId = data.tenant_id;
+          isImpersonating = false;
+          document.getElementById('impersonateBanner').classList.add('hidden');
+          showAlert('Вы вернулись к своему аккаунту');
+          await loadBots();
+          renderMessagesList();
+          await loadSubscriptionInfo();
+          showTab('super');
+        }
       } catch (e) { showAlert('Ошибка'); }
     }
 

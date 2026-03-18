@@ -309,14 +309,20 @@ app.post('/api/auth', rateLimit(req => req.ip, 15, 60000), (req, res) => {
       });
     }
 
+    // Автосоздание тенанта для суперадмина
+    let effectiveTenantId = tenantId;
+    if (role === 'super_admin' && !tenantId) {
+      effectiveTenantId = db.ensureSuperAdminTenant(telegramId);
+    }
+
     // Создаём сессию
-    const session = db.createSession(tenantId, telegramId, role);
+    const session = db.createSession(effectiveTenantId, telegramId, role);
 
     res.json({
       authorized: true,
       token: session.token,
       role,
-      tenantId,
+      tenantId: effectiveTenantId,
       user: {
         id: validation.user.id,
         first_name: validation.user.first_name,
@@ -1975,6 +1981,18 @@ app.post('/api/super/impersonate', requireSuperAdmin, (req, res) => {
     res.json({ ok: true, token: session.token, tenant_name: tenant.name });
   } catch (e) {
     console.error('POST /api/super/impersonate error:', e.message);
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+// --- Выход из режима impersonate (возврат к своему тенанту) ---
+app.post('/api/super/exit-impersonate', requireSuperAdmin, (req, res) => {
+  try {
+    const ownTenantId = db.ensureSuperAdminTenant(req.telegramId);
+    const session = db.createSession(ownTenantId, req.telegramId, 'super_admin');
+    res.json({ ok: true, token: session.token, tenant_id: ownTenantId });
+  } catch (e) {
+    console.error('POST /api/super/exit-impersonate error:', e.message);
     res.status(500).json({ error: 'Ошибка' });
   }
 });
