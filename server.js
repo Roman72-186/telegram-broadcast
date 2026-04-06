@@ -2537,27 +2537,27 @@ app.get('/api/cron/send', async (req, res) => {
 });
 
 // ============================================
-// Cron — каждую минуту проверяем и отправляем
+// Locks — защита от параллельных запусков
 // ============================================
-cron.schedule('* * * * *', async () => {
-  console.log(`[cron] ${new Date().toISOString()} — проверка рассылок`);
-  try {
-    const results = await processPendingBroadcasts();
-    if (results.length > 0) {
-      console.log('[cron] Обработано:', results);
-    }
-    // Авторассылки: цепочки
-    await processChainRuns();
-    // Авторассылки: рекурренция
-    await processRecurringBroadcasts();
-    // Очистка просроченных сессий
-    db.deleteExpiredSessions();
-    // Уведомления об истекающем trial (раз в час)
-    if (new Date().getMinutes() === 0) {
-      await notifyTrialExpiry();
-    }
-  } catch (e) {
-    console.error('[cron] Ошибка:', e.message);
+const runningBroadcasts = new Set(); // ID рассылок, сейчас в процессе
+let chainRunning = false;            // Флаг: цепочки обрабатываются
+let recurringRunning = false;        // Флаг: рекуррентные обрабатываются
+
+// ============================================
+// Cron — каждую минуту, запуск асинхронный
+// ============================================
+cron.schedule('* * * * *', () => {
+  console.log(`[cron] ${new Date().toISOString()} — тик`);
+
+  // Рассылки запускаются асинхронно — не блокируют cron-тик
+  processPendingBroadcasts().catch(e => console.error('[cron] broadcast:', e.message));
+  processChainRuns().catch(e => console.error('[cron] chain:', e.message));
+  processRecurringBroadcasts().catch(e => console.error('[cron] recurring:', e.message));
+
+  // Быстрые операции — синхронно
+  db.deleteExpiredSessions();
+  if (new Date().getMinutes() === 0) {
+    notifyTrialExpiry().catch(e => console.error('[cron] notify:', e.message));
   }
 });
 
@@ -2594,37 +2594,59 @@ async function notifyTrialExpiry() {
 // ============================================
 async function processPendingBroadcasts() {
   const pending = db.getPendingBroadcasts();
-  const results = [];
+  const started = [];
 
   for (const broadcast of pending) {
+    // Пропускаем если уже запущена
+    if (runningBroadcasts.has(broadcast.id)) continue;
+
+    runningBroadcasts.add(broadcast.id);
     db.updateBroadcastStatus(broadcast.id, { status: 'sending' });
+    console.log(`[broadcast] Запуск рассылки ${broadcast.id} (асинхронно)`);
 
-    try {
-      const result = await sendBroadcast(broadcast);
-      db.updateBroadcastStatus(broadcast.id, {
-        status: 'sent',
-        sent_count: result.sent,
-        failed_count: result.failed,
-        sent_at: new Date().toISOString(),
+    // Запускаем без await — не блокируем следующие рассылки и cron
+    sendBroadcast(broadcast)
+      .then(result => {
+        db.updateBroadcastStatus(broadcast.id, {
+          status: result.failed === 0 ? 'sent' : (result.sent === 0 ? 'error' : 'sent_partial'),
+          sent_count: result.sent,
+          failed_count: result.failed,
+          sent_at: new Date().toISOString(),
+        });
+        console.log(`[broadcast] ${broadcast.id} завершена: отправлено ${result.sent}, ошибок ${result.failed}`);
+      })
+      .catch(e => {
+        console.error(`[broadcast] Ошибка ${broadcast.id}:`, e.message);
+        db.updateBroadcastStatus(broadcast.id, { status: 'error', error: e.message });
+      })
+      .finally(() => {
+        runningBroadcasts.delete(broadcast.id);
       });
-    } catch (e) {
-      console.error(`Ошибка отправки ${broadcast.id}:`, e.message);
-      db.updateBroadcastStatus(broadcast.id, {
-        status: 'error',
-        error: e.message,
-      });
-    }
 
-    results.push({ id: broadcast.id });
+    started.push({ id: broadcast.id });
   }
 
-  return results;
+  return started;
 }
 
 // ============================================
 // Авторассылки: обработка цепочек (per-contact enrollment)
 // ============================================
 async function processChainRuns() {
+  if (chainRunning) {
+    console.log('[auto-chain] Уже запущена, пропускаем тик');
+    return;
+  }
+  chainRunning = true;
+
+  try {
+    await _processChainRunsInner();
+  } finally {
+    chainRunning = false;
+  }
+}
+
+async function _processChainRunsInner() {
   // 1. Найти новых контактов для активных цепочек → enroll + отправить шаг 0
   const activeChains = db.getActiveChains();
   for (const chain of activeChains) {
@@ -2673,7 +2695,7 @@ async function processChainRuns() {
         } catch (e) {
           console.error(`[auto-chain] Ошибка отправки шага 0 контакту ${contact.telegram_id}:`, e.message);
         }
-        await new Promise(r => setTimeout(r, 35));
+        await new Promise(r => setTimeout(r, 60));
       }
     } catch (e) {
       console.error(`[auto-chain] Ошибка обработки цепочки ${chain.id}:`, e.message);
@@ -2731,7 +2753,7 @@ async function processChainRuns() {
       db.updateEnrollment(enrollment.id, { status: 'error' });
     }
   }
-}
+} // конец _processChainRunsInner
 
 // Получить контакты, подходящие под фильтры авторассылки
 async function getFilteredContacts(autoBroadcast) {
@@ -2836,6 +2858,12 @@ async function sendPreparedToContact(autoBroadcast, prepared, telegramId) {
 // Авторассылки: обработка рекурренции (recurring)
 // ============================================
 async function processRecurringBroadcasts() {
+  if (recurringRunning) {
+    console.log('[auto-recurring] Уже запущена, пропускаем тик');
+    return;
+  }
+  recurringRunning = true;
+
   const recurring = db.getRecurringDue();
   const now = new Date();
 
@@ -2844,7 +2872,6 @@ async function processRecurringBroadcasts() {
       const schedule = JSON.parse(ab.schedule_json);
       if (!schedule.days || !schedule.time) continue;
 
-      // Часовой пояс из настроек (по умолчанию МСК UTC+3)
       const tzOffset = (typeof schedule.tz_offset === 'number' ? schedule.tz_offset : 3) * 60 * 60 * 1000;
       const localNow = new Date(now.getTime() + tzOffset);
       const localDay = localNow.getUTCDay();
@@ -2852,31 +2879,35 @@ async function processRecurringBroadcasts() {
       const localMinute = localNow.getUTCMinutes();
       const localTimeStr = String(localHour).padStart(2, '0') + ':' + String(localMinute).padStart(2, '0');
 
-      // Проверяем день недели
       if (!schedule.days.includes(localDay)) continue;
-
-      // Проверяем время (минутная точность)
       if (localTimeStr !== schedule.time) continue;
-
-      // Проверяем: уже отправляли сегодня?
       if (db.hasRunToday(ab.id)) continue;
-
-      console.log(`[auto-recurring] Запуск "${ab.name}" (${schedule.time}, день ${localDay}, UTC+${typeof schedule.tz_offset === 'number' ? schedule.tz_offset : 3})`);
 
       const fullAb = db.getAutoBroadcast(ab.id);
       if (!fullAb || !fullAb.steps || fullAb.steps.length === 0) continue;
 
       const runId = db.createAutoRun(ab.id, null);
-      const step = fullAb.steps[0]; // recurring — всегда 1 шаг
+      const step = fullAb.steps[0];
 
-      await sendStepMessages(fullAb, step);
+      console.log(`[auto-recurring] Запуск "${ab.name}" асинхронно`);
 
-      db.updateAutoRun(runId, { current_step: 1, status: 'completed', completed_at: new Date().toISOString() });
-      console.log(`[auto-recurring] "${ab.name}" отправлена`);
+      // Запускаем без await
+      sendStepMessages(fullAb, step)
+        .then(() => {
+          db.updateAutoRun(runId, { current_step: 1, status: 'completed', completed_at: new Date().toISOString() });
+          console.log(`[auto-recurring] "${ab.name}" завершена`);
+        })
+        .catch(e => {
+          console.error(`[auto-recurring] Ошибка отправки "${ab.name}":`, e.message);
+          db.updateAutoRun(runId, { status: 'error' });
+        });
+
     } catch (e) {
       console.error(`[auto-recurring] Ошибка ${ab.id}:`, e.message);
     }
   }
+
+  recurringRunning = false;
 }
 
 // ============================================
@@ -2905,7 +2936,7 @@ async function sendStepMessages(autoBroadcast, step) {
     } else {
       failed++;
     }
-    await new Promise(r => setTimeout(r, 35));
+    await new Promise(r => setTimeout(r, 60));
   }
 
   console.log(`[auto] Отправлено: ${sent}, ошибок: ${failed}`);
@@ -3051,7 +3082,13 @@ async function sendBroadcast(broadcast) {
         if (!r.ok) {
           const err = await r.json();
           lastError = err.description || 'Telegram API error';
-          console.error(`Не удалось отправить ${contact.telegram_id} (msg ${i + 1}):`, err.description);
+          // 403 — пользователь заблокировал бота, не ретраим
+          if (r.status === 403) {
+            lastError = 'bot_blocked';
+            console.log(`[broadcast] ${contact.telegram_id} заблокировал бота, пропускаем`);
+          } else {
+            console.error(`Не удалось отправить ${contact.telegram_id} (msg ${i + 1}):`, err.description);
+          }
           contactFailed = true;
           break;
         }
@@ -3075,7 +3112,7 @@ async function sendBroadcast(broadcast) {
       db.saveBroadcastRecipient(broadcast.id, {
         telegram_id: contact.telegram_id,
         name: contactName,
-        status: 'failed',
+        status: lastError === 'bot_blocked' ? 'blocked' : 'failed',
         error: lastError || 'Ошибка отправки',
         sent_at: new Date().toISOString(),
       });
@@ -3090,7 +3127,7 @@ async function sendBroadcast(broadcast) {
       db.logContactSend(broadcast.tenant_id, contact.telegram_id, 'broadcast', broadcast.id);
     }
 
-    await new Promise(r => setTimeout(r, 35));
+    await new Promise(r => setTimeout(r, 60));
   }
 
   return { sent, failed };
