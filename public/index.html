@@ -26,6 +26,14 @@
       /* Дополнительные акценты */
       --cyan: #00cfff;
       --violet: #9b00ff;
+      /* Переменные для банеров и состояний */
+      --info-bg: rgba(0, 207, 255, 0.08);
+      --info-text: #00cfff;
+      --danger-bg: rgba(255, 51, 85, 0.10);
+      --danger-text: #ff3355;
+      --success-bg: rgba(0, 207, 255, 0.08);
+      --success-text: #00cfff;
+      --card-bg: var(--bg-secondary);
     }
 
     body {
@@ -180,10 +188,7 @@
       letter-spacing: 0.3px;
     }
 
-    .status-pending { background: rgba(243, 156, 18, 0.15); color: var(--warning); border: 1px solid rgba(243, 156, 18, 0.3); }
-    .status-sending { background: rgba(52, 152, 219, 0.15); color: #3498db; border: 1px solid rgba(52, 152, 219, 0.3); }
-    .status-sent { background: rgba(46, 204, 113, 0.15); color: var(--success); border: 1px solid rgba(46, 204, 113, 0.3); }
-    .status-sent_partial { background: rgba(243, 156, 18, 0.15); color: var(--warning); border: 1px solid rgba(243, 156, 18, 0.3); }
+    .status-sent_partial { background: rgba(255, 230, 0, 0.12); color: var(--warning); border: 1px solid rgba(255, 230, 0, 0.3); }
     .status-error { background: rgba(231, 76, 60, 0.15); color: var(--danger); border: 1px solid rgba(231, 76, 60, 0.3); }
     .status-active { background: rgba(46, 204, 113, 0.15); color: var(--success); border: 1px solid rgba(46, 204, 113, 0.3); }
     .status-blocked { background: rgba(231, 76, 60, 0.15); color: var(--danger); border: 1px solid rgba(231, 76, 60, 0.3); }
@@ -839,9 +844,9 @@
   <!-- Основной контент -->
   <div id="app" class="hidden max-w-lg mx-auto p-4">
     <!-- Баннер impersonate -->
-    <div id="impersonateBanner" class="hidden rounded-xl px-4 py-3 mb-4 text-sm flex items-center justify-between" style="background:#fef3c7;color:#92400e">
+    <div id="impersonateBanner" class="hidden rounded px-4 py-3 mb-4 text-sm flex items-center justify-between" style="background:rgba(155,0,255,0.12);border:1px solid rgba(155,0,255,0.4);color:#cc88ff">
       <span id="impersonateBannerText"></span>
-      <button onclick="exitImpersonate()" class="ml-3 px-3 py-1 rounded-lg text-xs font-medium" style="background:#92400e;color:#fff">Вернуться</button>
+      <button onclick="exitImpersonate()" class="ml-3 px-3 py-1 rounded text-xs font-bold" style="background:rgba(255,45,155,0.2);border:1px solid rgba(255,45,155,0.4);color:#ff2d9b">Вернуться</button>
     </div>
     <!-- Баннер подписки -->
     <div id="subscriptionBanner" class="hidden rounded-xl px-4 py-3 mb-4 text-sm"></div>
@@ -1847,15 +1852,15 @@
       const isExpired = subscriptionInfo.status === 'trial_expired' || subscriptionInfo.status === 'no_subscription';
 
       if (subscriptionInfo.status === 'trial') {
-        banner.style.background = 'var(--info-bg, #e0f2fe)';
-        banner.style.color = 'var(--info-text, #0369a1)';
+        banner.style.background = 'var(--info-bg)';
+        banner.style.color = 'var(--info-text)';
         const balance = currentTariff?.messages_balance || 0;
         banner.innerHTML = `<strong>Тестовый период:</strong> осталось ${subscriptionInfo.trialDaysLeft} дн. (${balance.toLocaleString('ru-RU')} сообщ.) <a href="javascript:void(0)" onclick="showTariffConfigurator()" style="text-decoration:underline;color:inherit">Оплатить</a>`;
         if (tabCreate) { tabCreate.style.opacity = ''; tabCreate.style.pointerEvents = ''; }
         updateCreateSubtabsDisabled(false);
       } else if (isExpired) {
-        banner.style.background = 'var(--danger-bg, #fee2e2)';
-        banner.style.color = 'var(--danger-text, #dc2626)';
+        banner.style.background = 'var(--danger-bg)';
+        banner.style.color = 'var(--danger-text)';
         banner.innerHTML = `<strong>Доступ ограничен.</strong> Создание рассылок заблокировано. <a href="javascript:void(0)" onclick="showTariffConfigurator()" style="text-decoration:underline;color:inherit">Выбрать тариф</a>`;
         if (tabCreate) { tabCreate.style.opacity = '0.5'; tabCreate.style.pointerEvents = 'none'; }
         updateCreateSubtabsDisabled(true);
@@ -1866,8 +1871,8 @@
           banner.classList.add('hidden');
         } else {
           const daysLeft = Math.max(0, Math.ceil((paidDate - new Date()) / (24*60*60*1000)));
-          banner.style.background = daysLeft <= 3 ? 'var(--danger-bg, #fee2e2)' : 'var(--info-bg, #e0f2fe)';
-          banner.style.color = daysLeft <= 3 ? 'var(--danger-text, #dc2626)' : 'var(--info-text, #0369a1)';
+          banner.style.background = daysLeft <= 3 ? 'var(--danger-bg)' : 'var(--info-bg)';
+          banner.style.color = daysLeft <= 3 ? 'var(--danger-text)' : 'var(--info-text)';
           const planName = currentTariff?.plan_name || '';
           banner.innerHTML = `<strong>${planName ? planName + ' — ' : ''}до ${paidDate.toLocaleDateString('ru-RU')}</strong> (${daysLeft} дн.) <a href="javascript:void(0)" onclick="showTariffConfigurator()" style="text-decoration:underline;color:inherit">Изменить</a>`;
         }
@@ -3706,10 +3711,10 @@
       // FREE_MODE: показываем упрощённый блок без тарифов и баланса
       if (isFreeMode) {
         el.innerHTML = `
-          <div class="section-label" style="color:var(--success-text,#16a34a)">Бесплатный доступ</div>
+          <div class="section-label" style="color:var(--cyan)">Быстрый доступ</div>
           <div class="flex items-center justify-between">
             <span class="text-xs" style="color:var(--text-secondary)">Ботов: ${limits.current_bots || 0}</span>
-            <span class="text-xs" style="color:var(--success-text,#16a34a)">Без ограничений</span>
+            <span class="text-xs" style="color:var(--cyan)">Без ограничений</span>
           </div>`;
         return;
       }
@@ -3720,7 +3725,7 @@
       el.innerHTML = `
         <div class="section-label">Тариф: ${escapeHtml(planName)}</div>
         <div class="mb-2">
-          <div class="text-xs mb-1" style="color:${isLow ? 'var(--danger-text,#dc2626)' : 'var(--text-secondary)'}">
+          <div class="text-xs mb-1" style="color:${isLow ? 'var(--danger-text)' : 'var(--text-secondary)'}">
             Баланс сообщений: <strong>${balance.toLocaleString('ru-RU')}</strong>
           </div>
         </div>
@@ -4211,19 +4216,19 @@
       const isFreeModeOn = !!cfg.free_mode;
       container.innerHTML = `
         <div class="section-label mb-2">Режим доступа</div>
-        <div class="flex items-center justify-between mb-3 p-3 rounded-lg" style="background:${isFreeModeOn ? 'var(--success-bg,#dcfce7)' : 'var(--card-bg)'}; border:1px solid ${isFreeModeOn ? 'var(--success,#16a34a)' : 'var(--border)'}">
+        <div class="flex items-center justify-between mb-3 p-3 rounded" style="background:${isFreeModeOn ? 'rgba(0,207,255,0.08)' : 'var(--bg-secondary)'}; border:1px solid ${isFreeModeOn ? '#00cfff' : 'var(--border)'}">
           <div>
-            <div class="text-sm font-bold" style="color:${isFreeModeOn ? 'var(--success-text,#16a34a)' : 'var(--text-primary)'}">
-              ${isFreeModeOn ? 'Бесплатный режим' : 'Платный режим'}
+            <div class="text-sm font-bold" style="color:${isFreeModeOn ? '#00cfff' : 'var(--text-primary)'}">
+              ${isFreeModeOn ? '⚡ Быстрый доступ' : 'Платный режим'}
             </div>
             <div class="text-xs" style="color:var(--text-muted)">
-              ${isFreeModeOn ? 'Все функции доступны без ограничений и оплаты' : 'Действуют тарифы, лимиты и оплата'}
+              ${isFreeModeOn ? 'Все функции без ограничений и оплаты' : 'Действуют тарифы, лимиты и оплата'}
             </div>
           </div>
           <label style="position:relative;display:inline-block;width:48px;height:26px;cursor:pointer">
             <input type="checkbox" ${isFreeModeOn ? 'checked' : ''} onchange="toggleFreeMode(this.checked)" style="opacity:0;width:0;height:0">
-            <span style="position:absolute;inset:0;background:${isFreeModeOn ? 'var(--success,#16a34a)' : 'var(--border,#ccc)'};border-radius:13px;transition:.3s"></span>
-            <span style="position:absolute;top:3px;left:${isFreeModeOn ? '25px' : '3px'};width:20px;height:20px;background:#fff;border-radius:50%;transition:.3s;box-shadow:0 1px 3px rgba(0,0,0,.2)"></span>
+            <span style="position:absolute;inset:0;background:${isFreeModeOn ? '#ff2d9b' : 'rgba(255,45,155,0.2)'};border-radius:13px;transition:.3s;box-shadow:${isFreeModeOn ? '0 0 10px rgba(255,45,155,0.5)' : 'none'}"></span>
+            <span style="position:absolute;top:3px;left:${isFreeModeOn ? '25px' : '3px'};width:20px;height:20px;background:#fff;border-radius:50%;transition:.3s;box-shadow:0 1px 3px rgba(0,0,0,.4)"></span>
           </label>
         </div>
         <div class="section-label">Докупка сообщений</div>
