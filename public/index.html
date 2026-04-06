@@ -272,6 +272,109 @@
     .status-error { background: rgba(255, 51, 85, 0.12); color: #ff3355; border: 1px solid rgba(255, 51, 85, 0.3); }
     .status-blocked { background: rgba(255, 51, 85, 0.12); color: #ff3355; border: 1px solid rgba(255, 51, 85, 0.3); }
 
+    /* ===== КИБЕРПАНК: экраны доступа ===== */
+    .cp-panel {
+      border: 1px solid rgba(255, 45, 155, 0.35);
+      border-radius: 4px;
+      background: linear-gradient(160deg, rgba(26, 0, 50, 0.95) 0%, rgba(10, 0, 18, 0.98) 100%);
+      padding: 28px 20px;
+      position: relative;
+      box-shadow: 0 0 24px rgba(255, 45, 155, 0.2), inset 0 0 40px rgba(255, 45, 155, 0.04);
+    }
+    .cp-panel::before {
+      content: '';
+      position: absolute;
+      top: -1px; left: 16px; right: 16px; height: 2px;
+      background: linear-gradient(90deg, transparent, #ff2d9b, #9b00ff, transparent);
+    }
+    .cp-panel::after {
+      content: '';
+      position: absolute;
+      bottom: -1px; left: 16px; right: 16px; height: 2px;
+      background: linear-gradient(90deg, transparent, #00cfff, #9b00ff, transparent);
+    }
+    .cp-title-blocked {
+      font-size: 1.2rem;
+      font-weight: 800;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #ff3355;
+      text-shadow: 0 0 12px rgba(255, 51, 85, 0.7), 0 0 28px rgba(255, 51, 85, 0.3);
+    }
+    .cp-title {
+      font-size: 1.2rem;
+      font-weight: 800;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #ff2d9b;
+      text-shadow: 0 0 12px rgba(255, 45, 155, 0.7), 0 0 28px rgba(255, 45, 155, 0.3);
+    }
+    .cp-icon {
+      font-size: 3rem;
+      display: block;
+      margin-bottom: 14px;
+      filter: drop-shadow(0 0 10px rgba(255, 45, 155, 0.5));
+    }
+    .cp-icon-blocked {
+      font-size: 3rem;
+      display: block;
+      margin-bottom: 14px;
+      filter: drop-shadow(0 0 10px rgba(255, 51, 85, 0.6));
+    }
+    .cp-id-box {
+      background: rgba(0, 207, 255, 0.07);
+      border: 1px solid rgba(0, 207, 255, 0.25);
+      border-left: 3px solid #00cfff;
+      border-radius: 4px;
+      padding: 10px 14px;
+      font-size: 12px;
+    }
+    .cp-pricing-card {
+      border: 1px solid rgba(0, 207, 255, 0.25);
+      border-radius: 4px;
+      background: rgba(0, 207, 255, 0.05);
+      padding: 14px;
+      text-align: left;
+      position: relative;
+      overflow: hidden;
+    }
+    .cp-pricing-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, #00cfff, transparent);
+    }
+    .cp-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 18px;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 600;
+      border: 1px solid rgba(255, 45, 155, 0.4);
+      color: #ff2d9b;
+      background: rgba(255, 45, 155, 0.08);
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+    .cp-link:hover {
+      background: rgba(255, 45, 155, 0.15);
+      box-shadow: 0 0 12px rgba(255, 45, 155, 0.3);
+    }
+    .cp-loading-text {
+      font-size: 13px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #ff2d9b;
+      text-shadow: 0 0 10px rgba(255, 45, 155, 0.6);
+      animation: cpBlink 1.2s ease-in-out infinite;
+    }
+    @keyframes cpBlink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
     .list-info {
       font-size: 12px;
       color: var(--text-secondary);
@@ -629,56 +732,59 @@
 <body class="pb-24">
   <!-- Экран загрузки -->
   <div id="loadingScreen" class="flex flex-col items-center justify-center min-h-screen p-6 text-center">
-    <div class="text-sm" style="color: var(--text-secondary)">Авторизация...</div>
+    <div class="cp-loading-text">Инициализация...</div>
   </div>
 
   <!-- Экран «Доступ запрещён» -->
-  <div id="accessDenied" class="hidden flex flex-col items-center min-h-screen p-6 text-center">
+  <div id="accessDenied" class="hidden flex flex-col items-center justify-center min-h-screen p-5 text-center">
     <!-- Блок для заблокированных -->
-    <div id="accessDeniedBlocked" class="hidden w-full max-w-md">
-      <div class="text-5xl mb-4 mt-8">&#128683;</div>
-      <h1 class="text-xl font-bold mb-2" style="color: var(--danger)">Доступ заблокирован</h1>
-      <p class="text-sm mb-4" style="color: var(--text-secondary)">Ваш аккаунт заблокирован администратором платформы.</p>
-      <div id="accessDeniedBlockedTgId" class="mb-4 px-4 py-3 rounded-lg text-xs" style="background: var(--bg-tertiary); border: 1px solid var(--border);">
-        Ваш Telegram ID: <span id="accessDeniedBlockedTgIdValue" class="font-mono font-bold" style="color: var(--text-primary); user-select: all;"></span>
-        <div class="mt-1" style="color: var(--text-muted)">Сообщите этот ID администратору для разблокировки</div>
+    <div id="accessDeniedBlocked" class="hidden w-full max-w-sm">
+      <div class="cp-panel">
+        <span class="cp-icon-blocked">&#128683;</span>
+        <div class="cp-title-blocked mb-3">Доступ заблокирован</div>
+        <p class="text-xs mb-4" style="color: var(--text-secondary)">Ваш аккаунт заблокирован администратором платформы.</p>
+        <div id="accessDeniedBlockedTgId" class="cp-id-box mb-5 text-left">
+          <div style="color: var(--text-muted); font-size: 11px; margin-bottom: 4px;">TELEGRAM ID</div>
+          <span id="accessDeniedBlockedTgIdValue" class="font-mono font-bold" style="color: #00cfff; user-select: all; font-size: 13px;"></span>
+          <div class="mt-2" style="color: var(--text-muted); font-size: 11px;">Сообщите этот ID администратору</div>
+        </div>
+        <a href="https://t.me/roman_chatbots" target="_blank" class="cp-link">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Связаться с администратором
+        </a>
       </div>
-      <a href="https://t.me/roman_chatbots" target="_blank" class="inline-flex items-center gap-2 px-5 py-3 rounded-lg text-sm font-medium" style="background: var(--bg-tertiary); color: var(--accent); border: 1px solid var(--border);">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        Связаться с администратором
-      </a>
     </div>
 
     <!-- Блок для незарегистрированных -->
-    <div id="accessDeniedRegister" class="hidden w-full max-w-md">
-      <div class="text-5xl mb-4 mt-8">&#128274;</div>
-      <h1 class="text-xl font-bold mb-2">Добро пожаловать в LT Кабинет</h1>
-      <p class="text-sm mb-4" style="color: var(--text-secondary)">Нажмите «Начать работу», чтобы пользоваться личным кабинетом.</p>
-      <div id="accessDeniedTgId" class="hidden mb-4 px-4 py-2 rounded-lg text-xs" style="background: var(--bg-tertiary); color: var(--text-secondary); border: 1px solid var(--border);">
-        Ваш Telegram ID: <span id="accessDeniedTgIdValue" class="font-mono font-bold" style="color: var(--text-primary); user-select: all;"></span>
-      </div>
+    <div id="accessDeniedRegister" class="hidden w-full max-w-sm">
+      <div class="cp-panel">
+        <span class="cp-icon">&#9889;</span>
+        <div class="cp-title mb-2">LT Кабинет</div>
+        <p class="text-xs mb-4" style="color: var(--text-secondary)">Платформа для Telegram-рассылок. Начните прямо сейчас.</p>
 
-      <!-- Информация о тарифе -->
-      <div id="accessDeniedInfo" class="w-full mt-2">
-        <div id="accessDeniedPricingCard" class="broadcast-card text-left" style="padding: 14px;">
-          <div class="text-sm font-bold mb-2" style="color:var(--accent)">Тестовый период — 7 дней</div>
-          <div class="text-xs mb-2" style="color:var(--text-secondary)">
-            50 сообщений бесплатно
-          </div>
-          <div class="text-xs" style="color:var(--text-muted)">
-            Боты — без ограничений. Далее от <span id="publicHintPrice">390 ₽</span>
-          </div>
+        <div id="accessDeniedTgId" class="hidden cp-id-box mb-4 text-left">
+          <div style="color: var(--text-muted); font-size: 11px; margin-bottom: 4px;">TELEGRAM ID</div>
+          <span id="accessDeniedTgIdValue" class="font-mono font-bold" style="color: #00cfff; user-select: all; font-size: 13px;"></span>
         </div>
-        <button onclick="publicRegister('free')" id="publicBtnFree" class="w-full py-3 rounded-lg text-sm font-medium btn-primary mt-3">
-          Попробовать бесплатно 7 дней
-        </button>
-      </div>
 
-      <div class="mt-4 pt-4" style="border-top: 1px solid var(--border);">
-        <a href="https://t.me/roman_chatbots" target="_blank" class="inline-flex items-center gap-2 text-xs" style="color: var(--text-secondary);">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          Связаться с администратором
-        </a>
+        <!-- Информация о тарифе -->
+        <div id="accessDeniedInfo" class="w-full">
+          <div id="accessDeniedPricingCard" class="cp-pricing-card mb-4">
+            <div class="text-xs font-bold mb-2" style="color:#00cfff; letter-spacing: 0.5px; text-transform: uppercase;">Тестовый период — 7 дней</div>
+            <div class="text-xs mb-1" style="color: var(--text-secondary)">50 сообщений бесплатно</div>
+            <div class="text-xs" style="color: var(--text-muted)">Без ограничений по ботам. Далее от <span id="publicHintPrice" style="color: #ffe600;">390 ₽</span></div>
+          </div>
+          <button onclick="publicRegister('free')" id="publicBtnFree" class="w-full py-3 rounded text-sm font-bold btn-primary">
+            &#9889; Начать бесплатно — 7 дней
+          </button>
+        </div>
+
+        <div class="mt-5 pt-4" style="border-top: 1px solid rgba(255,45,155,0.15);">
+          <a href="https://t.me/roman_chatbots" target="_blank" class="inline-flex items-center gap-2 text-xs" style="color: var(--text-muted);">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            Связаться с администратором
+          </a>
+        </div>
       </div>
     </div>
   </div>

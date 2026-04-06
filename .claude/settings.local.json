@@ -8,7 +8,8 @@
       "Bash(echo \"EXIT: $?\")",
       "Bash(bash deploy.sh \"design: неоновый зелёный редизайн\")",
       "Bash(bash deploy.sh \"design: киберпанк — cyan neon, dark purple bg, grid\")",
-      "Bash(bash deploy.sh \"design: полноценная киберпанк палитра — pink/violet/cyan/green/yellow\")"
+      "Bash(bash deploy.sh \"design: полноценная киберпанк палитра — pink/violet/cyan/green/yellow\")",
+      "Bash(bash deploy.sh \"design: киберпанк — экраны доступа, загрузки, онбординга\")"
     ]
   }
 }
