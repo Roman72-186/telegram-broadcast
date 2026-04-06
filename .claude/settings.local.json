@@ -17,7 +17,8 @@
       "WebFetch(domain:www.pexels.com)",
       "WebFetch(domain:peakpx.com)",
       "WebFetch(domain:unsplash.com)",
-      "Bash(bash deploy.sh \"feat: асинхронные рассылки — fire-and-forget, locks, 60ms delay, 403 blocked\")"
+      "Bash(bash deploy.sh \"feat: асинхронные рассылки — fire-and-forget, locks, 60ms delay, 403 blocked\")",
+      "Bash(bash:*)"
     ]
   }
 }

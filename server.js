@@ -2541,7 +2541,6 @@ app.get('/api/cron/send', async (req, res) => {
 // ============================================
 const runningBroadcasts = new Set(); // ID рассылок, сейчас в процессе
 let chainRunning = false;            // Флаг: цепочки обрабатываются
-let recurringRunning = false;        // Флаг: рекуррентные обрабатываются
 
 // ============================================
 // Cron — каждую минуту, запуск асинхронный
@@ -2858,12 +2857,6 @@ async function sendPreparedToContact(autoBroadcast, prepared, telegramId) {
 // Авторассылки: обработка рекурренции (recurring)
 // ============================================
 async function processRecurringBroadcasts() {
-  if (recurringRunning) {
-    console.log('[auto-recurring] Уже запущена, пропускаем тик');
-    return;
-  }
-  recurringRunning = true;
-
   const recurring = db.getRecurringDue();
   const now = new Date();
 
@@ -2907,7 +2900,6 @@ async function processRecurringBroadcasts() {
     }
   }
 
-  recurringRunning = false;
 }
 
 // ============================================
