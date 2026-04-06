@@ -379,6 +379,32 @@
       0%, 100% { opacity: 1; }
       50% { opacity: 0.4; }
     }
+    @keyframes cpEyePulse {
+      0%, 100% { opacity: 0.9; filter: drop-shadow(0 0 6px #00cfff); }
+      50% { opacity: 0.4; filter: drop-shadow(0 0 2px #00cfff); }
+    }
+    @keyframes cpScan {
+      0% { transform: translateY(-20px); opacity: 0; }
+      10% { opacity: 0.15; }
+      90% { opacity: 0.08; }
+      100% { transform: translateY(520px); opacity: 0; }
+    }
+    .cp-bg-mask {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      overflow: hidden; display: flex; align-items: center; justify-content: center;
+    }
+    .cp-bg-mask svg {
+      width: min(90vw, 480px);
+      height: auto;
+      opacity: 0.09;
+    }
+    .cp-eye-glow { animation: cpEyePulse 2.4s ease-in-out infinite; }
+    .cp-eye-glow-r { animation: cpEyePulse 2.4s ease-in-out infinite 0.4s; }
+    .cp-scan-line {
+      position: absolute; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, rgba(0,207,255,0.3), transparent);
+      animation: cpScan 4s linear infinite;
+    }
 
     .list-info {
       font-size: 12px;
@@ -735,6 +761,122 @@
   </style>
 </head>
 <body class="pb-24">
+
+  <!-- Киберпанк-фон: лицо в противогазе -->
+  <div class="cp-bg-mask">
+    <div class="cp-scan-line"></div>
+    <svg viewBox="0 0 400 540" xmlns="http://www.w3.org/2000/svg">
+      <!-- Голова -->
+      <ellipse cx="200" cy="215" rx="142" ry="172" fill="none" stroke="#ff2d9b" stroke-width="1.8"/>
+      <ellipse cx="200" cy="215" rx="148" ry="178" fill="none" stroke="#ff2d9b" stroke-width="0.6" opacity="0.4"/>
+
+      <!-- Козырёк / надбровная дуга -->
+      <path d="M105 162 Q155 138 200 135 Q245 138 295 162" fill="none" stroke="#ff2d9b" stroke-width="1.6"/>
+      <path d="M112 155 Q155 133 200 130 Q245 133 288 155" fill="none" stroke="#9b00ff" stroke-width="0.7" opacity="0.6"/>
+
+      <!-- Сканирующая линия HUD -->
+      <line x1="55" y1="162" x2="345" y2="162" stroke="#00cfff" stroke-width="0.5" opacity="0.35"/>
+
+      <!-- Левый окуляр (goggle) -->
+      <g class="cp-eye-glow">
+        <circle cx="152" cy="194" r="42" fill="none" stroke="#00cfff" stroke-width="2.2"/>
+        <circle cx="152" cy="194" r="32" fill="none" stroke="#00cfff" stroke-width="0.9" opacity="0.6"/>
+        <circle cx="152" cy="194" r="20" fill="rgba(0,207,255,0.07)" stroke="#00cfff" stroke-width="1.4"/>
+        <circle cx="152" cy="194" r="9"  fill="rgba(0,207,255,0.18)" stroke="#00cfff" stroke-width="1.2"/>
+        <circle cx="152" cy="194" r="3"  fill="#00cfff" opacity="0.8"/>
+        <!-- Блик -->
+        <path d="M138 182 Q146 176 154 180" stroke="rgba(255,255,255,0.35)" stroke-width="1.2" fill="none"/>
+      </g>
+
+      <!-- Правый окуляр -->
+      <g class="cp-eye-glow-r">
+        <circle cx="248" cy="194" r="42" fill="none" stroke="#00cfff" stroke-width="2.2"/>
+        <circle cx="248" cy="194" r="32" fill="none" stroke="#00cfff" stroke-width="0.9" opacity="0.6"/>
+        <circle cx="248" cy="194" r="20" fill="rgba(0,207,255,0.07)" stroke="#00cfff" stroke-width="1.4"/>
+        <circle cx="248" cy="194" r="9"  fill="rgba(0,207,255,0.18)" stroke="#00cfff" stroke-width="1.2"/>
+        <circle cx="248" cy="194" r="3"  fill="#00cfff" opacity="0.8"/>
+        <path d="M234 182 Q242 176 250 180" stroke="rgba(255,255,255,0.35)" stroke-width="1.2" fill="none"/>
+      </g>
+
+      <!-- Переносица между окулярами -->
+      <rect x="192" y="189" width="16" height="10" rx="2" fill="none" stroke="#9b00ff" stroke-width="1.2"/>
+      <line x1="194" y1="194" x2="206" y2="194" stroke="#9b00ff" stroke-width="0.8"/>
+
+      <!-- Ремни крепления -->
+      <path d="M50 194 L110 194" stroke="#ff2d9b" stroke-width="1.4" stroke-dasharray="6,3"/>
+      <path d="M290 194 L350 194" stroke="#ff2d9b" stroke-width="1.4" stroke-dasharray="6,3"/>
+      <rect x="42" y="189" width="13" height="10" rx="1.5" fill="none" stroke="#9b00ff" stroke-width="1.4"/>
+      <rect x="345" y="189" width="13" height="10" rx="1.5" fill="none" stroke="#9b00ff" stroke-width="1.4"/>
+
+      <!-- Корпус маски (нижняя часть лица) -->
+      <path d="M108 248 Q98 330 110 385 Q155 415 200 418 Q245 415 290 385 Q302 330 292 248 Q248 230 200 228 Q152 230 108 248Z"
+            fill="rgba(20,0,40,0.25)" stroke="#ff2d9b" stroke-width="1.8"/>
+
+      <!-- Внутренняя линия маски -->
+      <path d="M118 258 Q110 330 120 378 Q157 404 200 406 Q243 404 280 378 Q290 330 282 258 Q244 243 200 241 Q156 243 118 258Z"
+            fill="none" stroke="#ff2d9b" stroke-width="0.6" opacity="0.4"/>
+
+      <!-- Левый фильтр-канистра -->
+      <ellipse cx="143" cy="325" rx="34" ry="26" fill="rgba(0,207,255,0.05)" stroke="#00cfff" stroke-width="1.8"/>
+      <ellipse cx="143" cy="325" rx="26" ry="19" fill="none" stroke="#00cfff" stroke-width="0.7" opacity="0.5"/>
+      <line x1="111" y1="319" x2="175" y2="319" stroke="#00cfff" stroke-width="0.7" opacity="0.55"/>
+      <line x1="111" y1="325" x2="175" y2="325" stroke="#00cfff" stroke-width="0.7" opacity="0.55"/>
+      <line x1="111" y1="331" x2="175" y2="331" stroke="#00cfff" stroke-width="0.7" opacity="0.55"/>
+      <line x1="114" y1="313" x2="172" y2="313" stroke="#00cfff" stroke-width="0.5" opacity="0.3"/>
+      <line x1="114" y1="337" x2="172" y2="337" stroke="#00cfff" stroke-width="0.5" opacity="0.3"/>
+
+      <!-- Правый фильтр-канистра -->
+      <ellipse cx="257" cy="325" rx="34" ry="26" fill="rgba(0,207,255,0.05)" stroke="#00cfff" stroke-width="1.8"/>
+      <ellipse cx="257" cy="325" rx="26" ry="19" fill="none" stroke="#00cfff" stroke-width="0.7" opacity="0.5"/>
+      <line x1="225" y1="319" x2="289" y2="319" stroke="#00cfff" stroke-width="0.7" opacity="0.55"/>
+      <line x1="225" y1="325" x2="289" y2="325" stroke="#00cfff" stroke-width="0.7" opacity="0.55"/>
+      <line x1="225" y1="331" x2="289" y2="331" stroke="#00cfff" stroke-width="0.7" opacity="0.55"/>
+      <line x1="228" y1="313" x2="286" y2="313" stroke="#00cfff" stroke-width="0.5" opacity="0.3"/>
+      <line x1="228" y1="337" x2="286" y2="337" stroke="#00cfff" stroke-width="0.5" opacity="0.3"/>
+
+      <!-- Центральный клапан выдоха -->
+      <circle cx="200" cy="305" r="24" fill="rgba(155,0,255,0.08)" stroke="#9b00ff" stroke-width="1.8"/>
+      <circle cx="200" cy="305" r="16" fill="none" stroke="#9b00ff" stroke-width="1.1"/>
+      <circle cx="200" cy="305" r="7"  fill="rgba(155,0,255,0.2)" stroke="#9b00ff" stroke-width="1.1"/>
+      <circle cx="200" cy="281" r="3"  fill="#9b00ff" opacity="0.55"/>
+      <circle cx="200" cy="329" r="3"  fill="#9b00ff" opacity="0.55"/>
+      <circle cx="176" cy="305" r="3"  fill="#9b00ff" opacity="0.55"/>
+      <circle cx="224" cy="305" r="3"  fill="#9b00ff" opacity="0.55"/>
+
+      <!-- Трубки от канистр к клапану -->
+      <path d="M177 323 Q186 316 176 305" fill="none" stroke="#9b00ff" stroke-width="1.4"/>
+      <path d="M223 323 Q214 316 224 305" fill="none" stroke="#9b00ff" stroke-width="1.4"/>
+
+      <!-- Схемные линии на маске -->
+      <path d="M118 265 L118 298 L132 298 L132 305" stroke="#9b00ff" stroke-width="0.8" opacity="0.5"/>
+      <circle cx="132" cy="265" r="2" fill="#9b00ff" opacity="0.5"/>
+      <line x1="118" y1="265" x2="132" y2="265" stroke="#9b00ff" stroke-width="0.8" opacity="0.5"/>
+      <path d="M282 265 L282 298 L268 298 L268 305" stroke="#9b00ff" stroke-width="0.8" opacity="0.5"/>
+      <circle cx="268" cy="265" r="2" fill="#9b00ff" opacity="0.5"/>
+      <line x1="282" y1="265" x2="268" y2="265" stroke="#9b00ff" stroke-width="0.8" opacity="0.5"/>
+
+      <!-- Подбородочный ремень -->
+      <path d="M152 400 Q200 422 248 400" fill="none" stroke="#ff2d9b" stroke-width="1.4"/>
+
+      <!-- Шея / воротник -->
+      <path d="M158 408 L148 465 L252 465 L242 408" fill="none" stroke="#ff2d9b" stroke-width="1" opacity="0.5"/>
+      <line x1="148" y1="445" x2="252" y2="445" stroke="#ff2d9b" stroke-width="0.7" opacity="0.4"/>
+      <line x1="151" y1="455" x2="249" y2="455" stroke="#ff2d9b" stroke-width="0.5" opacity="0.3"/>
+
+      <!-- Угловые прицельные метки -->
+      <path d="M55 95 L55 118 L78 118"  fill="none" stroke="#ff2d9b" stroke-width="1.2" opacity="0.5"/>
+      <path d="M345 95 L345 118 L322 118" fill="none" stroke="#ff2d9b" stroke-width="1.2" opacity="0.5"/>
+      <path d="M55 455 L55 432 L78 432"  fill="none" stroke="#ff2d9b" stroke-width="1.2" opacity="0.5"/>
+      <path d="M345 455 L345 432 L322 432" fill="none" stroke="#ff2d9b" stroke-width="1.2" opacity="0.5"/>
+
+      <!-- Мелкие декоративные элементы HUD -->
+      <text x="57" y="92" font-size="7" fill="#ff2d9b" opacity="0.5" font-family="monospace">ID:7731</text>
+      <text x="310" y="92" font-size="7" fill="#ff2d9b" opacity="0.5" font-family="monospace">SYS:OK</text>
+      <text x="57" y="468" font-size="7" fill="#00cfff" opacity="0.5" font-family="monospace">O2:98%</text>
+      <text x="308" y="468" font-size="7" fill="#00cfff" opacity="0.5" font-family="monospace">SIG:ON</text>
+    </svg>
+  </div>
+
   <!-- Экран загрузки -->
   <div id="loadingScreen" class="flex flex-col items-center justify-center min-h-screen p-6 text-center">
     <div class="cp-loading-text">Инициализация...</div>
