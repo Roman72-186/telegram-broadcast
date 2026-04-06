@@ -8,46 +8,49 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     :root {
-      --bg-primary: #07050f;
-      --bg-secondary: #0d0a1a;
-      --bg-tertiary: #130f24;
-      --accent: #00f0ff;
-      --accent-hover: #00d4e8;
-      --accent-subtle: rgba(0, 240, 255, 0.10);
-      --accent-light: rgba(0, 240, 255, 0.18);
-      --text-primary: #ddf4ff;
-      --text-secondary: rgba(221, 244, 255, 0.6);
-      --text-muted: rgba(221, 244, 255, 0.30);
-      --danger: #ff2d78;
+      --bg-primary: #0a0012;
+      --bg-secondary: #10001e;
+      --bg-tertiary: #1a0032;
+      --accent: #ff2d9b;
+      --accent-hover: #e6007a;
+      --accent-subtle: rgba(255, 45, 155, 0.12);
+      --accent-light: rgba(255, 45, 155, 0.22);
+      --text-primary: #f0e6ff;
+      --text-secondary: rgba(240, 230, 255, 0.62);
+      --text-muted: rgba(240, 230, 255, 0.32);
+      --danger: #ff3355;
       --warning: #ffe600;
-      --success: #39ff85;
-      --success-text: #39ff85;
-      --border: rgba(0, 240, 255, 0.14);
+      --success: #00ff88;
+      --success-text: #00ff88;
+      --border: rgba(255, 45, 155, 0.18);
+      /* Дополнительные акценты */
+      --cyan: #00cfff;
+      --violet: #9b00ff;
     }
 
     body {
       background-color: var(--bg-primary);
       background-image:
-        linear-gradient(rgba(0, 240, 255, 0.025) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0, 240, 255, 0.025) 1px, transparent 1px);
-      background-size: 32px 32px;
+        linear-gradient(rgba(255, 45, 155, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 100, 255, 0.04) 1px, transparent 1px);
+      background-size: 36px 36px;
       color: var(--text-primary);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
 
     .btn-primary {
-      background: linear-gradient(135deg, #00f0ff, #0070d8);
-      color: #020c14;
+      background: linear-gradient(135deg, #ff2d9b, #7000ff);
+      color: #fff;
       font-weight: 700;
       letter-spacing: 0.4px;
       text-transform: uppercase;
       font-size: 0.8em;
-      box-shadow: 0 0 14px rgba(0, 240, 255, 0.55), 0 0 28px rgba(0, 240, 255, 0.2), 0 2px 8px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 0 14px rgba(255, 45, 155, 0.6), 0 0 28px rgba(112, 0, 255, 0.25), 0 2px 8px rgba(0, 0, 0, 0.5);
     }
 
     .btn-primary:hover {
-      background: linear-gradient(135deg, #33f5ff, #00a0ff);
-      box-shadow: 0 0 22px rgba(0, 240, 255, 0.75), 0 0 44px rgba(0, 240, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.5);
+      background: linear-gradient(135deg, #ff55b3, #9000ff);
+      box-shadow: 0 0 22px rgba(255, 45, 155, 0.8), 0 0 44px rgba(112, 0, 255, 0.35), 0 2px 8px rgba(0, 0, 0, 0.5);
     }
 
     .btn-primary:disabled {
@@ -77,7 +80,7 @@
     .input-field:focus {
       border-color: var(--accent);
       outline: none;
-      box-shadow: 0 0 0 2px rgba(0, 240, 255, 0.18), 0 0 12px rgba(0, 240, 255, 0.2);
+      box-shadow: 0 0 0 2px rgba(255, 45, 155, 0.2), 0 0 12px rgba(255, 45, 155, 0.2);
     }
 
     .input-field::placeholder {
@@ -86,7 +89,7 @@
 
     select.input-field {
       appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2300f0ff' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23ff2d9b' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
       background-repeat: no-repeat;
       background-position: right 10px center;
       padding-right: 28px;
@@ -235,27 +238,39 @@
 
     ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-track { background: var(--bg-primary); }
-    ::-webkit-scrollbar-thumb { background: rgba(0, 240, 255, 0.25); border-radius: 2px; }
-    ::-webkit-scrollbar-thumb:hover { background: rgba(0, 240, 255, 0.5); }
+    ::-webkit-scrollbar-thumb { background: rgba(255, 45, 155, 0.3); border-radius: 2px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255, 45, 155, 0.55); }
 
     h2 { letter-spacing: 0.3px; }
 
     /* Киберпанк: свечение на активных элементах */
     .tag-chip.selected {
-      box-shadow: 0 0 10px rgba(0, 240, 255, 0.45);
+      box-shadow: 0 0 10px rgba(255, 45, 155, 0.5);
     }
     .msg-card:hover {
-      box-shadow: 0 0 12px rgba(0, 240, 255, 0.15);
+      box-shadow: 0 0 14px rgba(255, 45, 155, 0.18);
     }
     .broadcast-card {
-      box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(0, 240, 255, 0.04);
+      box-shadow: 0 1px 6px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 45, 155, 0.05);
     }
 
-    /* Статистика — акцент cyan */
-    .stat-value { color: var(--accent) !important; text-shadow: 0 0 10px rgba(0, 240, 255, 0.5); }
+    /* Статистика — синтетический зелёный */
+    .stat-value { color: #00ff88 !important; text-shadow: 0 0 12px rgba(0, 255, 136, 0.55); }
 
-    /* Hint-box — cyan рамка */
-    .hint-box { border-left-color: var(--accent) !important; border-color: var(--accent) !important; }
+    /* Hint-box — электрический синий */
+    .hint-box {
+      border-left: 3px solid var(--cyan) !important;
+      border-color: rgba(0, 207, 255, 0.3) !important;
+      background: rgba(0, 207, 255, 0.05) !important;
+    }
+
+    /* Статус-бейджи в палитре киберпанк */
+    .status-sent { background: rgba(0, 255, 136, 0.12); color: #00ff88; border: 1px solid rgba(0, 255, 136, 0.3); }
+    .status-active { background: rgba(0, 255, 136, 0.12); color: #00ff88; border: 1px solid rgba(0, 255, 136, 0.3); }
+    .status-sending { background: rgba(0, 207, 255, 0.12); color: #00cfff; border: 1px solid rgba(0, 207, 255, 0.3); }
+    .status-pending { background: rgba(255, 230, 0, 0.12); color: #ffe600; border: 1px solid rgba(255, 230, 0, 0.3); }
+    .status-error { background: rgba(255, 51, 85, 0.12); color: #ff3355; border: 1px solid rgba(255, 51, 85, 0.3); }
+    .status-blocked { background: rgba(255, 51, 85, 0.12); color: #ff3355; border: 1px solid rgba(255, 51, 85, 0.3); }
 
     .list-info {
       font-size: 12px;
