@@ -2562,21 +2562,26 @@ const runningBots = new Set();       // bot_id ботов, занятых рас
 let chainRunning = false;            // Флаг: цепочки обрабатываются
 
 // ============================================
-// Cron — каждую минуту, запуск асинхронный
+// Cron — три независимые задачи каждую минуту
 // ============================================
+
+// Задача 1: Отложенные рассылки + служебные операции
 cron.schedule('* * * * *', () => {
-  console.log(`[cron] ${new Date().toISOString()} — тик`);
-
-  // Рассылки запускаются асинхронно — не блокируют cron-тик
-  processPendingBroadcasts().catch(e => console.error('[cron] broadcast:', e.message));
-  processChainRuns().catch(e => console.error('[cron] chain:', e.message));
-  processRecurringBroadcasts().catch(e => console.error('[cron] recurring:', e.message));
-
-  // Быстрые операции — синхронно
+  processPendingBroadcasts().catch(e => console.error('[cron:broadcast]', e.message));
   db.deleteExpiredSessions();
   if (new Date().getMinutes() === 0) {
-    notifyTrialExpiry().catch(e => console.error('[cron] notify:', e.message));
+    notifyTrialExpiry().catch(e => console.error('[cron:notify]', e.message));
   }
+});
+
+// Задача 2: Цепочки (chain) — независимо от рассылок
+cron.schedule('* * * * *', () => {
+  processChainRuns().catch(e => console.error('[cron:chain]', e.message));
+});
+
+// Задача 3: Расписание (recurring) — независимо от цепочек и рассылок
+cron.schedule('* * * * *', () => {
+  processRecurringBroadcasts().catch(e => console.error('[cron:recurring]', e.message));
 });
 
 // ============================================
