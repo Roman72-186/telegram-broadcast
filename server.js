@@ -2,6 +2,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const fs = require('fs');
+const fsPromises = require('fs').promises;
 const path = require('path');
 const cron = require('node-cron');
 const { loadConfig } = require('./lib/config');
@@ -882,8 +883,12 @@ app.post('/api/recipients/preview', requireTenantAdmin, async (req, res) => {
       }));
     }
 
-    // Кэшируем результат
+    // Кэшируем результат (лимит 50 записей — удаляем самые старые)
     const cacheId = `${req.tenantId}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    if (recipientPreviewCache.size >= 50) {
+      const oldest = [...recipientPreviewCache.entries()].sort((a, b) => a[1].createdAt - b[1].createdAt)[0];
+      if (oldest) recipientPreviewCache.delete(oldest[0]);
+    }
     recipientPreviewCache.set(cacheId, {
       tenantId: req.tenantId,
       contacts,
@@ -2608,9 +2613,18 @@ async function processPendingBroadcasts() {
   const pending = db.getPendingBroadcasts();
   const started = [];
 
+  // Лимит параллельных рассылок: не более 5 одновременно
+  const MAX_PARALLEL_BROADCASTS = 5;
+
   for (const broadcast of pending) {
     // Пропускаем если уже запущена
     if (runningBroadcasts.has(broadcast.id)) continue;
+
+    // Не запускаем новые если уже достигнут лимит параллельных
+    if (runningBroadcasts.size >= MAX_PARALLEL_BROADCASTS) {
+      console.log(`[broadcast] Достигнут лимит параллельных рассылок (${MAX_PARALLEL_BROADCASTS}), пропускаем тик`);
+      break;
+    }
 
     runningBroadcasts.add(broadcast.id);
     db.updateBroadcastStatus(broadcast.id, { status: 'sending' });
@@ -3314,7 +3328,7 @@ async function sendLocalMedia(botToken, chatId, text, localPath, replyMarkup, pa
     return { ok: false, json: async () => ({ description: 'Файл не найден: ' + localPath }) };
   }
 
-  const fileBuffer = fs.readFileSync(filePath);
+  const fileBuffer = await fsPromises.readFile(filePath);
   const ext = path.extname(filePath).toLowerCase();
 
   // Определяем MIME-тип
