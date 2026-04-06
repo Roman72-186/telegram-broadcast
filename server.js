@@ -2897,11 +2897,23 @@ async function processRecurringBroadcasts() {
       const localDay = localNow.getUTCDay();
       const localHour = localNow.getUTCHours();
       const localMinute = localNow.getUTCMinutes();
-      const localTimeStr = String(localHour).padStart(2, '0') + ':' + String(localMinute).padStart(2, '0');
 
       if (!schedule.days.includes(localDay)) continue;
-      if (localTimeStr !== schedule.time) continue;
+
+      // Окно запуска: запланированное время + до 5 минут (бот мог быть занят в точное время)
+      const [schedH, schedM] = schedule.time.split(':').map(Number);
+      const schedTotalMin = schedH * 60 + schedM;
+      const nowTotalMin = localHour * 60 + localMinute;
+      const diffMin = nowTotalMin - schedTotalMin;
+      if (diffMin < 0 || diffMin > 5) continue; // вне окна запуска
+
       if (db.hasRunToday(ab.id)) continue;
+
+      // Бот занят массовой рассылкой — пробуем следующий тик (пока в окне 5 мин)
+      if (ab.bot_id && runningBots.has(ab.bot_id)) {
+        console.log(`[auto-recurring] Бот ${ab.bot_id} занят, пробуем следующий тик для "${ab.name}" (осталось ${5 - diffMin} мин)`);
+        continue;
+      }
 
       const fullAb = db.getAutoBroadcast(ab.id);
       if (!fullAb || !fullAb.steps || fullAb.steps.length === 0) continue;
@@ -2909,7 +2921,8 @@ async function processRecurringBroadcasts() {
       const runId = db.createAutoRun(ab.id, null);
       const step = fullAb.steps[0];
 
-      console.log(`[auto-recurring] Запуск "${ab.name}" асинхронно`);
+      if (ab.bot_id) runningBots.add(ab.bot_id);
+      console.log(`[auto-recurring] Запуск "${ab.name}" бот=${ab.bot_id} (асинхронно)`);
 
       // Запускаем без await
       sendStepMessages(fullAb, step)
@@ -2920,6 +2933,9 @@ async function processRecurringBroadcasts() {
         .catch(e => {
           console.error(`[auto-recurring] Ошибка отправки "${ab.name}":`, e.message);
           db.updateAutoRun(runId, { status: 'error' });
+        })
+        .finally(() => {
+          if (ab.bot_id) runningBots.delete(ab.bot_id);
         });
 
     } catch (e) {
