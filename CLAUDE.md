@@ -1,165 +1,129 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # LT Кабинет — Мультитенантная SaaS-платформа (Telegram Mini App)
 
-## Описание проекта
+## Команды
 
-Мультитенантная SaaS-платформа для Telegram рассылок. Позволяет:
-1. **Суперадмин** (telegram_id из .env SUPER_ADMIN_ID) управляет арендаторами и тарифами
-2. **Арендаторы** (тенанты) — независимые пользователи со своими ботами, Leadteh-аккаунтами, рассылками
-3. Полная изоляция данных между арендаторами
-4. Все заходят через один платформенный бот суперадмина
+```bash
+# Запуск
+npm start              # node server.js (продакшн)
+npm run dev            # то же самое
 
-## Стек технологий
+# Одноразовая миграция из .env/JSON → SQLite
+node migrate.js
 
-- **Frontend:** HTML5, Tailwind CSS (CDN), vanilla JavaScript
-- **Backend:** Express.js (Node.js)
-- **Хранилище:** SQLite (sql.js — чистый JS/WASM, debounced save) — `data/broadcast.db`
-- **Авторизация:** Telegram initData HMAC-SHA-256 + Bearer token сессии
-- **API:** Leadteh REST API, Telegram Bot API (с retry + exponential backoff)
-- **Планировщик:** встроенный node-cron (каждую минуту)
-- **Деплой:** VPS + PM2
-
-## Структура проекта
-
+# Деплой на VPS
+bash deploy.sh "commit message"
 ```
-telegram-broadcast/
-├── server.js               — Express-сервер + cron + все API-роуты
-├── migrate.js              — Одноразовая миграция из .env/JSON в SQLite
-├── lib/
-│   ├── config.js           — Загрузка конфигурации (PORT, CRON_SECRET, PLATFORM_BOT_TOKEN)
-│   ├── db.js               — Инициализация SQLite (sql.js), все таблицы, CRUD-хелперы
-│   ├── auth.js             — Валидация initData (HMAC-SHA-256), роли, сессии
-│   ├── middleware.js       — Express middleware (Bearer auth, requireSuperAdmin, requireTenantAdmin)
-│   └── leadteh.js          — Работа с Leadteh API (контакты, теги, списки)
-├── public/
-│   └── index.html          — Mini App: мультишаговая форма + суперадмин-панель
-├── data/
-│   ├── broadcast.db        — SQLite база данных (создаётся автоматически)
-│   └── uploads/{tenant_id}/ — Загруженные файлы по тенантам
-├── package.json            — Зависимости: express, node-cron, sql.js
-├── .env.example            — Шаблон переменных окружения
-└── CLAUDE.md               — Этот файл
-```
+
+Тестов нет. Для ручной проверки cron: `GET /api/cron/send?secret=<CRON_SECRET>`.  
+Health check: `GET /health`.
+
+## Стек
+
+- **Backend:** Express.js (Node.js), без TypeScript
+- **БД:** SQLite через sql.js (WASM, in-memory + debounced disk save) — `data/broadcast.db`
+- **Frontend:** `public/index.html` — один HTML-файл, Tailwind CSS (CDN), vanilla JS
+- **Планировщик:** node-cron (каждую минуту проверяет pending рассылки)
+- **Шифрование:** AES-256-GCM (`lib/encryption.js`) — токены ботов и Leadteh API
 
 ## Переменные окружения (.env)
 
 | Переменная | Описание |
 |---|---|
-| `PORT` | Порт сервера (по умолчанию 3000) |
 | `PLATFORM_BOT_TOKEN` | Токен платформенного бота (для валидации initData) |
+| `SUPER_ADMIN_ID` | Telegram ID суперадмина |
+| `ENCRYPTION_KEY` | 64-символьный hex (32 байта AES-256). Автогенерируется при первом запуске и записывается в .env — **не терять** |
+| `PORT` | Порт (по умолчанию 3000) |
 | `CRON_SECRET` | Секрет для ручного вызова cron (необязательно) |
-| `SUPER_ADMIN_ID` | Telegram ID суперадмина платформы |
-| `FREE_MODE` | Бесплатный режим. Управляется из суперадмин-панели (Цены → переключатель). Можно принудительно задать `true`/`false` (перезаписывает БД) |
+| `FREE_MODE` | `true`/`false` — перезаписывает значение из БД при старте |
+| `BASE_URL` | Публичный URL приложения (нужен для платёжных webhook) |
+| `PAYMENT_PROVIDER` | `tbank` или `robokassa` |
+| `TBANK_TERMINAL_KEY`, `TBANK_PASSWORD`, `TBANK_TEST_MODE` | ТБанк |
+| `ROBOKASSA_LOGIN`, `ROBOKASSA_PASSWORD1`, `ROBOKASSA_PASSWORD2`, `ROBOKASSA_TEST_MODE` | Робокасса |
 
 Все остальные настройки (боты, Leadteh API, админы) хранятся в SQLite.
 
-## Архитектура аутентификации
+## Архитектура
+
+### Аутентификация и сессии
 
 ```
-Платформенный бот → Mini App → POST /api/auth (initData)
-  → Валидация HMAC-SHA-256 (PLATFORM_BOT_TOKEN)
-  → Определение роли: super_admin / owner / admin
-  → Создание сессии (24ч) → Bearer token
-  → Все API: Authorization: Bearer <token> → middleware → req.tenantId
+Telegram Mini App → POST /api/auth { initData }
+  → validateInitData() HMAC-SHA-256 (PLATFORM_BOT_TOKEN)
+  → getUserRole() → super_admin / owner / admin / none
+  → createSession() → Bearer token (24ч, хранится в sessions)
+  → Все API: Authorization: Bearer → authMiddleware → req.tenantId / req.role
 ```
 
-## Роли
+Impersonate: суперадмин вызывает `POST /api/super/impersonate` → сессия переключается на тенанта. `POST /api/super/exit-impersonate` — возврат к своему тенанту. Суперадмин при этом имеет собственный тенант (автосоздаётся при первой авторизации).
 
-| Роль | Описание |
+### Роли и middleware
+
+| Роль | Middleware |
 |---|---|
-| `super_admin` | SUPER_ADMIN_ID из .env. Имеет собственный тенант (автосоздаётся при первой авторизации). Видит все табы + суперадмин-панель. Может impersonate чужих тенантов и возвращаться к своему |
-| `owner` | Владелец тенанта. Управляет ботами, админами, Leadteh API |
-| `admin` | Админ тенанта. Создаёт рассылки, просматривает данные |
+| `super_admin` | `requireSuperAdmin` |
+| `owner` | `requireTenantOwner` (owner + super_admin) |
+| `admin` | `requireTenantAdmin` (admin + owner + super_admin) |
+| `chat_user` | `requireChatUser` |
 
-## API роуты
+### БД (lib/db.js)
 
-### Публичные
-- `GET /health` — health check (статус, uptime)
-- `POST /api/auth` — авторизация через initData
+sql.js держит базу в памяти. Запись на диск: debounced 500мс + каждые 5с + при SIGINT/SIGTERM.
 
-### Тенант (требует Bearer token)
-- `GET /api/bots` — боты тенанта
-- `GET /api/tags` — теги из Leadteh
-- `GET /api/contacts` — контакты с фильтрацией
-- `GET /api/lists` — списки Leadteh
-- `GET /api/lists/:id/items` — элементы списка
-- `POST /api/broadcast/save` — сохранить рассылку (валидация parse_mode)
-- `GET /api/broadcast/list` — список рассылок тенанта
-- `POST /api/broadcast/delete` — удалить pending рассылку
-- `POST /api/upload` — загрузка фото
-- `GET /api/settings` — настройки тенанта
-- `POST /api/settings/bot/add` — добавить бота (owner)
-- `POST /api/settings/bot/remove` — удалить бота (owner)
-- `POST /api/settings/admin/add` — добавить админа (owner)
-- `POST /api/settings/admin/remove` — удалить админа (owner)
-- `POST /api/settings/leadteh-token` — обновить Leadteh API токен (owner)
-- `POST /api/settings/validate-token` — проверить токен бота
-- `GET /api/settings/bot-lists` — привязка списков к ботам
-- `POST /api/settings/bot-lists` — сохранить привязку
-- `GET /api/tenant/info` — тариф и использование
+Обёртки над sql.js:
+- `run(sql, ...params)` — INSERT/UPDATE/DELETE, возвращает `{ lastInsertRowid, changes }`
+- `get(sql, ...params)` — SELECT одной строки
+- `all(sql, ...params)` — SELECT всех строк
 
-### Суперадмин
-- `GET /api/super/tenants` — список тенантов
-- `POST /api/super/tenants` — создать тенанта
-- `POST /api/super/tenants/:id/update` — обновить тенанта
-- `POST /api/super/tenants/:id/delete` — удалить тенанта
-- `POST /api/super/impersonate` — войти под тенантом
-- `POST /api/super/exit-impersonate` — вернуться к своему тенанту
-- `GET /api/super/tariffs` — тарифные планы
-- `POST /api/super/tariffs` — создать тариф
-- `POST /api/super/tariffs/:id/update` — обновить тариф
-- `GET /api/super/stats` — статистика платформы
+Транзакции: `beginTransaction()` / `commit()` / `rollback()`. Используются в `saveBroadcast`, `createTenant`, `setBotListMappings`.
 
-### Cron
-- `GET /api/cron/send?secret=...` — ручной запуск отправки
+Токены ботов и Leadteh API хранятся зашифрованными (AES-256-GCM, формат `enc:iv:authTag:data`). `decryptBotRow()` / `decryptTenantRow()` расшифровывают при чтении.
 
-## Установка с нуля
+### Схема таблиц БД
 
-```bash
-cp .env.example .env       # заполнить PLATFORM_BOT_TOKEN и SUPER_ADMIN_ID
-npm install
-node server.js
+```
+tariff_plans       — тарифные планы (messages_limit, price, is_default)
+pricing_config     — глобальная конфигурация цен (id=1, singleton)
+tenants            — арендаторы (telegram_id, leadteh_api_token, tariff_plan_id, status)
+tenant_admins      — owner/admin тенанта (telegram_id, role)
+bots               — боты тенанта (token зашифрован)
+broadcasts         — рассылки (status: pending/sending/done/failed)
+broadcast_messages — сообщения рассылки (photo_url, text, buttons_json, sort_order)
+broadcast_recipients — результаты доставки по получателям
+auto_broadcasts    — авторассылки (type: chain)
+auto_broadcast_steps — шаги авторассылки (delay_value, delay_unit)
+auto_broadcast_messages — сообщения шагов авторассылки
+usage_log          — учёт рассылок по месяцам
+sessions           — Bearer-сессии (expires_at +24ч)
+bot_list_mappings  — привязка бот → список Leadteh
+payments           — история оплат (status: pending/paid)
+platform_bot_users — пользователи, запустившие платформенного бота
 ```
 
-## Миграция с single-tenant
+### Cron (каждую минуту)
 
-```bash
-node migrate.js            # миграция .env → SQLite
-npm install
-node server.js
-```
+Находит `broadcasts` со `status='pending'` и `scheduled_at <= now`, загружает credentials бота из БД, отправляет сообщения через Telegram Bot API с exponential backoff при 429/5xx. Обрабатывает рассылки всех тенантов в одном процессе.
 
-## Деплой (PM2)
+### Платёжный модуль (lib/payment.js)
 
-```bash
-cd /opt/telegram-broadcast
-git pull
-npm install
-node migrate.js            # только при первой миграции
-pm2 restart broadcast
-```
+Strategy-паттерн: `getProvider(config)` возвращает объект с методами `createPayment()` и `verifyWebhook()`. Реализованы провайдеры: ТБанк (securepay.tinkoff.ru/v2) и Робокасса. В FREE_MODE платёжный провайдер не инициализируется.
 
-## Безопасность
+### Leadteh API (lib/leadteh.js)
 
-- Валидация Telegram initData через HMAC-SHA-256 (timingSafeEqual)
-- Сессии с Bearer token (24ч, хранятся в SQLite)
-- Все API защищены middleware авторизации
-- Изоляция данных: все SQL-запросы фильтруют по tenant_id
-- CORS: разрешён только Telegram WebApp и leadtehsms.ru
-- Загрузки изолированы по тенантам (data/uploads/{tenant_id}/)
-- Path traversal protection при доступе к файлам
-- Тарифные лимиты (макс. ботов, рассылок/мес, контактов)
-- Rate limiting: авторизация 5/мин, API 60/мин, загрузки 3/мин
-- Валидация parse_mode (Markdown, MarkdownV2, HTML)
-- Retry с exponential backoff при 429/5xx от Telegram API
-- Cron обрабатывает рассылки всех тенантов, загружая credentials из БД
-- Graceful shutdown с сохранением БД на диск (SIGINT/SIGTERM)
+Все вызовы к `app.leadteh.ru/api/v1` — получение контактов, тегов, списков. Контакты пагинируются по 500 штук. Leadteh Bot ID и API-токен берутся из настроек тенанта.
 
-## Архитектура БД (sql.js)
+### Безопасность
 
-- sql.js держит БД в памяти, пишет на диск debounced (500мс) + каждые 5с + при shutdown
-- Транзакции: saveBroadcast, createTenant, setBotListMappings обёрнуты в BEGIN/COMMIT
-- Для продакшена с высокой нагрузкой рекомендуется миграция на better-sqlite3 (нативный)
+- Валидация initData через HMAC-SHA-256 с timingSafeEqual
+- CORS: только telegram.org, t.me, leadtehsms.ru, localhost
+- Rate limiting (in-memory): авторизация 5/мин, API 60/мин, загрузки 3/мин
+- Path traversal protection для `data/uploads/{tenant_id}/`
+- Все SQL-запросы фильтруют по `tenant_id`
+- Webhook платформенного бота верифицируется через `X-Telegram-Bot-Api-Secret-Token`
 
 ## Язык
 
-- Интерфейс и комментарии — русский
+Интерфейс, комментарии в коде, имена переменных в SQL — русский.

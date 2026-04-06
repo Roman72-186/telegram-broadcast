@@ -5,7 +5,8 @@
       "WebFetch(domain:core.telegram.org)",
       "Bash(node:*)",
       "WebFetch(domain:docs.leadteh.ru)",
-      "Bash(echo \"EXIT: $?\")"
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(bash deploy.sh \"design: неоновый зелёный редизайн\")"
     ]
   }
 }

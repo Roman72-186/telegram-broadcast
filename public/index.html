@@ -8,21 +8,21 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     :root {
-      --bg-primary: #101014;
-      --bg-secondary: #1a1a21;
-      --bg-tertiary: #24242e;
-      --accent: #c4956a;
-      --accent-hover: #b5845c;
-      --accent-subtle: rgba(196, 149, 106, 0.12);
-      --accent-light: rgba(196, 149, 106, 0.18);
-      --text-primary: #e8e4e0;
-      --text-secondary: rgba(232, 228, 224, 0.6);
-      --text-muted: rgba(232, 228, 224, 0.32);
-      --danger: #d94f4f;
-      --warning: #e0a53e;
-      --success: #5cb87a;
-      --success-text: #5cb87a;
-      --border: rgba(200, 180, 160, 0.15);
+      --bg-primary: #090c0a;
+      --bg-secondary: #0f1610;
+      --bg-tertiary: #172117;
+      --accent: #00e676;
+      --accent-hover: #00cf69;
+      --accent-subtle: rgba(0, 230, 118, 0.10);
+      --accent-light: rgba(0, 230, 118, 0.18);
+      --text-primary: #e4f0e9;
+      --text-secondary: rgba(228, 240, 233, 0.6);
+      --text-muted: rgba(228, 240, 233, 0.32);
+      --danger: #ff4d6d;
+      --warning: #ffd166;
+      --success: #00e676;
+      --success-text: #00e676;
+      --border: rgba(0, 230, 118, 0.14);
     }
 
     body {
@@ -32,17 +32,21 @@
     }
 
     .btn-primary {
-      background: linear-gradient(135deg, #c4956a, #b5845c);
-      color: #fff;
+      background: linear-gradient(135deg, #00e676, #00c962);
+      color: #051a0b;
+      font-weight: 600;
+      box-shadow: 0 0 12px rgba(0, 230, 118, 0.35), 0 2px 8px rgba(0, 0, 0, 0.4);
     }
 
     .btn-primary:hover {
-      background: linear-gradient(135deg, #b5845c, #a3744e);
+      background: linear-gradient(135deg, #1fff85, #00e676);
+      box-shadow: 0 0 20px rgba(0, 230, 118, 0.55), 0 2px 8px rgba(0, 0, 0, 0.4);
     }
 
     .btn-primary:disabled {
-      opacity: 0.5;
+      opacity: 0.45;
       cursor: not-allowed;
+      box-shadow: none;
     }
 
     .btn-secondary {
@@ -66,7 +70,7 @@
     .input-field:focus {
       border-color: var(--accent);
       outline: none;
-      box-shadow: 0 0 0 2px var(--accent-subtle);
+      box-shadow: 0 0 0 2px rgba(0, 230, 118, 0.18), 0 0 8px rgba(0, 230, 118, 0.15);
     }
 
     .input-field::placeholder {
@@ -75,7 +79,7 @@
 
     select.input-field {
       appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23c4956a' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2300e676' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
       background-repeat: no-repeat;
       background-position: right 10px center;
       padding-right: 28px;
@@ -224,9 +228,21 @@
 
     ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-track { background: var(--bg-primary); }
-    ::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 2px; }
+    ::-webkit-scrollbar-thumb { background: rgba(0, 230, 118, 0.25); border-radius: 2px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(0, 230, 118, 0.45); }
 
     h2 { letter-spacing: 0.3px; }
+
+    /* Неоновое свечение на активных элементах */
+    .tag-chip.selected {
+      box-shadow: 0 0 8px rgba(0, 230, 118, 0.4);
+    }
+    .msg-card:hover {
+      box-shadow: 0 0 10px rgba(0, 230, 118, 0.12);
+    }
+    .broadcast-card {
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+    }
 
     .list-info {
       font-size: 12px;
