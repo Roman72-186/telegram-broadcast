@@ -2558,6 +2558,7 @@ app.get('/api/cron/send', async (req, res) => {
 // Locks — защита от параллельных запусков
 // ============================================
 const runningBroadcasts = new Set(); // ID рассылок, сейчас в процессе
+const runningBots = new Set();       // bot_id ботов, занятых рассылкой (1 бот = 1 рассылка)
 let chainRunning = false;            // Флаг: цепочки обрабатываются
 
 // ============================================
@@ -2613,22 +2614,20 @@ async function processPendingBroadcasts() {
   const pending = db.getPendingBroadcasts();
   const started = [];
 
-  // Лимит параллельных рассылок: не более 5 одновременно
-  const MAX_PARALLEL_BROADCASTS = 5;
-
   for (const broadcast of pending) {
-    // Пропускаем если уже запущена
+    // Пропускаем если эта рассылка уже запущена
     if (runningBroadcasts.has(broadcast.id)) continue;
 
-    // Не запускаем новые если уже достигнут лимит параллельных
-    if (runningBroadcasts.size >= MAX_PARALLEL_BROADCASTS) {
-      console.log(`[broadcast] Достигнут лимит параллельных рассылок (${MAX_PARALLEL_BROADCASTS}), пропускаем тик`);
-      break;
+    // 1 бот = 1 рассылка: пропускаем если бот уже занят другой рассылкой
+    if (broadcast.bot_id && runningBots.has(broadcast.bot_id)) {
+      console.log(`[broadcast] Бот ${broadcast.bot_id} занят, рассылка ${broadcast.id} ждёт следующего тика`);
+      continue;
     }
 
     runningBroadcasts.add(broadcast.id);
+    if (broadcast.bot_id) runningBots.add(broadcast.bot_id);
     db.updateBroadcastStatus(broadcast.id, { status: 'sending' });
-    console.log(`[broadcast] Запуск рассылки ${broadcast.id} (асинхронно)`);
+    console.log(`[broadcast] Запуск рассылки ${broadcast.id} бот=${broadcast.bot_id} (асинхронно)`);
 
     // Запускаем без await — не блокируем следующие рассылки и cron
     sendBroadcast(broadcast)
@@ -2647,6 +2646,7 @@ async function processPendingBroadcasts() {
       })
       .finally(() => {
         runningBroadcasts.delete(broadcast.id);
+        if (broadcast.bot_id) runningBots.delete(broadcast.bot_id);
       });
 
     started.push({ id: broadcast.id });
