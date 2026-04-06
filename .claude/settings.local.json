@@ -6,7 +6,8 @@
       "Bash(node:*)",
       "WebFetch(domain:docs.leadteh.ru)",
       "Bash(echo \"EXIT: $?\")",
-      "Bash(bash deploy.sh \"design: неоновый зелёный редизайн\")"
+      "Bash(bash deploy.sh \"design: неоновый зелёный редизайн\")",
+      "Bash(bash deploy.sh \"design: киберпанк — cyan neon, dark purple bg, grid\")"
     ]
   }
 }
