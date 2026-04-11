@@ -373,9 +373,10 @@ app.post('/api/auth/chat', rateLimit(req => req.ip, 10, 60000), (req, res) => {
 
     const telegramId = String(validation.user.id);
     const contactName = [validation.user.first_name, validation.user.last_name].filter(Boolean).join(' ');
+    const contactUsername = validation.user.username || '';
 
     // Находим или создаём чат
-    const chat = db.findOrCreateChat(bot.tenant_id, bot.id, telegramId, contactName);
+    const chat = db.findOrCreateChat(bot.tenant_id, bot.id, telegramId, contactName, contactUsername);
 
     // Создаём сессию chat_user
     const session = db.createSession(bot.tenant_id, telegramId, 'chat_user');

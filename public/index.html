@@ -1539,6 +1539,8 @@
 
       <!-- Подтаб: Диалоги (существующие чаты) -->
       <div id="chatDialogsView" class="hidden">
+        <input id="chatDialogsSearch" type="text" class="input-field w-full rounded-lg px-3 py-2 text-sm mb-3"
+          placeholder="Поиск по имени или @username..." oninput="filterChatDialogs()">
         <div id="chatListContent" class="space-y-2"></div>
         <div id="chatListEmpty" class="hidden text-center py-8">
           <div class="text-sm" style="color: var(--text-secondary)">Нет диалогов</div>
@@ -5266,6 +5268,7 @@
         btnDialogs.style.background = 'var(--accent)';
         btnDialogs.style.color = '#fff';
         viewDialogs.classList.remove('hidden');
+        document.getElementById('chatDialogsSearch').value = '';
         loadChatDialogs();
       }
     }
@@ -5401,6 +5404,8 @@
     }
 
     // --- Диалоги (существующие чаты) ---
+    let allChatDialogs = [];
+
     async function loadChatDialogs() {
       try {
         const r = await fetch('/api/chat/list', {
@@ -5409,45 +5414,71 @@
         const data = await r.json();
         const chats = data.chats || [];
 
-        const content = document.getElementById('chatListContent');
-        const empty = document.getElementById('chatListEmpty');
-
         const botId = document.getElementById('chatBotSelect').value;
-        const filtered = botId ? chats.filter(c => String(c.bot_id) === String(botId)) : chats;
+        allChatDialogs = botId ? chats.filter(c => String(c.bot_id) === String(botId)) : chats;
 
-        if (filtered.length === 0) {
-          content.innerHTML = '';
-          empty.classList.remove('hidden');
-          return;
-        }
-
-        empty.classList.add('hidden');
-        content.innerHTML = filtered.map(c => {
-          const initials = (c.contact_name || '?').charAt(0).toUpperCase();
-          const lastMsg = c.last_message_text
-            ? (c.last_message_direction === 'outgoing' ? 'Вы: ' : '') + truncate(c.last_message_text, 40)
-            : 'Нет сообщений';
-          const time = c.last_message_at ? formatChatTime(c.last_message_at) : '';
-          const badge = c.unread_count > 0
-            ? `<div class="chat-unread-badge">${c.unread_count}</div>`
-            : '';
-          return `<div class="chat-list-item" data-chat-id="${c.id}" data-name="${escapeHtml(c.contact_name || c.contact_telegram_id)}" data-tgid="${c.contact_telegram_id}" onclick="onChatListClick(this)">
-            <div class="chat-avatar">${initials}</div>
-            <div style="flex:1;min-width:0">
-              <div class="flex items-center justify-between">
-                <div class="font-medium text-sm truncate">${escapeHtml(c.contact_name || c.contact_telegram_id)}</div>
-                <div class="text-xs flex-shrink-0" style="color:var(--text-muted)">${time}</div>
-              </div>
-              <div class="flex items-center justify-between mt-0.5">
-                <div class="text-xs truncate" style="color:var(--text-secondary)">${escapeHtml(lastMsg)}</div>
-                ${badge}
-              </div>
-            </div>
-          </div>`;
-        }).join('');
+        renderChatDialogs(allChatDialogs);
       } catch (e) {
         console.error('loadChatDialogs error:', e);
       }
+    }
+
+    function filterChatDialogs() {
+      const q = (document.getElementById('chatDialogsSearch').value || '').trim().toLowerCase();
+      if (!q) {
+        renderChatDialogs(allChatDialogs);
+        return;
+      }
+      const filtered = allChatDialogs.filter(c => {
+        const name = (c.contact_name || '').toLowerCase();
+        const username = (c.contact_username || '').toLowerCase().replace(/^@/, '');
+        const tgid = String(c.contact_telegram_id || '');
+        const qClean = q.replace(/^@/, '');
+        return name.includes(q) || username.includes(qClean) || tgid.includes(q);
+      });
+      renderChatDialogs(filtered);
+    }
+
+    function renderChatDialogs(chats) {
+      const content = document.getElementById('chatListContent');
+      const empty = document.getElementById('chatListEmpty');
+
+      if (chats.length === 0) {
+        content.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+
+      empty.classList.add('hidden');
+      content.innerHTML = chats.map(c => {
+        const initials = (c.contact_name || '?').charAt(0).toUpperCase();
+        const lastMsg = c.last_message_text
+          ? (c.last_message_direction === 'outgoing' ? 'Вы: ' : '') + truncate(c.last_message_text, 40)
+          : 'Нет сообщений';
+        const time = c.last_message_at ? formatChatTime(c.last_message_at) : '';
+        const badge = c.unread_count > 0
+          ? `<div class="chat-unread-badge">${c.unread_count}</div>`
+          : '';
+        const usernameHint = c.contact_username
+          ? `<span class="text-xs" style="color:var(--text-muted)">@${escapeHtml(c.contact_username)}</span>`
+          : '';
+        return `<div class="chat-list-item" data-chat-id="${c.id}" data-name="${escapeHtml(c.contact_name || c.contact_telegram_id)}" data-tgid="${c.contact_telegram_id}" onclick="onChatListClick(this)">
+          <div class="chat-avatar">${initials}</div>
+          <div style="flex:1;min-width:0">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-1 min-w-0">
+                <div class="font-medium text-sm truncate">${escapeHtml(c.contact_name || c.contact_telegram_id)}</div>
+                ${usernameHint}
+              </div>
+              <div class="text-xs flex-shrink-0" style="color:var(--text-muted)">${time}</div>
+            </div>
+            <div class="flex items-center justify-between mt-0.5">
+              <div class="text-xs truncate" style="color:var(--text-secondary)">${escapeHtml(lastMsg)}</div>
+              ${badge}
+            </div>
+          </div>
+        </div>`;
+      }).join('');
     }
 
     function onChatListClick(el) {
