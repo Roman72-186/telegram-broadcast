@@ -26,8 +26,9 @@ Health check: `GET /health`.
 - **Backend:** Express.js (Node.js), без TypeScript
 - **БД:** SQLite через sql.js (WASM, in-memory + debounced disk save) — `data/broadcast.db`
 - **Frontend:** `public/index.html` — один HTML-файл, Tailwind CSS (CDN), vanilla JS
-- **Планировщик:** node-cron (каждую минуту проверяет pending рассылки)
+- **Планировщик:** node-cron (каждую минуту, три независимых задачи)
 - **Шифрование:** AES-256-GCM (`lib/encryption.js`) — токены ботов и Leadteh API
+- **Экспорт:** exceljs — выгрузка результатов рассылок в Excel
 
 ## Переменные окружения (.env)
 
@@ -60,6 +61,8 @@ Telegram Mini App → POST /api/auth { initData }
 
 Impersonate: суперадмин вызывает `POST /api/super/impersonate` → сессия переключается на тенанта. `POST /api/super/exit-impersonate` — возврат к своему тенанту. Суперадмин при этом имеет собственный тенант (автосоздаётся при первой авторизации).
 
+Чат-пользователи (контакты бота) авторизуются отдельно через `POST /api/auth/chat { initData, bot_id }` — валидация по токену конкретного бота тенанта, роль `chat_user`.
+
 ### Роли и middleware
 
 | Роль | Middleware |
@@ -68,6 +71,28 @@ Impersonate: суперадмин вызывает `POST /api/super/impersonate`
 | `owner` | `requireTenantOwner` (owner + super_admin) |
 | `admin` | `requireTenantAdmin` (admin + owner + super_admin) |
 | `chat_user` | `requireChatUser` |
+
+Доступ к диалогам дополнительно ограничен `requireDialogsAccess` (проверяет `has_dialogs` у тарифного плана).
+
+### Маршруты (server.js)
+
+| Префикс | Назначение |
+|---|---|
+| `/api/public/` | Регистрация, цены, тарифы — без авторизации |
+| `/api/auth` | Создание сессии через initData |
+| `/api/bots` | Управление ботами |
+| `/api/contacts`, `/api/tags`, `/api/lists` | Контакты, теги, списки Leadteh |
+| `/api/recipients` | Предварительный просмотр получателей (кэш) |
+| `/api/broadcast/` | Рассылки: создание, список, удаление, экспорт |
+| `/api/auto/` | Авторассылки: цепочки и расписания |
+| `/api/chat/` | Диалоги: admin ↔ contact |
+| `/api/settings/` | Настройки бота, администраторов, Leadteh |
+| `/api/tariff/` | Тарифный план, докупка сообщений |
+| `/api/payment/` | Webhook ТБанк/Робокасса, статус оплаты |
+| `/api/super/` | Суперадмин-панель |
+| `/api/cron/send` | Ручной запуск cron (CRON_SECRET) |
+| `/webhook/platform` | Webhook платформенного бота (/start) |
+| `/api/upload` | Загрузка фото для рассылок |
 
 ### БД (lib/db.js)
 
@@ -82,38 +107,58 @@ sql.js держит базу в памяти. Запись на диск: deboun
 
 Токены ботов и Leadteh API хранятся зашифрованными (AES-256-GCM, формат `enc:iv:authTag:data`). `decryptBotRow()` / `decryptTenantRow()` расшифровывают при чтении.
 
+**Миграции:** «Defensive ALTER TABLE» — при старте `initDb()` проверяет наличие колонки через `PRAGMA table_info(table)`, добавляет если нет. Все 20+ миграций идемпотентны, вынесены в конец `initTables()`.
+
 ### Схема таблиц БД
 
 ```
-tariff_plans       — тарифные планы (messages_limit, price, is_default)
-pricing_config     — глобальная конфигурация цен (id=1, singleton)
-tenants            — арендаторы (telegram_id, leadteh_api_token, tariff_plan_id, status)
-tenant_admins      — owner/admin тенанта (telegram_id, role)
-bots               — боты тенанта (token зашифрован)
-broadcasts         — рассылки (status: pending/sending/done/failed)
-broadcast_messages — сообщения рассылки (photo_url, text, buttons_json, sort_order)
-broadcast_recipients — результаты доставки по получателям
-auto_broadcasts    — авторассылки (type: chain)
-auto_broadcast_steps — шаги авторассылки (delay_value, delay_unit)
-auto_broadcast_messages — сообщения шагов авторассылки
-usage_log          — учёт рассылок по месяцам
-sessions           — Bearer-сессии (expires_at +24ч)
-bot_list_mappings  — привязка бот → список Leadteh
-payments           — история оплат (status: pending/paid)
-platform_bot_users — пользователи, запустившие платформенного бота
+tariff_plans            — тарифные планы (messages_limit, price, has_dialogs, is_default)
+pricing_config          — глобальная конфигурация цен (id=1, singleton, free_mode)
+tenants                 — арендаторы (telegram_id, leadteh_api_token, tariff_plan_id, messages_balance)
+tenant_admins           — owner/admin тенанта (telegram_id, role)
+bots                    — боты тенанта (token зашифрован)
+broadcasts              — рассылки (status: pending/sending/done/failed, scheduled_at)
+broadcast_messages      — сообщения рассылки (photo_url, text, buttons_json, parse_mode, sort_order, delay_before)
+broadcast_recipients    — результаты доставки по получателям
+auto_broadcasts         — авторассылки (type: chain/recurring, filters_json, status: active/paused)
+auto_broadcast_steps    — шаги цепочки (step_order, delay_value, delay_unit, message_delay)
+auto_broadcast_messages — сообщения шагов (photo_url, text, buttons_json, parse_mode, media_type)
+auto_broadcast_enrollments — состояние прохождения цепочки (contact_telegram_id, current_step, next_step_at, status)
+usage_log               — учёт рассылок по месяцам
+sessions                — Bearer-сессии (expires_at +24ч)
+bot_list_mappings       — привязка бот → список Leadteh
+payments                — история оплат (status: pending/paid)
+platform_bot_users      — пользователи, запустившие платформенного бота
+chats                   — диалоги admin↔contact (bot_id, contact_telegram_id, contact_name, contact_username, unread_count)
+chat_messages           — сообщения диалогов (direction: incoming/outgoing, text, status)
 ```
 
-### Cron (каждую минуту)
+### Cron (каждую минуту, три независимые задачи)
 
-Находит `broadcasts` со `status='pending'` и `scheduled_at <= now`, загружает credentials бота из БД, отправляет сообщения через Telegram Bot API с exponential backoff при 429/5xx. Обрабатывает рассылки всех тенантов в одном процессе.
+1. **`processPendingBroadcasts()`** — обычные рассылки: находит `status='pending'` и `scheduled_at <= now`, отправляет через Telegram Bot API с exponential backoff при 429/5xx, пишет в `broadcast_recipients`.
+
+2. **`processChainRuns()`** — цепочки авторассылок: записывает новые контакты в `auto_broadcast_enrollments`, отправляет нужный шаг цепочки, рассчитывает `next_step_at` следующего шага, помечает завершённые enrollments.
+
+3. **`processRecurringBroadcasts()`** — периодические рассылки: сверяет `schedule_json` (время + таймзона) с текущим временем, запускает рассылку в окне ±5 минут.
+
+Каждая задача независимо защищена от одновременного запуска флагом (`isRunning`).
+
+### Диалоги (чаты)
+
+Двусторонний обмен сообщениями между администратором тенанта и контактом.
+
+- **Создание чата:** при авторизации контакта через `/api/auth/chat` → `findOrCreateChat()` сохраняет `contact_name` и `contact_username` из Telegram initData. Чат также создаётся при первой отправке от администратора (`/api/chat/send`).
+- **Входящие:** контакт отправляет через `/api/chat/user/send` (роль `chat_user`). Платформенный бот уведомляет всех admin/owner тенанта.
+- **Исходящие:** админ отправляет через `/api/chat/send`, бот тенанта доставляет сообщение с кнопкой «Диалог».
+- **Tenant бoты НЕ имеют webhook** — платформа только отправляет сообщения через Telegram Bot API. Только платформенный бот (`/webhook/platform`) принимает входящие (только команда `/start`).
 
 ### Платёжный модуль (lib/payment.js)
 
-Strategy-паттерн: `getProvider(config)` возвращает объект с методами `createPayment()` и `verifyWebhook()`. Реализованы провайдеры: ТБанк (securepay.tinkoff.ru/v2) и Робокасса. В FREE_MODE платёжный провайдер не инициализируется.
+Strategy-паттерн: `getProvider(config)` возвращает объект с методами `createPayment()` и `verifyWebhook()`. Реализованы провайдеры: ТБанк (securepay.tinkoff.ru/v2, подпись SHA256) и Робокасса (MD5). В FREE_MODE платёжный провайдер не инициализируется.
 
 ### Leadteh API (lib/leadteh.js)
 
-Все вызовы к `app.leadteh.ru/api/v1` — получение контактов, тегов, списков. Контакты пагинируются по 500 штук. Leadteh Bot ID и API-токен берутся из настроек тенанта.
+Все вызовы к `app.leadteh.ru/api/v1` — получение контактов, тегов, списков. Контакты пагинируются по 500 штук. Leadteh Bot ID и API-токен берутся из настроек тенанта (зашифрованы в БД).
 
 ### Безопасность
 
@@ -123,6 +168,19 @@ Strategy-паттерн: `getProvider(config)` возвращает объект
 - Path traversal protection для `data/uploads/{tenant_id}/`
 - Все SQL-запросы фильтруют по `tenant_id`
 - Webhook платформенного бота верифицируется через `X-Telegram-Bot-Api-Secret-Token`
+- CSP и HSTS заголовки на всех ответах
+
+### Фронтенд (public/index.html)
+
+Один HTML-файл (~300 КБ). Пять основных вкладок:
+
+| Вкладка | Что внутри |
+|---|---|
+| **Создать** | Пошаговый мастер рассылки: бот → фильтры → сообщения → расписание → отправка |
+| **Список** | История рассылок + подтабы: «Обычные», «Цепочки», «Периодические» |
+| **Диалог** | Подтабы «Контакты» (из Leadteh) и «Диалоги» (существующие чаты) |
+| **Настройки** | Боты, администраторы, Leadteh токен, привязка бот→список |
+| **Суперадмин** | Управление тенантами, тарифами, ценами, платежами (только super_admin) |
 
 ## Язык
 
