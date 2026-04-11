@@ -613,6 +613,7 @@ app.get('/api/contacts', requireTenantAdmin, async (req, res) => {
       id: c.id,
       telegram_id: String(c.telegram_id),
       name: c.name || '',
+      username: c.username || '',
       tags: extractTags(c),
       variables: extractVariables(c),
     }));
@@ -2423,7 +2424,7 @@ app.post('/api/chat/send', requireTenantAdmin, requireDialogsAccess, async (req,
       }
     } else {
       // Новый чат — требуется bot_id и telegram_id
-      const { telegram_id, contact_name } = req.body;
+      const { telegram_id, contact_name, contact_username } = req.body;
       if (!bot_id || !telegram_id) {
         return res.status(400).json({ error: 'bot_id и telegram_id обязательны для нового чата' });
       }
@@ -2431,7 +2432,7 @@ app.post('/api/chat/send', requireTenantAdmin, requireDialogsAccess, async (req,
       if (!bot || bot.tenant_id !== req.tenantId) {
         return res.status(400).json({ error: 'Бот не найден' });
       }
-      chat = db.findOrCreateChat(req.tenantId, bot.id, String(telegram_id), contact_name || '');
+      chat = db.findOrCreateChat(req.tenantId, bot.id, String(telegram_id), contact_name || '', contact_username || '');
     }
 
     // Сохраняем сообщение

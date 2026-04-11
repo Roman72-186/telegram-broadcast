@@ -5326,9 +5326,11 @@
 
       let filtered = chatAllContacts;
       if (q.length >= 1) {
+        const qClean = q.replace(/^@/, '');
         filtered = chatAllContacts.filter(c =>
           (c.name && c.name.toLowerCase().includes(q)) ||
-          String(c.telegram_id).includes(q)
+          String(c.telegram_id).includes(q) ||
+          (c.username && c.username.toLowerCase().includes(qClean))
         );
       }
 
@@ -5344,11 +5346,14 @@
       list.innerHTML = shown.map(c => {
         const initials = (c.name || '?').charAt(0).toUpperCase();
         const tagsStr = (c.tags || []).slice(0, 3).map(t => escapeHtml(t)).join(', ');
-        return `<div class="chat-list-item" data-tgid="${c.telegram_id}" data-contactid="${c.id || ''}" data-name="${escapeHtml(c.name || '')}" onclick="onContactClick(this)">
+        const usernameHint = c.username
+          ? `<span style="color:var(--text-muted)">@${escapeHtml(c.username)}</span> · `
+          : '';
+        return `<div class="chat-list-item" data-tgid="${c.telegram_id}" data-contactid="${c.id || ''}" data-name="${escapeHtml(c.name || '')}" data-username="${escapeHtml(c.username || '')}" onclick="onContactClick(this)">
           <div class="chat-avatar">${initials}</div>
           <div style="flex:1;min-width:0">
             <div class="font-medium text-sm truncate">${escapeHtml(c.name || 'Без имени')}</div>
-            <div class="text-xs" style="color:var(--text-secondary)">ID: ${c.telegram_id}${tagsStr ? ' · ' + tagsStr : ''}</div>
+            <div class="text-xs" style="color:var(--text-secondary)">${usernameHint}ID: ${c.telegram_id}${tagsStr ? ' · ' + tagsStr : ''}</div>
           </div>
         </div>`;
       }).join('');
@@ -5362,12 +5367,13 @@
       const contactId = el.dataset.contactid || '';
       const tgId = el.dataset.tgid;
       const name = el.dataset.name;
+      const username = el.dataset.username || '';
       const botId = document.getElementById('chatBotSelect').value;
       if (!botId) { showAlert('Выберите бота'); return; }
-      openContactProfile(contactId, tgId, name, botId);
+      openContactProfile(contactId, tgId, name, botId, username);
     }
 
-    async function startNewChat(telegramId, contactName) {
+    async function startNewChat(telegramId, contactName, contactUsername) {
       const botId = document.getElementById('chatBotSelect').value;
       if (!botId) { showAlert('Выберите бота'); return; }
 
@@ -5386,7 +5392,7 @@
         } else {
           // Новый чат — показываем окно переписки, чат создастся при первом сообщении
           chatCurrentId = null;
-          chatNewChatData = { telegramId, contactName, botId };
+          chatNewChatData = { telegramId, contactName, contactUsername: contactUsername || '', botId };
           document.getElementById('chatTopPanel').classList.add('hidden');
           document.getElementById('chatContactsView').classList.add('hidden');
           document.getElementById('chatDialogsView').classList.add('hidden');
@@ -5573,12 +5579,14 @@
     let profileContactId = null;
     let profileTelegramId = null;
     let profileContactName = '';
+    let profileContactUsername = '';
     let profileBotId = null;
 
-    async function openContactProfile(contactId, telegramId, name, botId) {
+    async function openContactProfile(contactId, telegramId, name, botId, username) {
       profileContactId = contactId;
       profileTelegramId = telegramId;
       profileContactName = name || '';
+      profileContactUsername = username || '';
       profileBotId = botId;
 
       document.getElementById('chatTopPanel').classList.add('hidden');
@@ -5725,7 +5733,7 @@
 
     function openChatFromProfile() {
       document.getElementById('contactProfile').classList.add('hidden');
-      startNewChat(profileTelegramId, profileContactName);
+      startNewChat(profileTelegramId, profileContactName, profileContactUsername);
     }
 
     function openProfileFromChat() {
@@ -5769,6 +5777,7 @@
               bot_id: chatNewChatData.botId,
               telegram_id: chatNewChatData.telegramId,
               contact_name: chatNewChatData.contactName,
+              contact_username: chatNewChatData.contactUsername || '',
             }),
           });
           const data = await r.json();
