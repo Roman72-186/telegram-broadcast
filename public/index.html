@@ -1526,8 +1526,11 @@
 
       <!-- Подтаб: Контакты (список из Leadteh) -->
       <div id="chatContactsView">
-        <input id="chatContactsSearch" type="text" class="input-field w-full rounded-lg px-3 py-2 text-sm mb-3"
+        <input id="chatContactsSearch" type="text" class="input-field w-full rounded-lg px-3 py-2 text-sm mb-2"
           placeholder="Поиск по имени, @username или ID..." oninput="filterChatContacts()">
+        <select id="chatContactsTagFilter" class="input-field w-full rounded-lg px-3 py-2 text-sm mb-3" onchange="filterChatContacts()">
+          <option value="">Все теги</option>
+        </select>
         <div id="chatContactsLoading" class="text-center py-8">
           <div class="text-sm" style="color: var(--text-secondary)">Загрузка контактов...</div>
         </div>
@@ -5276,6 +5279,8 @@
     function onChatBotChange() {
       chatAllContacts = [];
       chatContactsBotId = null;
+      const tagSel = document.getElementById('chatContactsTagFilter');
+      if (tagSel) { tagSel.innerHTML = '<option value="">Все теги</option>'; }
       if (chatCurrentSubtab === 'contacts') loadChatContacts();
       else loadChatDialogs();
     }
@@ -5312,6 +5317,13 @@
         chatAllContacts = data.contacts || [];
         chatContactsBotId = botId;
         loading.classList.add('hidden');
+        // Заполняем список тегов из загруженных контактов
+        const tagSet = new Set();
+        chatAllContacts.forEach(c => (c.tags || []).forEach(t => tagSet.add(t)));
+        const tagSel = document.getElementById('chatContactsTagFilter');
+        const prevTag = tagSel.value;
+        tagSel.innerHTML = '<option value="">Все теги</option>' +
+          [...tagSet].sort().map(t => `<option value="${escapeAttr(t)}"${t === prevTag ? ' selected' : ''}>${escapeHtml(t)}</option>`).join('');
         filterChatContacts();
       } catch (e) {
         loading.classList.add('hidden');
@@ -5321,13 +5333,17 @@
 
     function filterChatContacts() {
       const q = (document.getElementById('chatContactsSearch').value || '').trim().toLowerCase();
+      const tag = document.getElementById('chatContactsTagFilter')?.value || '';
       const list = document.getElementById('chatContactsList');
       const empty = document.getElementById('chatContactsEmpty');
 
       let filtered = chatAllContacts;
+      if (tag) {
+        filtered = filtered.filter(c => (c.tags || []).some(t => t === tag));
+      }
       if (q.length >= 1) {
         const qClean = q.replace(/^@/, '');
-        filtered = chatAllContacts.filter(c =>
+        filtered = filtered.filter(c =>
           (c.name && c.name.toLowerCase().includes(q)) ||
           String(c.telegram_id).includes(q) ||
           (c.username && c.username.toLowerCase().includes(qClean))
