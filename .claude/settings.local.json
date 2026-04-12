@@ -22,7 +22,11 @@
       "Bash(sshpass:*)",
       "Bash(git add:*)",
       "Bash(git commit -m ':*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(expect:*)",
+      "Read(//usr/**)",
+      "Bash(python3 -c \"import paramiko; print\\('paramiko ok'\\)\")",
+      "Bash(python3:*)"
     ]
   }
 }
