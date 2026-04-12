@@ -609,6 +609,11 @@ app.get('/api/contacts', requireTenantAdmin, async (req, res) => {
 
     if (countOnly) return res.json({ count: filtered.length });
 
+    // Временно: логируем ключи первого контакта для диагностики username
+    if (filtered.length > 0) {
+      console.log('[contacts] keys:', Object.keys(filtered[0]));
+    }
+
     const contacts = filtered.map(c => ({
       id: c.id,
       telegram_id: String(c.telegram_id),
