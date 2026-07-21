@@ -1,8 +1,28 @@
+﻿> Совместимый вход для Claude Code: перед работой читать [AGENTS.md](AGENTS.md), затем [../AGENTS.md](../AGENTS.md).  
+> Сохранить сессию → C:\Users\User\.agents\skills\save-session\SKILL.md → session-handoffs/current.md.  
+> Прочитай сохранённую сессию → сначала session-handoffs/current.md, затем [AGENTS.md](AGENTS.md).
+
+---
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 # LT Кабинет — Мультитенантная SaaS-платформа (Telegram Mini App)
+
+## Общие слои
+
+Этот проект использует общие принципы и активы из корня монорепо `Project/`:
+
+- **Голос и стиль:** [../voice/](../voice/), [../style/](../style/)
+- **Принципы кода:** [../principles/code.md](../principles/code.md)
+- **Принципы продукта:** [../principles/product.md](../principles/product.md)
+- **Уроки и подтверждённые решения:** [../feedback/](../feedback/) — `Why / How to apply`
+- **Совет директоров (методы):** [../mastery/README.md](../mastery/README.md)
+- **Активные планы:** [../../plans/](../../plans/) — файлы с префиксом `tg-broadcast-`
+- **Ретроспективы:** [../../retrospectives/](../../retrospectives/)
+- **Навигатор слоя ai-clone:** [../CLAUDE.md](../CLAUDE.md)
+
+---
 
 ## Команды
 
@@ -18,7 +38,14 @@ node migrate.js
 bash deploy.sh "commit message"
 ```
 
-Тестов нет. Для ручной проверки cron: `GET /api/cron/send?secret=<CRON_SECRET>`.  
+Автотестов (unit/CI) нет. Ручные проверки:
+
+```bash
+node tests/stability.js                       # smoke-тест продакшн-VPS (по умолчанию https://broadcast.leadtehsms.ru)
+node tests/stability.js http://localhost:3000  # smoke-тест локального сервера
+```
+
+Ручной запуск cron: `GET /api/cron/send?secret=<CRON_SECRET>`.  
 Health check: `GET /health`.
 
 ## Стек
@@ -124,6 +151,8 @@ auto_broadcasts         — авторассылки (type: chain/recurring, fil
 auto_broadcast_steps    — шаги цепочки (step_order, delay_value, delay_unit, message_delay)
 auto_broadcast_messages — сообщения шагов (photo_url, text, buttons_json, parse_mode, media_type)
 auto_broadcast_enrollments — состояние прохождения цепочки (contact_telegram_id, current_step, next_step_at, status)
+auto_broadcast_runs     — состояние периодических (recurring) авторассылок (current_step, next_step_at, status)
+contact_sends_log       — лог отправок по контакту (tenant_id, telegram_id, source_type, sent_at) — для антиспам-лимитов
 usage_log               — учёт рассылок по месяцам
 sessions                — Bearer-сессии (expires_at +24ч)
 bot_list_mappings       — привязка бот → список Leadteh

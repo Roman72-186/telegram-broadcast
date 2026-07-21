@@ -28,5 +28,8 @@
       "Bash(python3 -c \"import paramiko; print\\('paramiko ok'\\)\")",
       "Bash(python3:*)"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "open-knowledge"
+  ]
 }
