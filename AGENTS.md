@@ -4,13 +4,13 @@
 
 Этот файл подключает существующий проект к общим правилам Codex и Claude Code. Локальная специфика проекта остаётся в этом каталоге, общие правила берутся уровнем выше.
 
-1. Сначала читать [../AGENTS.md](../AGENTS.md) — главный источник правды workspace.
+1. Сначала читать [../../../AGENTS.md](../../../AGENTS.md) — главный источник правды workspace.
 2. Для Claude Code совместимый вход — [CLAUDE.md](CLAUDE.md), но он должен вести к этому AGENTS.md.
-3. Для кода читать [../principles/code.md](../principles/code.md).
-4. Для продуктовых решений читать [../principles/product.md](../principles/product.md).
-5. Для правил работы агентов читать [../principles/working-with-claude.md](../principles/working-with-claude.md).
-6. Для уроков и повторяющихся ошибок читать [../feedback/](../feedback/).
-7. Для планов использовать [../plans/](../plans/); для handoff между Codex и Claude Code использовать [session-handoffs/current.md](session-handoffs/current.md).
+3. Для кода читать [../../_brain/principles/code.md](../../_brain/principles/code.md).
+4. Для продуктовых решений читать [../../_brain/principles/product.md](../../_brain/principles/product.md).
+5. Для правил работы агентов читать [../../_brain/principles/working-with-claude.md](../../_brain/principles/working-with-claude.md).
+6. Для уроков и повторяющихся ошибок читать [../../_brain/feedback/](../../_brain/feedback/).
+7. Планы этого проекта — в локальной папке `plans/`; для handoff между Codex и Claude Code использовать [session-handoffs/current.md](session-handoffs/current.md).
 
 ## Паритет Codex и Claude Code
 
@@ -25,6 +25,10 @@ Codex и Claude Code равноправны: любой из них может �
 ## Локальная специфика проекта
 
 Если в проекте уже есть подробный CLAUDE.md, считать его историческим локальным контекстом проекта. Новые общие требования не копировать сюда целиком: ссылаться на общий слой выше.
+
+## Промт для нового чата
+
+Когда владелец просит промт для нового чата: текст пишется в `session-handoffs/<сессия>-NEXT-CHAT-PROMPT.md` этого проекта, где `<сессия>` — короткое название текущей сессии без пробелов по теме работы (`links-fix`). Файл сразу коммитится — только он, по пути, в репозитории, которому принадлежит эта папка. В чат — одна строка в блоке кода для копирования: `Прочитай <полный путь к файлу>`, без пересказа промта. Полное правило — корневой `AGENTS.md`, раздел «Сохранение и восстановление сессии».
 
 ## Связь с другими файлами
 

@@ -1,4 +1,4 @@
-﻿> Совместимый вход для Claude Code: перед работой читать [AGENTS.md](AGENTS.md), затем [../AGENTS.md](../AGENTS.md).  
+﻿> Совместимый вход для Claude Code: перед работой читать [AGENTS.md](AGENTS.md), затем [../../../AGENTS.md](../../../AGENTS.md).  
 > Сохранить сессию → C:\Users\User\.agents\skills\save-session\SKILL.md → session-handoffs/current.md.  
 > Прочитай сохранённую сессию → сначала session-handoffs/current.md, затем [AGENTS.md](AGENTS.md).
 
@@ -13,14 +13,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Этот проект использует общие принципы и активы из корня монорепо `Project/`:
 
-- **Голос и стиль:** [../voice/](../voice/), [../style/](../style/)
-- **Принципы кода:** [../principles/code.md](../principles/code.md)
-- **Принципы продукта:** [../principles/product.md](../principles/product.md)
-- **Уроки и подтверждённые решения:** [../feedback/](../feedback/) — `Why / How to apply`
-- **Совет директоров (методы):** [../mastery/README.md](../mastery/README.md)
-- **Активные планы:** [../../plans/](../../plans/) — файлы с префиксом `tg-broadcast-`
-- **Ретроспективы:** [../../retrospectives/](../../retrospectives/)
-- **Навигатор слоя ai-clone:** [../CLAUDE.md](../CLAUDE.md)
+- **Голос и стиль:** [../../_brain/voice/](../../_brain/voice/), [../../_brain/style/](../../_brain/style/)
+- **Принципы кода:** [../../_brain/principles/code.md](../../_brain/principles/code.md)
+- **Принципы продукта:** [../../_brain/principles/product.md](../../_brain/principles/product.md)
+- **Уроки и подтверждённые решения:** [../../_brain/feedback/](../../_brain/feedback/) — `Why / How to apply`
+- **Совет директоров (методы):** [../../_brain/mastery/README.md](../../_brain/mastery/README.md)
+- **Планы:** локальная папка `plans/` этого проекта, файлы `ГГГГ-ММ-ДД-<тема>.md`. Общая корневая `plans/` для новых планов не используется.
+- **Ретроспективы:** [../../../retrospectives/](../../../retrospectives/)
+- **Навигатор слоя ai-clone:** [../../CLAUDE.md](../../CLAUDE.md)
 
 ---
 
