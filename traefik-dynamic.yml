@@ -16,7 +16,7 @@ http:
       priority: 10
 
     s3-upload:
-      rule: "Host(`n8n.creativeanalytic.ru`) && PathPrefix(`/s3-upload/`)"
+      rule: "Host(`n8n.retired.invalid`) && PathPrefix(`/s3-upload/`)"
       entryPoints:
         - websecure
       tls:
@@ -27,7 +27,7 @@ http:
         - s3-strip-prefix
 
     n8n:
-      rule: "Host(`n8n.creativeanalytic.ru`)"
+      rule: "Host(`n8n.retired.invalid`)"
       entryPoints:
         - websecure
       tls:
